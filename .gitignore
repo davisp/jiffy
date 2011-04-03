@@ -1,0 +1,4 @@
+*.beam
+*.o
+*.so
+ebin/jiffy.app

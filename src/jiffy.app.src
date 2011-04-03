@@ -1,0 +1,7 @@
+{application, jiffy, [
+    {description, "JSON Decoder/Encoder."},
+    {vsn, "%VSN%"},
+    {registered, []},
+    {mod, reloading, []},
+    {applications, [kernel]}
+]}.
