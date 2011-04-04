@@ -364,7 +364,7 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    stack = enif_make_list1(env, argv[0]);
+    stack = enif_make_list(env, 1, argv[0]);
 
     while(!enif_is_empty_list(env, stack)) {
         if(!enif_get_list_cell(env, stack, &curr, &stack)) {

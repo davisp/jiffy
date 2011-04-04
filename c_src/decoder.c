@@ -633,7 +633,7 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ErlNifBinary bin;
 
     ERL_NIF_TERM objs = enif_make_list(env, 0);
-    ERL_NIF_TERM curr;
+    ERL_NIF_TERM curr = enif_make_list(env, 0);
     ERL_NIF_TERM val;
     ERL_NIF_TERM ret;
 

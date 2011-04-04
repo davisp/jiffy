@@ -15,8 +15,9 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_false = make_atom(env, "false");
     st->atom_bignum = make_atom(env, "bignum");
 
-    st->ref_object = enif_make_ref(env);
-    st->ref_array = enif_make_ref(env);
+    // Markers used in encoding
+    st->ref_object = make_atom(env, "$object_ref$");
+    st->ref_array = make_atom(env, "$array_ref$");
 
     *priv = (void*) st;
 
