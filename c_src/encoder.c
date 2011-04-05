@@ -7,6 +7,7 @@
 
 #define BIN_INC_SIZE 1024
 
+
 typedef struct {
     ErlNifEnv*      env;
     jiffy_st*       atoms;
@@ -14,8 +15,7 @@ typedef struct {
     int             count;
 
     ERL_NIF_TERM    iolist;
-    ErlNifBinary    curr;
-    int             cleared;
+    ErlNifBinary*   curr;
     
     char*           p;
     unsigned char*  u;
@@ -23,21 +23,23 @@ typedef struct {
 } Encoder;
 
 int
-enc_init(Encoder* e, ErlNifEnv* env)
+enc_init(Encoder* e, ErlNifEnv* env, ErlNifBinary* bin)
 {
     e->env = env;
     e->atoms = enif_priv_data(env);
-
     e->count = 0;
 
+
     e->iolist = enif_make_list(env, 0);
-    if(!enif_alloc_binary(BIN_INC_SIZE, &(e->curr))) {
+    e->curr = bin;
+    if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
         return 0;
     }
-    e->cleared = 0;
 
-    e->p = (char*) e->curr.data;
-    e->u = (unsigned char*) e->curr.data;
+    memset(e->curr->data, 0, e->curr->size);
+
+    e->p = (char*) e->curr->data;
+    e->u = (unsigned char*) e->curr->data;
     e->i = 0;
 
     return 1;
@@ -46,8 +48,8 @@ enc_init(Encoder* e, ErlNifEnv* env)
 void
 enc_destroy(Encoder* e)
 {
-    if(!e->cleared) {
-        enif_release_binary(&(e->curr));
+    if(e->curr != NULL) {
+        enif_release_binary(e->curr);
     }
 }
 
@@ -61,14 +63,14 @@ enc_error(Encoder* e, const char* msg)
 int
 enc_result(Encoder* e, ERL_NIF_TERM* value)
 {
-    if(e->i != e->curr.size) {
-        if(!enif_realloc_binary(&(e->curr), e->i)) {
+    if(e->i != e->curr->size) {
+        if(!enif_realloc_binary(e->curr, e->i)) {
             return 0;
         }
     }
 
-    *value = enif_make_binary(e->env, &(e->curr));
-    e->cleared = 1;
+    *value = enif_make_binary(e->env, e->curr);
+    e->curr = NULL;
     return 1;
 }
 
@@ -77,19 +79,21 @@ enc_ensure(Encoder* e, size_t req)
 {
     size_t new_sz;
 
-    if(req < e->curr.size - e->i) {
+    if(req < e->curr->size - e->i) {
         return 1;
     }
 
-    new_sz = req - (e->curr.size - e->i);
+    new_sz = req - (e->curr->size - e->i) + e->curr->size;
     new_sz += BIN_INC_SIZE - (new_sz % BIN_INC_SIZE);
-    assert(new_sz % BIN_INC_SIZE == 0 && "Invalid modulo math.");
-
-    if(!enif_realloc_binary(&(e->curr), new_sz)) {
+    assert(new_sz > e->curr->size && "Invalid size calculation.");
+    
+    if(!enif_realloc_binary(e->curr, new_sz)) {
         return 0;
     }
-
-    memset(&(e->u[e->i]), 0, e->curr.size - e->i);
+    e->p = (char*) e->curr->data;
+    e->u = (unsigned char*) e->curr->data;
+    
+    memset(&(e->u[e->i]), 0, e->curr->size - e->i);
 
     return 1;
 }
@@ -113,6 +117,9 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
     ErlNifBinary bin;
     char atom[512];
 
+    unsigned char* data;
+    size_t size;
+
     int esc_extra = 0;
     int ulen;
     int ui;
@@ -122,20 +129,21 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
         if(!enif_inspect_binary(e->env, val, &bin)) {
             return 0;
         }
+        data = bin.data;
+        size = bin.size;
     } else if(enif_is_atom(e->env, val)) {
         if(!enif_get_atom(e->env, val, atom, 512, ERL_NIF_LATIN1)) {
             return 0;
         }
-        // Fake as a binary for code below.
-        bin.data = (unsigned char*) atom;
-        bin.size = strlen(atom);
+        data = (unsigned char*) atom;
+        size = strlen(atom);
     } else {
         return 0;
     }
 
     i = 0;
-    while(i < bin.size) {
-        switch((char) bin.data[i]) {
+    while(i < size) {
+        switch((char) data[i]) {
             case '\"':
             case '\\':
             case '/':
@@ -148,71 +156,71 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
                 i++;
                 continue;
             default:
-                if(bin.data[i] < 0x20) {
+                if(data[i] < 0x20) {
                     esc_extra += 5;
                     i++;
                     continue;
-                } else if(bin.data[i] < 0x80) {
+                } else if(data[i] < 0x80) {
                     i++;
                     continue;
                 }
                 ulen = -1;
-                if((bin.data[i] & 0xE0) == 0xC0) {
+                if((data[i] & 0xE0) == 0xC0) {
                     ulen = 1;
-                } else if((bin.data[i] & 0xF0) == 0xE0) {
+                } else if((data[i] & 0xF0) == 0xE0) {
                     ulen = 2;
-                } else if((bin.data[i] & 0xF8) == 0xF0) {
+                } else if((data[i] & 0xF8) == 0xF0) {
                     ulen = 3;
-                } else if((bin.data[i] & 0xFC) == 0xF8) {
+                } else if((data[i] & 0xFC) == 0xF8) {
                     ulen = 4;
-                } else if((bin.data[i] & 0xFE) == 0xFC) {
+                } else if((data[i] & 0xFE) == 0xFC) {
                     ulen = 5;
                 }
                 if(ulen < 0) {
                     return 0;
                 }
-                if(i+1+ulen > bin.size) {
+                if(i+1+ulen > size) {
                     return 0;
                 }
                 for(ui = 0; ui < ulen; ui++) {
-                    if((bin.data[i+1+ui] & 0xC0) != 0x80) {
+                    if((data[i+1+ui] & 0xC0) != 0x80) {
                         return 0;
                     }
                 }
                 if(ulen == 1) {
-                    if((bin.data[i] & 0x1E) == 0)
+                    if((data[i] & 0x1E) == 0)
                         return 0;
                 } else if(ulen == 2) {
-                    if((bin.data[i] & 0x0F) + (bin.data[i+1] & 0x20) == 0)
+                    if((data[i] & 0x0F) + (data[i+1] & 0x20) == 0)
                         return 0;
                 } else if(ulen == 3) {
-                    if((bin.data[i] & 0x07) + (bin.data[i+1] & 0x30) == 0)
+                    if((data[i] & 0x07) + (data[i+1] & 0x30) == 0)
                         return 0;
                 } else if(ulen == 4) {
-                    if((bin.data[i] & 0x03) + (bin.data[i+1] & 0x38) == 0)
+                    if((data[i] & 0x03) + (data[i+1] & 0x38) == 0)
                         return 0;
                 } else if(ulen == 5) {
-                    if((bin.data[i] & 0x01) + (bin.data[i+1] & 0x3C) == 0)
+                    if((data[i] & 0x01) + (data[i+1] & 0x3C) == 0)
                         return 0;
                 }
                 i += 1 + ulen;
         }
     }
 
-    if(!enc_ensure(e, bin.size + esc_extra + 2)) {
+    if(!enc_ensure(e, size + esc_extra + 2)) {
         return 0;
     }
 
     e->p[e->i++] = '\"';
 
     i = 0;
-    while(i < bin.size) {
-        switch((char) bin.data[i]) {
+    while(i < size) {
+        switch((char) data[i]) {
             case '\"':
             case '\\':
             case '/':
                 e->p[e->i++] = '\\';
-                e->u[e->i++] = bin.data[i];
+                e->u[e->i++] = data[i];
                 i++;
                 continue;
             case '\b':
@@ -241,16 +249,16 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
                 i++;
                 continue;
             default:
-                if(bin.data[i] < 0x20) {
+                if(data[i] < 0x20) {
                     e->p[e->i++] = '\\';
                     e->p[e->i++] = 'u';
-                    if(!int_to_hex(bin.data[i], &(e->p[e->i]))) {
+                    if(!int_to_hex(data[i], &(e->p[e->i]))) {
                         return 0;
                     }
                     e->i += 4;
                     i++;
                 } else {
-                    e->u[e->i++] = bin.data[i++];
+                    e->u[e->i++] = data[i++];
                 }
         }
     }
@@ -282,7 +290,7 @@ enc_double(Encoder* e, double val)
         return 0;
     }
 
-    snprintf(&(e->p[e->i]), 32, "%g", val);
+    snprintf(&(e->p[e->i]), 31, "%g", val);
     e->i += strlen(&(e->p[e->i]));
     e->count++;
 
@@ -344,6 +352,7 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     Encoder enc;
     Encoder* e = &enc;
 
+    ErlNifBinary bin;
     ERL_NIF_TERM ret;
 
     ERL_NIF_TERM stack;
@@ -360,7 +369,7 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
     
-    if(!enc_init(e, env)) {
+    if(!enc_init(e, env, &bin)) {
         return enif_make_badarg(env);
     }
 
@@ -412,7 +421,7 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             stack = enif_make_list_cell(env, tuple[1], stack);
         } else if(enif_is_identical(curr, e->atoms->ref_array)) {
             if(!enif_get_list_cell(env, stack, &curr, &stack)) {
-                ret = enc_error(e, "internal_error.5");
+                ret = enc_error(e, "internal_error");
                 goto done;
             }
             if(enif_is_empty_list(env, curr)) {
