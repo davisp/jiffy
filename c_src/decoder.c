@@ -259,7 +259,7 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
             // can't do things like encode 't' in three bytes.
             // To check this all we need to ensure is that for each
             // of the following bit patterns that there is at least
-            // one 1 bit in each of the x's
+            // one 1 bit in any of the x's
             // 11: 110xxxxy 10yyyyyy
             // 16: 1110xxxx 10xyyyyy 10yyyyyy
             // 21: 11110xxx 10xxyyyy 10yyyyyy 10yyyyyy
