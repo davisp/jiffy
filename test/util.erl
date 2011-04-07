@@ -27,9 +27,16 @@ check_good({J, E, J2}) ->
     etap:is(jiffy:decode(J), {ok, E}, ok_dec(J, E)),
     etap:is(do_encode(E), {ok, J2}, ok_enc(E, J2)).
 
+check_error({J, E}) ->
+    etap:fun_is(
+        fun({error, E1}) when E1 == E -> true; (E1) -> E1 end,
+        jiffy:decode(J),
+        error_mesg(J)
+    );
 check_error(J) ->
     etap:fun_is(
-        fun({error, _}) -> true; (_) -> false end,
+        fun({error, _}) -> true; (Else) -> Else end,
         jiffy:decode(J),
         error_mesg(J)
     ).
+
