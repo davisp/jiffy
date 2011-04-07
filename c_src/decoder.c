@@ -11,7 +11,7 @@
 #define ERROR(i, msg) make_error(st, env, msg)
 
 #define STACK_SIZE_INC 64
-#define NUM_BUF_LEN 256
+#define NUM_BUF_LEN 32
 
 enum {
     st_value=0,
@@ -42,7 +42,7 @@ typedef struct {
     ERL_NIF_TERM    arg;
     ErlNifBinary    bin;
 
-    int             has_bignum;
+    int             is_partial;
 
     char*           p;
     unsigned char*  u;
@@ -63,7 +63,7 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
     d->atoms = enif_priv_data(env);
     d->arg = arg;
 
-    d->has_bignum = 0;
+    d->is_partial = 0;
 
     d->p = (char*) bin->data;
     d->u = bin->data;
@@ -353,10 +353,12 @@ parse:
 int
 dec_number(Decoder* d, ERL_NIF_TERM* value)
 {
+    ERL_NIF_TERM num_type = d->atoms->atom_error;
     char state = nst_init;
     char nbuf[NUM_BUF_LEN];
     int st = d->i;
-    int is_double = 0;
+    int has_frac = 0;
+    int has_exp = 0;
     double dval;
     long lval;
 
@@ -457,7 +459,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                 break;
 
             case nst_frac1:
-                is_double = 1;
+                has_frac = 1;
                 switch(d->p[d->i]) {
                     case '0':
                     case '1':
@@ -502,7 +504,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                 break;
 
             case nst_esign:
-                is_double = 1;
+                has_exp = 1;
                 switch(d->p[d->i]) {
                     case '-':
                     case '+':
@@ -560,37 +562,38 @@ parse:
             break;
     }
 
-
-    if(st - d->i > NUM_BUF_LEN && is_double) {
-        return 0;
-    } else if(st - d->i > NUM_BUF_LEN) {
-        d->has_bignum = 1;
-        *value = enif_make_sub_binary(d->env, d->arg, st, d->i - st);
-        *value = enif_make_tuple2(d->env, d->atoms->atom_bignum, *value);
-        return 1;
-    }
-
-    memset(nbuf, 0, NUM_BUF_LEN);
-    memcpy(nbuf, &(d->p[st]), d->i - st);
-
     errno = 0;
-    if(is_double) {
-        dval = strtod(nbuf, NULL);
-        if(errno == ERANGE) {
-            return 0;
+
+    if(d->i - st < NUM_BUF_LEN) {
+        memset(nbuf, 0, NUM_BUF_LEN);
+        memcpy(nbuf, &(d->p[st]), d->i - st);
+
+        if(has_frac || has_exp) {
+            dval = strtod(nbuf, NULL);
+            if(errno != ERANGE) {
+                *value = enif_make_double(d->env, dval);
+                return 1;
+            }
+        } else {
+            lval = strtol(nbuf, NULL, 10);
+            if(errno != ERANGE) {
+                *value = enif_make_int64(d->env, lval);
+                return 1;
+            }
         }
-        *value = enif_make_double(d->env, dval);
-        return 1;
+    }
+    
+    if(!has_frac && !has_exp) {
+        num_type = d->atoms->atom_bignum;
+    } else if(has_exp) {
+        num_type = d->atoms->atom_bignum_e;
+    } else {
+        num_type = d->atoms->atom_bigdbl;
     }
 
-    lval = strtol(nbuf, NULL, 10);
-    if(errno == ERANGE) {
-        d->has_bignum = 1;
-        *value = enif_make_sub_binary(d->env, d->arg, st, d->i - st);
-        *value = enif_make_tuple2(d->env, d->atoms->atom_bignum, *value);
-    } else {
-        *value = enif_make_int64(d->env, lval);
-    }
+    d->is_partial = 1;
+    *value = enif_make_sub_binary(d->env, d->arg, st, d->i - st);
+    *value = enif_make_tuple2(d->env, num_type, *value);
     return 1;
 }
 
@@ -921,8 +924,8 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     if(dec_curr(d) != st_done) {
         ret = dec_error(d, "truncated_json");
-    } else if(d->has_bignum) {
-        ret = enif_make_tuple2(env, d->atoms->atom_bignum, val);
+    } else if(d->is_partial) {
+        ret = enif_make_tuple2(env, d->atoms->atom_partial, val);
     } else {
         ret = enif_make_tuple2(env, d->atoms->atom_ok, val);
     }

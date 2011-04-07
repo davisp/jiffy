@@ -10,6 +10,10 @@ typedef struct {
     ERL_NIF_TERM    atom_true;
     ERL_NIF_TERM    atom_false;
     ERL_NIF_TERM    atom_bignum;
+    ERL_NIF_TERM    atom_bignum_e;
+    ERL_NIF_TERM    atom_bigdbl;
+    ERL_NIF_TERM    atom_partial;
+    
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
 } jiffy_st;

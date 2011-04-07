@@ -13,15 +13,19 @@ ok_dec(J, _E) ->
 ok_enc(E, _J) ->
     lists:flatten(io_lib:format("Encoded ~p", [E])).
 
+do_encode(E) ->
+    {ok, Data} = jiffy:encode(E),
+    {ok, iolist_to_binary(Data)}.
+
 error_mesg(J) ->
     lists:flatten(io_lib:format("Decoding ~p returns an error.", [J])).
 
 check_good({J, E}) ->
     etap:is(jiffy:decode(J), {ok, E}, ok_dec(J, E)),
-    etap:is(jiffy:encode(E), {ok, J}, ok_enc(E, J));
+    etap:is(do_encode(E), {ok, J}, ok_enc(E, J));
 check_good({J, E, J2}) ->
     etap:is(jiffy:decode(J), {ok, E}, ok_dec(J, E)),
-    etap:is(jiffy:encode(E), {ok, J2}, ok_enc(E, J2)).
+    etap:is(do_encode(E), {ok, J2}, ok_enc(E, J2)).
 
 check_error(J) ->
     etap:fun_is(

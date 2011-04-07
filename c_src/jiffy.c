@@ -14,6 +14,9 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_true = make_atom(env, "true");
     st->atom_false = make_atom(env, "false");
     st->atom_bignum = make_atom(env, "bignum");
+    st->atom_bignum_e = make_atom(env, "bignum_e");
+    st->atom_bigdbl = make_atom(env, "bigdbl");
+    st->atom_partial = make_atom(env, "partial");
 
     // Markers used in encoding
     st->ref_object = make_atom(env, "$object_ref$");

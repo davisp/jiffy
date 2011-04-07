@@ -14,9 +14,11 @@ typedef struct {
 
     int             count;
 
+    int             iolen;
     ERL_NIF_TERM    iolist;
     ErlNifBinary*   curr;
     
+
     char*           p;
     unsigned char*  u;
     size_t          i;
@@ -30,6 +32,7 @@ enc_init(Encoder* e, ErlNifEnv* env, ErlNifBinary* bin)
     e->count = 0;
 
 
+    e->iolen = 0;
     e->iolist = enif_make_list(env, 0);
     e->curr = bin;
     if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
@@ -56,22 +59,8 @@ enc_destroy(Encoder* e)
 ERL_NIF_TERM
 enc_error(Encoder* e, const char* msg)
 {
-    assert(0 && msg);
+    //assert(0 && msg);
     return make_error(e->atoms, e->env, msg);
-}
-
-int
-enc_result(Encoder* e, ERL_NIF_TERM* value)
-{
-    if(e->i != e->curr->size) {
-        if(!enif_realloc_binary(e->curr, e->i)) {
-            return 0;
-        }
-    }
-
-    *value = enif_make_binary(e->env, e->curr);
-    e->curr = NULL;
-    return 1;
 }
 
 int
@@ -94,6 +83,75 @@ enc_ensure(Encoder* e, size_t req)
     e->u = (unsigned char*) e->curr->data;
     
     memset(&(e->u[e->i]), 0, e->curr->size - e->i);
+
+    return 1;
+}
+
+int
+enc_result(Encoder* e, ERL_NIF_TERM* value)
+{
+    if(e->i != e->curr->size) {
+        if(!enif_realloc_binary(e->curr, e->i)) {
+            return 0;
+        }
+    }
+
+    *value = enif_make_binary(e->env, e->curr);
+    e->curr = NULL;
+    return 1;
+}
+
+int
+enc_done(Encoder* e, ERL_NIF_TERM* value)
+{
+    ERL_NIF_TERM last;
+
+    if(e->iolen == 0) {
+        return enc_result(e, value);
+    }
+
+    if(e->i > 0 ) {
+        if(!enc_result(e, &last)) {
+            return 0;
+        }
+
+        e->iolist = enif_make_list_cell(e->env, last, e->iolist);
+        e->iolen++;
+    }
+
+    *value = e->iolist;
+    return 1;
+}
+
+int
+enc_unknown(Encoder* e, ERL_NIF_TERM value)
+{
+    ErlNifBinary* bin = e->curr;
+    ERL_NIF_TERM curr;
+
+    if(e->i > 0) {
+        if(!enc_result(e, &curr)) {
+            return 0;
+        }
+
+        e->iolist = enif_make_list_cell(e->env, curr, e->iolist);
+        e->iolen++;
+    }
+        
+    e->iolist = enif_make_list_cell(e->env, value, e->iolist);
+    e->iolen++;
+
+    // Reinitialize our binary for the next buffer.
+    e->curr = bin;
+    if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
+        return 0;
+    }
+    
+    memset(e->curr->data, 0, e->curr->size);
+
+    e->p = (char*) e->curr->data;
+    e->u = (unsigned char*) e->curr->data;
+    e->i = 0;
 
     return 1;
 }
@@ -290,7 +348,7 @@ enc_double(Encoder* e, double val)
         return 0;
     }
 
-    snprintf(&(e->p[e->i]), 31, "%g", val);
+    snprintf(&(e->p[e->i]), 31, "%0.20g", val);
     e->i += strlen(&(e->p[e->i]));
     e->count++;
 
@@ -363,7 +421,7 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     double dval;
     long lval;
 
-    int has_unknown = 0;
+    int is_partial = 0;
 
     if(argc != 1) {
         return enif_make_badarg(env);
@@ -540,24 +598,24 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
             stack = enif_make_list_cell(env, item, stack);
         } else {
-            has_unknown = 1;
-            ret = enc_error(e, "invalid_ejson");
-            goto done;
-            /*
-            if(!enc_unknown(env, curr)) {
+            is_partial = 1;
+            if(!enc_unknown(e, curr)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            */
         }
     } while(!enif_is_empty_list(env, stack));
 
-    if(!enc_result(e, &item)) {
+    if(!enc_done(e, &item)) {
         ret = enc_error(e, "internal_error");
         goto done;
     }
 
-    ret = enif_make_tuple2(env, e->atoms->atom_ok, item);
+    if(!is_partial) {
+        ret = enif_make_tuple2(env, e->atoms->atom_ok, item);
+    } else {
+        ret = enif_make_tuple2(env, e->atoms->atom_partial, item);
+    }
 
 done:
     enc_destroy(e);
