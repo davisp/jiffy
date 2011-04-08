@@ -27,16 +27,22 @@ allow for the encoding of large numbers.
 Data Format
 -----------
 
-    JSON             ->   Erlang
-    null             ->   null
-    true             ->   true
-    false            ->   false
-    1                ->   1
-    1.25             ->   1.25
-    []               ->   []
-    [true, 1.0]      ->   [true, 1.0]
-    {}               ->   {[]}
-    {"foo": "bar"}   ->   {[{<<"foo">>, <<"bar">>}]}
+    Erlang                          JSON            Erlang
+    ======================================================
+
+    null                       ->   null         -> null
+    true                       ->   true         -> true
+    false                      ->   false        -> false
+    "hi"                       ->   [104, 105]   -> [104, 105]
+    <<"hi">>                   ->   "hi"         -> <<"hi">>
+    hi                         ->   "hi"         -> <<"hi">>
+    1                          ->   1            -> 1
+    1.25                       ->   1.25         -> 1.24
+    []                         ->   []           -> []
+    [true, 1.0]                ->   [true, 1.0]  -> [true, 1.0]
+    {[]}                       ->   {}           -> {[]}
+    {[{foo, bar}]}             -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
+    {[{<<"foo">>, <<"bar">>}]} -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
 
 Improvements over EEP0018
 -------------------------
