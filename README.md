@@ -9,8 +9,11 @@ possible while not placing any constraints on the parsed JSON.
 Usage
 -----
 
-Jiffy's API is a drop in replacement for the EEP0018 application. The
-JSON representation in Erlang is also exactly the same.
+Jiffy's API is nearly an exact duplicate of the EEP0018 behaviour
+except for one small difference. `jiffy:encode/1` now returns an
+iolist (specifically, a binary or list of binaries). This is to
+allow for the encoding of large numbers.
+
 
     Eshell V5.8.2  (abort with ^G)
     1> jiffy:decode(<<"{\"foo\": \"bar\"}">>).
@@ -34,3 +37,12 @@ Data Format
     [true, 1.0]      ->   [true, 1.0]
     {}               ->   {[]}
     {"foo": "bar"}   ->   {[{<<"foo">>, <<"bar">>}]}
+
+Improvements over EEP0018
+-------------------------
+
+Jiffy should be in all ways an improvemnt over EEP0018. It no longer
+imposes limits on the nesting depth. It is capable of encoding and
+decoding large numbers and t does quite a bit more checking for validity
+of valid UTF-8 in strings.
+
