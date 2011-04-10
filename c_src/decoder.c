@@ -1,3 +1,6 @@
+// This file is part of Jiffy released under the MIT license. 
+// See the LICENSE file for more information.
+
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>

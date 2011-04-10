@@ -1,3 +1,6 @@
+% This file is part of Jiffy released under the MIT license. 
+% See the LICENSE file for more information.
+
 -module(jiffy).
 -export([decode/1, encode/1]).
 -define(NOT_LOADED, not_loaded(?LINE)).

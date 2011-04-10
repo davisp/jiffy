@@ -1,3 +1,5 @@
+// This file is part of Jiffy released under the MIT license. 
+// See the LICENSE file for more information.
 
 static const char hexvals[256] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
