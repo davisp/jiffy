@@ -6,7 +6,7 @@ main([]) ->
     code:add_pathz("ebin"),
     code:add_pathz("test"),
     
-    etap:plan(75),
+    etap:plan(76),
     util:test_good(good()),
     util:test_errors(errors()),
     
@@ -32,6 +32,7 @@ good() ->
 
 errors() ->
     [
+        <<"\"foo">>,
         <<"\"", 0, "\"">>,
         <<"\"\\g\"">>,
         <<"\"\\uFFFF\"">>,
@@ -45,13 +46,13 @@ test_utf8([]) ->
 test_utf8([Case | Rest]) ->
     etap:fun_is(
         fun({error, invalid_string}) -> true; (Else) -> Else end,
-        jiffy:encode(Case),
+        (catch jiffy:encode(Case)),
         lists:flatten(io_lib:format("Invalid utf-8: ~p", [Case]))
     ),
     Case2 = <<34, Case/binary, 34>>,
     etap:fun_is(
         fun({error, {_, invalid_string}}) -> true; (Else) -> Else end,
-        jiffy:decode(Case2),
+        (catch jiffy:decode(Case2)),
         lists:flatten(io_lib:format("Invalid utf-8: ~p", [Case2]))
     ),
     test_utf8(Rest).

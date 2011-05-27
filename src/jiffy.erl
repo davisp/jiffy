@@ -9,18 +9,23 @@
 
 decode(Data) ->
     case nif_decode(Data) of
+        {error, _} = Error ->
+            throw(Error);
         {partial, EJson} ->
-            {ok, finish_decode(EJson)};
-        Else ->
-            Else
+            finish_decode(EJson);
+        EJson ->
+            EJson
     end.
+
 
 encode(Data) ->
     case nif_encode(Data) of
+        {error, _} = Error ->
+            throw(Error);
         {partial, IOData} ->
             finish_encode(IOData, []);
-        Else ->
-            Else
+        IOData ->
+            IOData
     end.
 
 
@@ -59,14 +64,14 @@ finish_decode_arr([V | Vals], Acc) ->
 finish_encode([], Acc) ->
     %% No reverse! The NIF returned us
     %% the pieces in reverse order.
-    {ok, Acc};
+    Acc;
 finish_encode([<<_/binary>>=B | Rest], Acc) ->
     finish_encode(Rest, [B | Acc]);
 finish_encode([Val | Rest], Acc) when is_integer(Val) ->
     Bin = list_to_binary(integer_to_list(Val)),
     finish_encode(Rest, [Bin | Acc]);
 finish_encode(_, _) ->
-    {error, invalid_ejson}.
+    throw({error, invalid_ejson}).
 
 
 init() ->

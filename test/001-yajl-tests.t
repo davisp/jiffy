@@ -12,6 +12,8 @@ main([]) ->
     lists:foreach(fun(Case) -> test(Case) end, Cases),
     etap:end_tests().
 
+test({Name, Json, {error, _}=Erl}) ->
+    etap:is((catch jiffy:decode(Json)), Erl, Name);
 test({Name, Json, Erl}) ->
     etap:is(jiffy:decode(Json), Erl, Name).
 
@@ -25,11 +27,4 @@ make_pair(FileName) ->
     {BaseName, _} = lists:splitwith(fun(C) -> C /= $. end, FileName),
     ErlFname = BaseName ++ ".erl",
     {ok, [Term]} = file:consult(ErlFname),
-    case Term of
-        {error, _} ->
-            {BaseName, Json, Term};
-        {error, _, _} ->
-            {BaseName, Json, Term};
-        _ ->
-            {BaseName, Json, {ok, Term}}
-    end.
+    {BaseName, Json, Term}.

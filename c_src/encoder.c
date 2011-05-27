@@ -424,8 +424,6 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     double dval;
     long lval;
 
-    int is_partial = 0;
-
     if(argc != 1) {
         return enif_make_badarg(env);
     }
@@ -563,15 +561,15 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
             if(!enif_get_tuple(env, item, &arity, &tuple)) {
-                ret = enc_error(e, "invalid_object_pair");
+                ret = enc_error(e, "invalid_object_member");
                 goto done;
             }
             if(arity != 2) {
-                ret = enc_error(e, "invalid_object_pair");
+                ret = enc_error(e, "invalid_object_member_arity");
                 goto done;
             }
             if(!enc_string(e, tuple[0])) {
-                ret = enc_error(e, "invalid_object_key");
+                ret = enc_error(e, "invalid_object_member_key");
                 goto done;
             }
             if(!enc_colon(e)) {
@@ -601,7 +599,6 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
             stack = enif_make_list_cell(env, item, stack);
         } else {
-            is_partial = 1;
             if(!enc_unknown(e, curr)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
@@ -614,8 +611,8 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         goto done;
     }
 
-    if(!is_partial) {
-        ret = enif_make_tuple2(env, e->atoms->atom_ok, item);
+    if(e->iolen == 0) {
+        ret = item;
     } else {
         ret = enif_make_tuple2(env, e->atoms->atom_partial, item);
     }

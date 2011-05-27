@@ -284,6 +284,10 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     }
 
 parse:
+    if(d->p[d->i-1] != '\"') {
+        return 0;
+    }
+
     if(!has_escape) {
         *value = enif_make_sub_binary(d->env, d->arg, st, (d->i - st - 1));
         return 1;
@@ -930,7 +934,7 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     } else if(d->is_partial) {
         ret = enif_make_tuple2(env, d->atoms->atom_partial, val);
     } else {
-        ret = enif_make_tuple2(env, d->atoms->atom_ok, val);
+        ret = val;
     }
 
 done:
