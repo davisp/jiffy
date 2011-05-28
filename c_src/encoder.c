@@ -8,7 +8,7 @@
 #include "erl_nif.h"
 #include "jiffy.h"
 
-#define BIN_INC_SIZE 1024
+#define BIN_INC_SIZE 2048
 
 
 typedef struct {
@@ -81,26 +81,19 @@ enc_error(Encoder* e, const char* msg)
     return make_error(e->atoms, e->env, msg);
 }
 
-int
+static inline int
 enc_ensure(Encoder* e, size_t req)
 {
-    size_t new_sz;
+    size_t need = e->curr->size;
+    while(req >= (need - e->i)) need <<= 1;
 
-    if(req < e->curr->size - e->i) {
-        return 1;
+    if(need != e->curr->size) {
+        if(!enif_realloc_binary(e->curr, need)) {
+            return 0;
+        }
+        e->p = (char*) e->curr->data;
+        e->u = (unsigned char*) e->curr->data;
     }
-
-    new_sz = req - (e->curr->size - e->i) + e->curr->size;
-    new_sz += BIN_INC_SIZE - (new_sz % BIN_INC_SIZE);
-    assert(new_sz > e->curr->size && "Invalid size calculation.");
-    
-    if(!enif_realloc_binary(e->curr, new_sz)) {
-        return 0;
-    }
-    e->p = (char*) e->curr->data;
-    e->u = (unsigned char*) e->curr->data;
-    
-    memset(&(e->u[e->i]), 0, e->curr->size - e->i);
 
     return 1;
 }
@@ -141,7 +134,7 @@ enc_done(Encoder* e, ERL_NIF_TERM* value)
     return 1;
 }
 
-int
+static inline int
 enc_unknown(Encoder* e, ERL_NIF_TERM value)
 {
     ErlNifBinary* bin = e->curr;
@@ -174,7 +167,7 @@ enc_unknown(Encoder* e, ERL_NIF_TERM value)
     return 1;
 }
 
-int
+static inline int
 enc_literal(Encoder* e, const char* literal, size_t len)
 {
     if(!enc_ensure(e, len)) {
@@ -187,7 +180,7 @@ enc_literal(Encoder* e, const char* literal, size_t len)
     return 1;
 }
 
-int
+static inline int
 enc_string(Encoder* e, ERL_NIF_TERM val)
 {
     ErlNifBinary bin;
@@ -336,7 +329,7 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
     return 1;
 }
 
-int
+static inline int
 enc_long(Encoder* e, long val)
 {
     if(!enc_ensure(e, 32)) {
@@ -350,21 +343,22 @@ enc_long(Encoder* e, long val)
     return 1;
 }
 
-int
+static inline int
 enc_double(Encoder* e, double val)
 {
     if(!enc_ensure(e, 32)) {
         return 0;
     }
 
-    snprintf(&(e->p[e->i]), 31, "%0.20g", val);
+    //snprintf(&(e->p[e->i]), 31, "%0.20g", val);
+    sprintf(&(e->p[e->i]), "%.20g", val);
     e->i += strlen(&(e->p[e->i]));
     e->count++;
 
     return 1;
 }
 
-int
+static inline int
 enc_char(Encoder* e, char c)
 {
     if(!enc_ensure(e, 1)) {
@@ -375,39 +369,39 @@ enc_char(Encoder* e, char c)
     return 1;
 }
 
-int
+static inline int
 enc_start_object(Encoder* e)
 {
     e->count++;
     return enc_char(e, '{');
 }
 
-int
+static inline int
 enc_end_object(Encoder* e)
 {
     return enc_char(e, '}');
 }
 
-int
+static inline int
 enc_start_array(Encoder* e)
 {
     e->count++;
     return enc_char(e, '[');
 }
 
-int
+static inline int
 enc_end_array(Encoder* e)
 {
     return enc_char(e, ']');
 }
 
-int
+static inline int
 enc_colon(Encoder* e)
 {
     return enc_char(e, ':');
 }
 
-int
+static inline int
 enc_comma(Encoder* e)
 {
     return enc_char(e, ',');
