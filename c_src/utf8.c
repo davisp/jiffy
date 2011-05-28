@@ -1,5 +1,7 @@
 // This file is part of Jiffy released under the MIT license. 
 // See the LICENSE file for more information.
+#include "jiffy.h"
+#include <stdio.h>
 
 static const char hexvals[256] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -42,7 +44,7 @@ int
 int_to_hex(int val, char* p)
 {
     if(val < 0 || val > 65535)
-        return 0;
+        return -1;
 
     p[0] = hexdigits[(val >> 12) & 0xF];
     p[1] = hexdigits[(val >> 8) & 0xF];
@@ -65,27 +67,107 @@ utf8_len(int c)
         } else {
             return -1;
         }
-    } else if(c < 0x200000) {
+    } else if(c <= 0x10FFFF) {
         return 4;
-    } else if(c < 0x4000000) {
-        return 5;
-    } else if(c < 0x80000000) {
-        return 6;
     } else {
         return -1;
     }
 }
 
 int
-utf8_from_pair(int hi, int lo)
+utf8_esc_len(int c)
 {
-    if(hi < 0xD800 || hi >= 0xDC00) return -1;
-    if(lo < 0xDC00 || lo > 0xDFFF) return -1;
-    return ((hi & 0x3FF) << 10) + (lo & 0x3FF) + 0x10000;
+    if(c < 0x10000) {
+        return 6;
+    } else if(c <= 0x10FFFF) {
+        return 12;
+    } else {
+        return -1;
+    }
 }
 
 int
-utf8_to_binary(int c, unsigned char* buf)
+utf8_validate(unsigned char* data, size_t size)
+{
+    int ulen = -1;
+    int ui;
+
+    if((data[0] & 0x80) == 0x00) {
+        ulen = 1;  
+    } if((data[0] & 0xE0) == 0xC0) {
+        ulen = 2;
+    } else if((data[0] & 0xF0) == 0xE0) {
+        ulen = 3;
+    } else if((data[0] & 0xF8) == 0xF0) {
+        ulen = 4;
+    }
+    if(ulen < 0 || ulen > size) {
+        return -1;
+    }
+    
+    // Check each continuation byte.
+    for(ui = 1; ui < ulen; ui++) {
+        if((data[ui] & 0xC0) != 0x80) return -1;
+    }
+    
+    // Wikipedia says I have to check that a UTF-8 encoding
+    // uses as few bits as possible. This means that we
+    // can't do things like encode 't' in three bytes.
+    // To check this all we need to ensure is that for each
+    // of the following bit patterns that there is at least
+    // one 1 bit in any of the x's
+    //  1: 0yyyyyyy
+    //  2: 110xxxxy 10yyyyyy
+    //  3: 1110xxxx 10xyyyyy 10yyyyyy
+    //  4: 11110xxx 10xxyyyy 10yyyyyy 10yyyyyy
+    
+    // ulen == 1 passes by definition
+    if(ulen == 2) {
+        if((data[0] & 0x1E) == 0)
+            return -1;
+    } else if(ulen == 3) {
+        if((data[0] & 0x0F) + (data[1] & 0x20) == 0)
+            return -1;
+    } else if(ulen == 4) {
+        if((data[0] & 0x07) + (data[1] & 0x30) == 0)
+            return -1;
+    }
+    return ulen;
+}
+
+int
+utf8_to_unicode(unsigned char* buf, size_t size)
+{
+    int ret;
+    if((buf[0] & 0x80) == 0x00) {
+        // 0xxxxxxx
+        ret = (int) buf[0];
+    } else if((buf[0] & 0xE0) == 0xC0 && size >= 2) {
+        // 110xxxxy 10yyyyyy
+        ret = ((buf[0] & 0x1F) << 6)
+            | ((buf[1] & 0x3F));
+    } else if((buf[0] & 0xF0) == 0xE0 && size >= 3) {
+        // 1110xxxx 10xyyyyy 10yyyyyy
+        ret = ((buf[0] & 0x0F) << 12)
+            | ((buf[1] & 0x3F) << 6)
+            | ((buf[2] & 0x3F));
+        if(ret >= 0xD800 && ret <= 0xDFFF) {
+            ret = -1;
+        }
+    } else if((buf[0] & 0xF8) == 0xF0 && size >= 4) {
+        // 11110xxx 10xxyyyy 10yyyyyy 10yyyyyy
+        ret = ((buf[0] & 0x07) << 18)
+            | ((buf[1] & 0x3F) << 12)
+            | ((buf[2] & 0x3F) << 6)
+            | ((buf[3] & 0x3F));
+    } else {
+        ret = -1;
+    }
+    return ret;
+}
+
+int
+unicode_to_utf8(int c, unsigned char* buf)
 {
     if(c < 0x80) {
         buf[0] = (unsigned char) c;
@@ -103,27 +185,48 @@ utf8_to_binary(int c, unsigned char* buf)
         } else {
             return -1;
         }
-    } else if(c < 0x200000) {
+    } else if(c < 0x10FFFF) {
         buf[0] = (unsigned char) 0xF0 + (c >> 18);
         buf[1] = (unsigned char) 0x80 + ((c >> 12) & 0x3F);
         buf[2] = (unsigned char) 0x80 + ((c >> 6) & 0x3F);
         buf[3] = (unsigned char) 0x80 + (c & 0x3F);
         return 4;
-    } else if(c < 0x4000000) {
-        buf[0] = (unsigned char) 0xF8 + (c >> 24);
-        buf[1] = (unsigned char) 0x80 + ((c >> 18) & 0x3F);
-        buf[2] = (unsigned char) 0x80 + ((c >> 12) & 0x3F);
-        buf[3] = (unsigned char) 0x80 + ((c >> 6) & 0x3F);
-        buf[4] = (unsigned char) 0x80 + (c & 0x3F);
-        return 5;
-    } else if(c < 0x80000000) {
-        buf[0] = (unsigned char) 0xFC + (c >> 30);
-        buf[1] = (unsigned char) 0x80 + ((c >> 24) & 0x3F);
-        buf[2] = (unsigned char) 0x80 + ((c >> 18) & 0x3F);
-        buf[3] = (unsigned char) 0x80 + ((c >> 12) & 0x3F);
-        buf[4] = (unsigned char) 0x80 + ((c >> 6) & 0x3F);
-        buf[5] = (unsigned char) 0x80 + (c & 0x3F);
+    }
+    return -1;
+}
+
+int
+unicode_from_pair(int hi, int lo)
+{
+    if(hi < 0xD800 || hi >= 0xDC00) return -1;
+    if(lo < 0xDC00 || lo > 0xDFFF) return -1;
+    return ((hi & 0x3FF) << 10) + (lo & 0x3FF) + 0x10000;
+}
+
+int
+unicode_uescape(int val, char* p)
+{
+    int n;
+    if(val < 0x10000) {
+        p[0] = '\\';
+        p[1] = 'u';
+        if(int_to_hex(val, p+2) < 0) {
+            return -1;
+        }
         return 6;
+    } else if (val <= 0x10FFFF) {
+        n = val - 0x10000;
+        p[0] = '\\';
+        p[1] = 'u';
+        if(int_to_hex((0xD800 | ((n << 10) & 0x03FF)), p+2) < 0) {
+            return -1;
+        }
+        p[6] = '\\';
+        p[7] = 'u';
+        if(int_to_hex((0xDC00 | (n & 0x03FF)), p+8) < 0) {
+            return -1;
+        }
+        return 12;
     }
     return -1;
 }

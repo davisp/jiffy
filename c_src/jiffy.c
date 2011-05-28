@@ -20,6 +20,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_bignum_e = make_atom(env, "bignum_e");
     st->atom_bigdbl = make_atom(env, "bigdbl");
     st->atom_partial = make_atom(env, "partial");
+    st->atom_uescape = make_atom(env, "uescape");
 
     // Markers used in encoding
     st->ref_object = make_atom(env, "$object_ref$");
@@ -53,7 +54,7 @@ unload(ErlNifEnv* env, void* priv)
 static ErlNifFunc funcs[] =
 {
     {"nif_decode", 1, decode},
-    {"nif_encode", 1, encode}
+    {"nif_encode", 2, encode}
 };
 
 ERL_NIF_INIT(jiffy, funcs, &load, &reload, &upgrade, &unload);

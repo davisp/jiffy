@@ -14,6 +14,7 @@
 typedef struct {
     ErlNifEnv*      env;
     jiffy_st*       atoms;
+    int             uescape;
 
     int             count;
 
@@ -28,12 +29,26 @@ typedef struct {
 } Encoder;
 
 int
-enc_init(Encoder* e, ErlNifEnv* env, ErlNifBinary* bin)
+enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
 {
+    ERL_NIF_TERM val;
+    
     e->env = env;
     e->atoms = enif_priv_data(env);
+    e->uescape = 0;
     e->count = 0;
 
+    if(!enif_is_list(env, opts)) {
+        return 0;
+    }
+    
+    while(enif_get_list_cell(env, opts, &val, &opts)) {
+        if(enif_compare(val, e->atoms->atom_uescape) == 0) {
+            e->uescape = 1;
+        } else {
+            return 0;
+        }
+    }
 
     e->iolen = 0;
     e->iolist = enif_make_list(env, 0);
@@ -183,7 +198,7 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
 
     int esc_extra = 0;
     int ulen;
-    int ui;
+    int uval;
     int i;
 
     if(enif_is_binary(e->env, val)) {
@@ -225,46 +240,21 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
                     i++;
                     continue;
                 }
-                ulen = -1;
-                if((data[i] & 0xE0) == 0xC0) {
-                    ulen = 1;
-                } else if((data[i] & 0xF0) == 0xE0) {
-                    ulen = 2;
-                } else if((data[i] & 0xF8) == 0xF0) {
-                    ulen = 3;
-                } else if((data[i] & 0xFC) == 0xF8) {
-                    ulen = 4;
-                } else if((data[i] & 0xFE) == 0xFC) {
-                    ulen = 5;
-                }
+                ulen = utf8_validate(&(data[i]), size - i);
                 if(ulen < 0) {
                     return 0;
                 }
-                if(i+1+ulen > size) {
-                    return 0;
-                }
-                for(ui = 0; ui < ulen; ui++) {
-                    if((data[i+1+ui] & 0xC0) != 0x80) {
+                if(e->uescape) {
+                    uval = utf8_to_unicode(&(data[i]), ulen);
+                    if(uval < 0) {
+                        return 0;
+                    }
+                    ulen = utf8_esc_len(uval);
+                    if(ulen < 0) {
                         return 0;
                     }
                 }
-                if(ulen == 1) {
-                    if((data[i] & 0x1E) == 0)
-                        return 0;
-                } else if(ulen == 2) {
-                    if((data[i] & 0x0F) + (data[i+1] & 0x20) == 0)
-                        return 0;
-                } else if(ulen == 3) {
-                    if((data[i] & 0x07) + (data[i+1] & 0x30) == 0)
-                        return 0;
-                } else if(ulen == 4) {
-                    if((data[i] & 0x03) + (data[i+1] & 0x38) == 0)
-                        return 0;
-                } else if(ulen == 5) {
-                    if((data[i] & 0x01) + (data[i+1] & 0x3C) == 0)
-                        return 0;
-                }
-                i += 1 + ulen;
+                i += ulen;
         }
     }
 
@@ -311,13 +301,29 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
                 continue;
             default:
                 if(data[i] < 0x20) {
-                    e->p[e->i++] = '\\';
-                    e->p[e->i++] = 'u';
-                    if(!int_to_hex(data[i], &(e->p[e->i]))) {
+                    ulen = unicode_uescape(data[i], &(e->p[e->i]));
+                    if(ulen < 0) {
                         return 0;
                     }
-                    e->i += 4;
+                    e->i += ulen;
                     i++;
+                } else if((data[i] & 0x80) && e->uescape) {
+                    uval = utf8_to_unicode(&(data[i]), size-i);
+                    if(uval < 0) {
+                        return 0;
+                    }
+                    
+                    ulen = unicode_uescape(uval, &(e->p[e->i]));
+                    if(ulen < 0) {
+                        return 0;
+                    }
+                    e->i += ulen;
+                    
+                    ulen = utf8_len(uval);
+                    if(ulen < 0) {
+                        return 0;
+                    }
+                    i += ulen;
                 } else {
                     e->u[e->i++] = data[i++];
                 }
@@ -424,11 +430,11 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     double dval;
     long lval;
 
-    if(argc != 1) {
+    if(argc != 2) {
         return enif_make_badarg(env);
     }
     
-    if(!enc_init(e, env, &bin)) {
+    if(!enc_init(e, env, argv[1], &bin)) {
         return enif_make_badarg(env);
     }
 

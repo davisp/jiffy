@@ -2,7 +2,7 @@
 % See the LICENSE file for more information.
 
 -module(jiffy).
--export([decode/1, encode/1]).
+-export([decode/1, encode/1, encode/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
 -on_load(init/0).
@@ -19,7 +19,11 @@ decode(Data) ->
 
 
 encode(Data) ->
-    case nif_encode(Data) of
+    encode(Data, []).
+
+
+encode(Data, Options) ->
+    case nif_encode(Data, Options) of
         {error, _} = Error ->
             throw(Error);
         {partial, IOData} ->
@@ -95,6 +99,6 @@ not_loaded(Line) ->
 nif_decode(_Data) ->
     ?NOT_LOADED.
 
-nif_encode(_Data) ->
+nif_encode(_Data, _Options) ->
     ?NOT_LOADED.
 
