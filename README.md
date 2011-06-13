@@ -9,19 +9,23 @@ possible while not placing any constraints on the parsed JSON.
 Usage
 -----
 
-Jiffy's API is nearly an exact duplicate of the EEP0018 behaviour
-except for one small difference. `jiffy:encode/1` now returns an
-iolist (specifically, a binary or list of binaries). This is to
-allow for the encoding of large numbers.
+Jiffy is a simple API. The only thing that might catch you off guard
+is that the return type of jiffy:encode/1 is an iolist even though it
+returns a binary most of the time.
 
+A quick note on unicode. Jiffy only understands utf-8 in binaries. End
+of story. Also, there is a jiffy:encode/2 that takes a list of options
+for encoding. Currently the only supported option is `uescape`.
+
+Errors are raised as exceptions.
 
     Eshell V5.8.2  (abort with ^G)
     1> jiffy:decode(<<"{\"foo\": \"bar\"}">>).
-    {ok,{[{<<"foo">>,<<"bar">>}]}}
+    {[{<<"foo">>,<<"bar">>}]}
     2> Doc = {[{foo, [<<"bing">>, 2.3, true]}]}.
     {[{foo,[<<"bing">>,2.3,true]}]}
     3> jiffy:encode(Doc).
-    {ok,<<"{\"foo\":[\"bing\",2.2999999999999998224,true]}">>}
+    <<"{\"foo\":[\"bing\",2.2999999999999998224,true]}">>
 
 
 Data Format
@@ -49,6 +53,6 @@ Improvements over EEP0018
 
 Jiffy should be in all ways an improvemnt over EEP0018. It no longer
 imposes limits on the nesting depth. It is capable of encoding and
-decoding large numbers and t does quite a bit more checking for validity
+decoding large numbers and it does quite a bit more checking for validity
 of valid UTF-8 in strings.
 
