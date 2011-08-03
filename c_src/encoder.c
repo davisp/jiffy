@@ -330,13 +330,20 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
 }
 
 static inline int
-enc_long(Encoder* e, long val)
+enc_long(Encoder* e, ErlNifSInt64 val)
 {
     if(!enc_ensure(e, 32)) {
         return 0;
     }
 
+#if (defined(__WIN32__) || defined(_WIN32) || defined(_WIN32_))
     snprintf(&(e->p[e->i]), 32, "%ld", val);
+#elif SIZEOF_LONG == 8
+    snprintf(&(e->p[e->i]), 32, "%ld", val);
+#else
+    snprintf(&(e->p[e->i]), 32, "%lld", val);
+#endif
+
     e->i += strlen(&(e->p[e->i]));
     e->count++;
 
@@ -421,8 +428,8 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM item;
     const ERL_NIF_TERM* tuple;
     int arity;
+    ErlNifSInt64 lval;
     double dval;
-    long lval;
 
     if(argc != 2) {
         return enif_make_badarg(env);
