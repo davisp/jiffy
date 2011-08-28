@@ -242,7 +242,7 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
                     if(uval < 0) {
                         return 0;
                     }
-                    ulen = utf8_esc_len(uval);
+                    esc_extra = utf8_esc_len(uval);
                     if(ulen < 0) {
                         return 0;
                     }

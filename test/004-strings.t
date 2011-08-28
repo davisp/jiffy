@@ -6,8 +6,9 @@ main([]) ->
     code:add_pathz("ebin"),
     code:add_pathz("test"),
     
-    etap:plan(76),
+    etap:plan(78),
     util:test_good(good()),
+    util:test_good(uescaped(), [uescape]),
     util:test_errors(errors()),
     
     test_utf8(utf8_cases()),
@@ -27,6 +28,14 @@ good() ->
             <<"\"\\uD834\\uDD1E\"">>,
             <<240, 157, 132, 158>>,
             <<34, 240, 157, 132, 158, 34>>
+        }
+    ].
+
+uescaped() ->
+    [
+        {
+            <<"\"\\u8CA8\\u5481\\u3002\\u0091\\u0091\"">>,
+            <<232,178,168,229,146,129,227,128,130,194,145,194,145>>
         }
     ].
 
