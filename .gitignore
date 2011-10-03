@@ -4,3 +4,4 @@
 ebin/jiffy.app
 .eunit
 deps
+logs
