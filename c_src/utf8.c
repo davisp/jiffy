@@ -1,4 +1,4 @@
-// This file is part of Jiffy released under the MIT license. 
+// This file is part of Jiffy released under the MIT license.
 // See the LICENSE file for more information.
 #include "jiffy.h"
 #include <stdio.h>
@@ -93,7 +93,7 @@ utf8_validate(unsigned char* data, size_t size)
     int ui;
 
     if((data[0] & 0x80) == 0x00) {
-        ulen = 1;  
+        ulen = 1;
     } if((data[0] & 0xE0) == 0xC0) {
         ulen = 2;
     } else if((data[0] & 0xF0) == 0xE0) {
@@ -104,12 +104,12 @@ utf8_validate(unsigned char* data, size_t size)
     if(ulen < 0 || ulen > size) {
         return -1;
     }
-    
+
     // Check each continuation byte.
     for(ui = 1; ui < ulen; ui++) {
         if((data[ui] & 0xC0) != 0x80) return -1;
     }
-    
+
     // Wikipedia says I have to check that a UTF-8 encoding
     // uses as few bits as possible. This means that we
     // can't do things like encode 't' in three bytes.
@@ -120,7 +120,7 @@ utf8_validate(unsigned char* data, size_t size)
     //  2: 110xxxxy 10yyyyyy
     //  3: 1110xxxx 10xyyyyy 10yyyyyy
     //  4: 11110xxx 10xxyyyy 10yyyyyy 10yyyyyy
-    
+
     // ulen == 1 passes by definition
     if(ulen == 2) {
         if((data[0] & 0x1E) == 0)
@@ -132,6 +132,22 @@ utf8_validate(unsigned char* data, size_t size)
         if((data[0] & 0x07) + (data[1] & 0x30) == 0)
             return -1;
     }
+
+    // Lastly we need to check some miscellaneous ranges for
+    // some of the larger code point values.
+    if(ulen >= 3) {
+        ui = utf8_to_unicode(data, ulen);
+        if(ui < 0) {
+            return -1;
+        } else if(ui >= 0xD800 && ui <= 0xDFFF) {
+            return -1;
+        } else if(ui == 0xFFFE || ui == 0xFFFF) {
+            return -1;
+        } else if(ui > 0x10FFFF) {
+            return -1;
+        }
+    }
+
     return ulen;
 }
 

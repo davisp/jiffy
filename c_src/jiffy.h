@@ -1,4 +1,4 @@
-// This file is part of Jiffy released under the MIT license. 
+// This file is part of Jiffy released under the MIT license.
 // See the LICENSE file for more information.
 
 #ifndef JIFFY_H
@@ -17,7 +17,7 @@ typedef struct {
     ERL_NIF_TERM    atom_bigdbl;
     ERL_NIF_TERM    atom_partial;
     ERL_NIF_TERM    atom_uescape;
-    
+
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
 } jiffy_st;
