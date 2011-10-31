@@ -6,7 +6,7 @@ main([]) ->
     code:add_pathz("ebin"),
     code:add_pathz("test"),
     
-    etap:plan(78),
+    etap:plan(80),
     util:test_good(good()),
     util:test_good(uescaped(), [uescape]),
     util:test_errors(errors()),
@@ -45,6 +45,7 @@ errors() ->
         <<"\"", 0, "\"">>,
         <<"\"\\g\"">>,
         <<"\"\\uFFFF\"">>,
+        <<"\"\\uFFFE\"">>,
         <<"\"\\uD834foo\\uDD1E\"">>,
         % CouchDB-345
         <<34,78,69,73,77,69,78,32,70,216,82,82,32,70,65,69,78,33,34>>
@@ -71,6 +72,10 @@ utf8_cases() ->
         % Stray continuation byte
         <<16#C2, 16#81, 16#80>>,
         <<"foo", 16#80, "bar">>,
+
+        % Invalid Unicode code points
+        <<239, 191, 190>>,
+        <<237, 160, 129>>,
         
         % Not enough extension bytes
         <<16#C0>>,

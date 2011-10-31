@@ -132,6 +132,22 @@ utf8_validate(unsigned char* data, size_t size)
         if((data[0] & 0x07) + (data[1] & 0x30) == 0)
             return -1;
     }
+
+    // Lastly we need to check some miscellaneous ranges for
+    // some of the larger code point values.
+    if(ulen >= 3) {
+        ui = utf8_to_unicode(data, ulen);
+        if(ui < 0) {
+            return -1;
+        } else if(ui >= 0xD800 && ui <= 0xDFFF) {
+            return -1;
+        } else if(ui == 0xFFFE || ui == 0xFFFF) {
+            return -1;
+        } else if(ui > 0x10FFFF) {
+            return -1;
+        }
+    }
+
     return ulen;
 }
 
