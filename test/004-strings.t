@@ -1,18 +1,18 @@
 #! /usr/bin/env escript
-% This file is part of Jiffy released under the MIT license. 
+% This file is part of Jiffy released under the MIT license.
 % See the LICENSE file for more information.
 
 main([]) ->
     code:add_pathz("ebin"),
     code:add_pathz("test"),
-    
+
     etap:plan(80),
     util:test_good(good()),
     util:test_good(uescaped(), [uescape]),
     util:test_errors(errors()),
-    
+
     test_utf8(utf8_cases()),
-    
+
     etap:end_tests().
 
 good() ->
@@ -76,13 +76,13 @@ utf8_cases() ->
         % Invalid Unicode code points
         <<239, 191, 190>>,
         <<237, 160, 129>>,
-        
+
         % Not enough extension bytes
         <<16#C0>>,
-        
+
         <<16#E0>>,
         <<16#E0, 16#80>>,
-        
+
         <<16#F0>>,
         <<16#F0, 16#80>>,
         <<16#F0, 16#80, 16#80>>,
@@ -91,7 +91,7 @@ utf8_cases() ->
         <<16#F8, 16#80>>,
         <<16#F8, 16#80, 16#80>>,
         <<16#F8, 16#80, 16#80, 16#80>>,
-        
+
         <<16#FC>>,
         <<16#FC, 16#80>>,
         <<16#FC, 16#80, 16#80>>,
@@ -101,16 +101,16 @@ utf8_cases() ->
         % No data in high bits.
         <<16#C0, 16#80>>,
         <<16#C1, 16#80>>,
-        
+
         <<16#E0, 16#80, 16#80>>,
         <<16#E0, 16#90, 16#80>>,
-        
+
         <<16#F0, 16#80, 16#80, 16#80>>,
         <<16#F0, 16#88, 16#80, 16#80>>,
 
         <<16#F8, 16#80, 16#80, 16#80, 16#80>>,
         <<16#F8, 16#84, 16#80, 16#80, 16#80>>,
-        
+
         <<16#FC, 16#80, 16#80, 16#80, 16#80, 16#80>>,
         <<16#FC, 16#82, 16#80, 16#80, 16#80, 16#80>>
     ].

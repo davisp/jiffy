@@ -1,4 +1,4 @@
-// This file is part of Jiffy released under the MIT license. 
+// This file is part of Jiffy released under the MIT license.
 // See the LICENSE file for more information.
 
 #include "jiffy.h"
@@ -10,7 +10,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     if(st == NULL) {
         return 1;
     }
-    
+
     st->atom_ok = make_atom(env, "ok");
     st->atom_error = make_atom(env, "error");
     st->atom_null = make_atom(env, "null");

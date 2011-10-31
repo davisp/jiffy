@@ -1,4 +1,4 @@
-// This file is part of Jiffy released under the MIT license. 
+// This file is part of Jiffy released under the MIT license.
 // See the LICENSE file for more information.
 
 #include <assert.h>
@@ -76,7 +76,7 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC * sizeof(char));
     d->st_size = STACK_SIZE_INC;
     d->st_top = 0;
-    
+
     for(i = 0; i < d->st_size; i++) {
         d->st_data[i] = st_invalid;
     }
@@ -122,7 +122,7 @@ dec_push(Decoder* d, char val)
     int i;
 
     if(d->st_top >= d->st_size) {
-        new_sz = d->st_size + STACK_SIZE_INC; 
+        new_sz = d->st_size + STACK_SIZE_INC;
         tmp = (char*) enif_alloc(new_sz * sizeof(char));
         memcpy(tmp, d->st_data, d->st_size * sizeof(char));
         enif_free(d->st_data);
@@ -523,7 +523,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
     }
 
 parse:
-    
+
     switch(state) {
         case nst_init:
         case nst_sign:
@@ -554,7 +554,7 @@ parse:
             }
         }
     }
-    
+
     if(!has_frac && !has_exp) {
         num_type = d->atoms->atom_bignum;
     } else if(has_exp) {
@@ -604,7 +604,7 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     Decoder dec;
     Decoder* d = &dec;
-    
+
     ErlNifBinary bin;
 
     ERL_NIF_TERM objs = enif_make_list(env, 0);
@@ -739,7 +739,7 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     curr = enif_make_list_cell(env, val, curr);
                 }
                 break;
-            
+
             case st_key:
                 switch(d->p[d->i]) {
                     case ' ':
