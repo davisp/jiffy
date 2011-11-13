@@ -2,16 +2,16 @@
 all: build
 
 %.beam: %.erl
-	erlc -o test/ $<
+	erlc -o test_etap/ $<
 
 build: c_src/decoder.c
 	./rebar compile
 
-check: test/etap.beam test/util.beam
-	prove test/*.t
+check: test_etap/etap.beam test_etap/util.beam
+	prove test_etap/*.t
 
 clean:
 	rm -rf logs .eunit
 
-ct:
-	./rebar ct skip_deps=true verbose=1
+eunit:
+	./rebar eunit skip_deps=true
