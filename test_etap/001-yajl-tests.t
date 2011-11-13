@@ -3,7 +3,7 @@
 % See the LICENSE file for more information.
 
 main([]) ->
-    code:add_pathz("test"),
+    code:add_pathz("test_etap"),
     code:add_pathz("ebin"),
 
     Cases = read_cases(),
@@ -18,7 +18,7 @@ test({Name, Json, Erl}) ->
     etap:is(jiffy:decode(Json), Erl, Name).
 
 read_cases() ->
-    CasesPath = filename:join(["test", "cases", "*.json"]),
+    CasesPath = filename:join(["test_etap", "cases", "*.json"]),
     FileNames = lists:sort(filelib:wildcard(CasesPath)),
     lists:map(fun(F) -> make_pair(F) end, FileNames).
 

@@ -4,7 +4,7 @@
 
 main([]) ->
     code:add_pathz("ebin"),
-    code:add_pathz("test"),
+    code:add_pathz("test_etap"),
 
     etap:plan(83),
     util:test_good(good()),
