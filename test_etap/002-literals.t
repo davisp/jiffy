@@ -4,7 +4,7 @@
 
 main([]) ->
     code:add_pathz("ebin"),
-    code:add_pathz("test"),
+    code:add_pathz("test_etap"),
 
     etap:plan(6),
     etap:is(jiffy:decode(<<"true">>), true, "DEC: true -> true"),
@@ -17,5 +17,3 @@ main([]) ->
     etap:is(jiffy:encode(null), <<"null">>, "ENC: null -> null"),
 
     etap:end_tests().
-
-
