@@ -1,11 +1,11 @@
 #! /usr/bin/env escript
-% This file is part of Jiffy released under the MIT license. 
+% This file is part of Jiffy released under the MIT license.
 % See the LICENSE file for more information.
 
 main([]) ->
     code:add_pathz("ebin"),
     code:add_pathz("test"),
-    
+
     etap:plan(18),
     util:test_good(good()),
     util:test_errors(errors()),

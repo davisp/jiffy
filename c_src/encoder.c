@@ -1,4 +1,4 @@
-// This file is part of Jiffy released under the MIT license. 
+// This file is part of Jiffy released under the MIT license.
 // See the LICENSE file for more information.
 
 #include <assert.h>
@@ -21,7 +21,7 @@ typedef struct {
     int             iolen;
     ERL_NIF_TERM    iolist;
     ErlNifBinary*   curr;
-    
+
 
     char*           p;
     unsigned char*  u;
@@ -32,7 +32,7 @@ int
 enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
 {
     ERL_NIF_TERM val;
-    
+
     e->env = env;
     e->atoms = enif_priv_data(env);
     e->uescape = 0;
@@ -41,7 +41,7 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
     if(!enif_is_list(env, opts)) {
         return 0;
     }
-    
+
     while(enif_get_list_cell(env, opts, &val, &opts)) {
         if(enif_compare(val, e->atoms->atom_uescape) == 0) {
             e->uescape = 1;
@@ -148,7 +148,7 @@ enc_unknown(Encoder* e, ERL_NIF_TERM value)
         e->iolist = enif_make_list_cell(e->env, curr, e->iolist);
         e->iolen++;
     }
-        
+
     e->iolist = enif_make_list_cell(e->env, value, e->iolist);
     e->iolen++;
 
@@ -157,7 +157,7 @@ enc_unknown(Encoder* e, ERL_NIF_TERM value)
     if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
         return 0;
     }
-    
+
     memset(e->curr->data, 0, e->curr->size);
 
     e->p = (char*) e->curr->data;
@@ -176,7 +176,7 @@ enc_literal(Encoder* e, const char* literal, size_t len)
 
     memcpy(&(e->p[e->i]), literal, len);
     e->i += len;
-    e->count++; 
+    e->count++;
     return 1;
 }
 
@@ -305,13 +305,13 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
                     if(uval < 0) {
                         return 0;
                     }
-                    
+
                     ulen = unicode_uescape(uval, &(e->p[e->i]));
                     if(ulen < 0) {
                         return 0;
                     }
                     e->i += ulen;
-                    
+
                     ulen = utf8_len(uval);
                     if(ulen < 0) {
                         return 0;
@@ -434,7 +434,7 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     if(argc != 2) {
         return enif_make_badarg(env);
     }
-    
+
     if(!enc_init(e, env, argv[1], &bin)) {
         return enif_make_badarg(env);
     }
