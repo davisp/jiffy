@@ -77,7 +77,28 @@ prop_encode_decode() ->
                 Data == jiffy:decode(jiffy:encode(Data))
             end).
 
+prop_encode_not_crash() ->
+    ?FORALL(Data, any(),
+            begin
+                catch jiffy:encode(Data),
+                true
+            end).
+
+prop_decode_not_crash_bin() ->
+    ?FORALL(Data, binary(),
+            begin
+                catch jiffy:decode(Data),
+                true
+            end).
+
+prop_decode_not_crash_any() ->
+    ?FORALL(Data, any(),
+            begin
+                catch jiffy:decode(Data),
+                true
+            end).
+
 proper_test_() ->
     {timeout, 3600,
      ?_assertEqual([], proper:module(proper_tests, [{to_file, user},
-                                                    {numtests, 1000}]))}.
+                                                    {numtests, 5000}]))}.
