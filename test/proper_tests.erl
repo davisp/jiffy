@@ -70,7 +70,7 @@ json_list(S) ->
 json_list() ->
     list(json_object()).
 
-prop_foo() ->
+prop_encode_decode() ->
     ?FORALL(Data, json_object(),
             begin
 %%                io:format(user, "Data: ~p~n", [Data]),
