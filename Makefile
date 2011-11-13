@@ -14,4 +14,4 @@ clean:
 	rm -rf logs .eunit
 
 ct:
-	./rebar ct skip_deps=true verbose=1
+	./rebar ct skip_deps=true
