@@ -13,5 +13,5 @@ check: test_etap/etap.beam test_etap/util.beam
 clean:
 	rm -rf logs .eunit
 
-ct:
+eunit:
 	./rebar eunit skip_deps=true
