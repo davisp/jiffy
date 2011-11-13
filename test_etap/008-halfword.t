@@ -4,7 +4,7 @@
 
 main([]) ->
     code:add_pathz("ebin"),
-    code:add_pathz("test"),
+    code:add_pathz("test_etap"),
 
     etap:plan(unknown),
 
@@ -12,4 +12,3 @@ main([]) ->
     etap:is(jiffy:decode(<<"1">>) == 1, true, "1 == 1"),
 
     etap:end_tests().
-
