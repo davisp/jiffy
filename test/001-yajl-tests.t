@@ -25,6 +25,6 @@ read_cases() ->
 make_pair(FileName) ->
     {ok, Json} = file:read_file(FileName),
     {BaseName, _} = lists:splitwith(fun(C) -> C /= $. end, FileName),
-    ErlFname = BaseName ++ ".erl",
+    ErlFname = BaseName ++ ".eterm",
     {ok, [Term]} = file:consult(ErlFname),
     {BaseName, Json, Term}.
