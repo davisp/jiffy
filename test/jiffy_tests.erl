@@ -20,8 +20,7 @@ prop_encode_decode() ->
     ?FORALL(Data, json(),
         begin
             %io:format(standard_error, "Data: ~p~n", [Data]),
-            ExpData = conv_keys(Data),
-            ExpData == jiffy:decode(jiffy:encode(Data))
+            Data == jiffy:decode(jiffy:encode(Data))
         end
     ).
 
@@ -54,10 +53,6 @@ json_string() ->
     escaped_utf8_bin().
 
 
-json_key() ->
-    oneof([json_string(), escaped_atom()]).
-
-
 json_list(S) when S =< 0 ->
     [];
 json_list(S) ->
@@ -74,7 +69,7 @@ json_object(S) ->
     ?LETSHRINK(
         [ObjectSize],
         [integer(0, S)],
-        {vector(ObjectSize, {json_key(), json_text(S - ObjectSize)})}
+        {vector(ObjectSize, {json_string(), json_text(S - ObjectSize)})}
     ).
 
 
@@ -100,12 +95,6 @@ json() ->
     ?SIZED(S, json_text(S)).
 
 
-escaped_atom() ->
-    ?LET(A, atom(),
-        unicode:characters_to_binary(atom_to_list(A), unicode, utf8)
-    ).
-
-
 escaped_utf8_bin() ->
     ?SUCHTHAT(Bin,
         ?LET(S, ?SUCHTHAT(L, list(escaped_char()), L /= []),
@@ -121,18 +110,4 @@ escaped_char() ->
             C -> C
         end
     ).
-
-
-% Atoms get munged to binaries in the round trip.
-conv_keys({Props}) ->
-    {lists:map(fun({K, V}) -> {conv_key(K), conv_keys(V)} end, Props)};
-conv_keys(Vals) when is_list(Vals) ->
-    lists:map(fun(V) -> conv_keys(V) end, Vals);
-conv_keys(Other) ->
-    Other.
-
-conv_key(K) when is_atom(K) ->
-    list_to_binary(atom_to_list(K));
-conv_key(K) ->
-    K.
 
