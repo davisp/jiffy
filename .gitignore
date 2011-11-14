@@ -1,4 +1,6 @@
+*.app
 *.beam
 *.o
 *.so
-ebin/jiffy.app
+.eunit
+deps
