@@ -95,6 +95,15 @@ json() ->
     ?SIZED(S, json_text(S)).
 
 
+%% XXX: Add generators
+%
+% We should add generators that generate JSON binaries directly
+% so we can test things that aren't produced by the encoder.
+%
+% We should also have a version of the JSON generator that inserts
+% errors into the JSON that we can test for.
+
+
 escaped_utf8_bin() ->
     ?SUCHTHAT(Bin,
         ?LET(S, ?SUCHTHAT(L, list(escaped_char()), L /= []),
