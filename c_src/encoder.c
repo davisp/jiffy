@@ -10,12 +10,24 @@
 
 #define BIN_INC_SIZE 2048
 
+#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
+
+#define MAYBE_PRETTY(e)             \
+do {                                \
+    if(e->pretty) {                 \
+        if(!enc_shift(e))           \
+            return 0;               \
+    }                               \
+} while(0)
+
 
 typedef struct {
     ErlNifEnv*      env;
     jiffy_st*       atoms;
     int             uescape;
+    int             pretty;
 
+    int             shiftcnt;
     int             count;
 
     int             iolen;
@@ -28,6 +40,22 @@ typedef struct {
     size_t          i;
 } Encoder;
 
+
+// String constants for pretty printing.
+// Every string starts with its length.
+#define NUM_SHIFTS 8
+static char* shifts[NUM_SHIFTS] = {
+    "\x01\n",
+    "\x03\n  ",
+    "\x05\n    ",
+    "\x07\n      ",
+    "\x09\n        ",
+    "\x0b\n          ",
+    "\x0d\n            ",
+    "\x0f\n              "
+};
+
+
 int
 enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
 {
@@ -36,6 +64,8 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
     e->env = env;
     e->atoms = enif_priv_data(env);
     e->uescape = 0;
+    e->pretty = 0;
+    e->shiftcnt = 0;
     e->count = 0;
 
     if(!enif_is_list(env, opts)) {
@@ -45,6 +75,8 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
     while(enif_get_list_cell(env, opts, &val, &opts)) {
         if(enif_compare(val, e->atoms->atom_uescape) == 0) {
             e->uescape = 1;
+        } else if(enif_compare(val, e->atoms->atom_pretty) == 0) {
+            e->pretty = 1;
         } else {
             return 0;
         }
@@ -376,16 +408,42 @@ enc_char(Encoder* e, char c)
     return 1;
 }
 
+static int
+enc_shift(Encoder* e) {
+    int i;
+    char* shift;
+    assert(e->shiftcnt >= 0 && "Invalid shift count.");
+    shift = shifts[MIN(e->shiftcnt, NUM_SHIFTS-1)];
+
+    if(!enc_literal(e, shift + 1, *shift))
+        return 0;
+
+    // Finish the rest of this shift it's it bigger than
+    // our largest predefined constant.
+    for(i = NUM_SHIFTS - 1; i < e->shiftcnt; i++) {
+        if(!enc_literal(e, "  ", 2))
+            return 0;
+    }
+
+    return 1;
+}
+
 static inline int
 enc_start_object(Encoder* e)
 {
     e->count++;
-    return enc_char(e, '{');
+    e->shiftcnt++;
+    if(!enc_char(e, '{'))
+        return 0;
+    MAYBE_PRETTY(e);
+    return 1;
 }
 
 static inline int
 enc_end_object(Encoder* e)
 {
+    e->shiftcnt--;
+    MAYBE_PRETTY(e);
     return enc_char(e, '}');
 }
 
@@ -393,25 +451,36 @@ static inline int
 enc_start_array(Encoder* e)
 {
     e->count++;
-    return enc_char(e, '[');
+    e->shiftcnt++;
+    if(!enc_char(e, '['))
+        return 0;
+    MAYBE_PRETTY(e);
+    return 1;
 }
 
 static inline int
 enc_end_array(Encoder* e)
 {
+    e->shiftcnt--;
+    MAYBE_PRETTY(e);
     return enc_char(e, ']');
 }
 
 static inline int
 enc_colon(Encoder* e)
 {
+    if(e->pretty)
+        return enc_literal(e, " : ", 3);
     return enc_char(e, ':');
 }
 
 static inline int
 enc_comma(Encoder* e)
 {
-    return enc_char(e, ',');
+    if(!enc_char(e, ','))
+        return 0;
+    MAYBE_PRETTY(e);
+    return 1;
 }
 
 ERL_NIF_TERM
