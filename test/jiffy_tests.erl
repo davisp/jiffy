@@ -17,10 +17,10 @@ proper_test_() ->
 
 
 prop_encode_decode() ->
-    ?FORALL(Data, json(),
+    ?FORALL({Data, Opts}, {json(), union([[], [pretty]])},
         begin
             %io:format(standard_error, "Data: ~p~n", [Data]),
-            Data == jiffy:decode(jiffy:encode(Data))
+            Data == jiffy:decode(jiffy:encode(Data, Opts))
         end
     ).
 

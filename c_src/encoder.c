@@ -15,7 +15,9 @@ typedef struct {
     ErlNifEnv*      env;
     jiffy_st*       atoms;
     int             uescape;
+    int             pretty;
 
+    int             shiftcnt;
     int             count;
 
     int             iolen;
@@ -36,6 +38,8 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
     e->env = env;
     e->atoms = enif_priv_data(env);
     e->uescape = 0;
+    e->pretty = 0;
+    e->shiftcnt = 0;
     e->count = 0;
 
     if(!enif_is_list(env, opts)) {
@@ -45,6 +49,8 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
     while(enif_get_list_cell(env, opts, &val, &opts)) {
         if(enif_compare(val, e->atoms->atom_uescape) == 0) {
             e->uescape = 1;
+        } else if(enif_compare(val, e->atoms->atom_pretty) == 0) {
+            e->pretty = 1;
         } else {
             return 0;
         }
@@ -377,41 +383,79 @@ enc_char(Encoder* e, char c)
 }
 
 static inline int
+enc_shift(Encoder* e) {
+    int i = 0;
+    if (!e->pretty)
+        return 1;
+
+    switch (e->shiftcnt) {
+        case 0 :
+            return enc_char(e, '\n');
+        case 1 :
+            return enc_literal(e, "\n  ", 3);
+        case 2 :
+            return enc_literal(e, "\n    ", 5);
+        case 3 :
+            return enc_literal(e, "\n      ", 7);
+        case 4 :
+            return enc_literal(e, "\n        ", 9);
+        case 5 :
+            return enc_literal(e, "\n          ", 11);
+        default :
+            if (!enc_char(e, '\n'))
+                return 1;
+            for (;i < e->shiftcnt; i++) {
+                if (!enc_literal(e, "  ", 2))
+                    return 0;
+            }
+            return 1;
+    }
+}
+
+static inline int
 enc_start_object(Encoder* e)
 {
     e->count++;
-    return enc_char(e, '{');
+    e->shiftcnt++;
+    return enc_char(e, '{') && enc_shift(e);
 }
 
 static inline int
 enc_end_object(Encoder* e)
 {
-    return enc_char(e, '}');
+    e->shiftcnt--;
+    return enc_shift(e) && enc_char(e, '}');
 }
 
 static inline int
 enc_start_array(Encoder* e)
 {
     e->count++;
-    return enc_char(e, '[');
+    e->shiftcnt++;
+    return enc_char(e, '[') && enc_shift(e);
 }
 
 static inline int
 enc_end_array(Encoder* e)
 {
-    return enc_char(e, ']');
+    e->shiftcnt--;
+    return enc_shift(e) && enc_char(e, ']');
 }
 
 static inline int
 enc_colon(Encoder* e)
 {
-    return enc_char(e, ':');
+    if (!e->pretty)
+        return enc_char(e, ':');
+    return enc_literal(e, " : ", 3);
 }
 
 static inline int
 enc_comma(Encoder* e)
 {
-    return enc_char(e, ',');
+    if (!e->pretty)
+        return enc_char(e, ',');
+    return enc_literal(e, ", ", 2) && enc_shift(e);
 }
 
 ERL_NIF_TERM
