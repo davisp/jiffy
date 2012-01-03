@@ -5,6 +5,7 @@ clean:
 	./rebar clean
 	rm -rf logs
 	rm -rf .eunit
+	rm test/*.beam
 
 deps: ./deps/
 	./rebar get-deps update-deps
