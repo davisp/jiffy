@@ -10,6 +10,10 @@
 
 #define BIN_INC_SIZE 2048
 
+#define COUNT_OF(x) (sizeof(x)/sizeof(x[0]))
+#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
+
+#define MAYBE_PRETTY_INDENT(e) ( e->pretty ? enc_shift(e) : 1 )
 
 typedef struct {
     ErlNifEnv*      env;
@@ -382,34 +386,37 @@ enc_char(Encoder* e, char c)
     return 1;
 }
 
-static inline int
+static int
 enc_shift(Encoder* e) {
-    int i = 0;
-    if (!e->pretty)
-        return 1;
+    // Don't call this function directly.
+    // Use macro MAYBE_PRETTY_INDENT(e).
 
-    switch (e->shiftcnt) {
-        case 0 :
-            return enc_char(e, '\n');
-        case 1 :
-            return enc_literal(e, "\n  ", 3);
-        case 2 :
-            return enc_literal(e, "\n    ", 5);
-        case 3 :
-            return enc_literal(e, "\n      ", 7);
-        case 4 :
-            return enc_literal(e, "\n        ", 9);
-        case 5 :
-            return enc_literal(e, "\n          ", 11);
-        default :
-            if (!enc_char(e, '\n'))
-                return 1;
-            for (;i < e->shiftcnt; i++) {
-                if (!enc_literal(e, "  ", 2))
-                    return 0;
-            }
-            return 1;
+    // Compile-time initialized array of indent strings.
+    // Every string starts with its length.
+    static char* shifts[] = {
+        "\x01\n",
+        "\x03\n  ",
+        "\x05\n    ",
+        "\x07\n      ",
+        "\x09\n        ",
+        "\x0b\n          ",
+        "\x0d\n            ",
+        "\x0f\n              "
+    };
+
+    int cnt = COUNT_OF(shifts) - 1;
+    char *shift = shifts[ MIN(e->shiftcnt, cnt) ];
+    if (!enc_literal(e, shift + 1, *shift)) {
+        return 0;
     }
+
+    for (; cnt < e->shiftcnt; ++cnt) {
+        if (!enc_literal(e, "  ", 2)) {
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 static inline int
@@ -417,14 +424,14 @@ enc_start_object(Encoder* e)
 {
     e->count++;
     e->shiftcnt++;
-    return enc_char(e, '{') && enc_shift(e);
+    return enc_char(e, '{') && MAYBE_PRETTY_INDENT(e);
 }
 
 static inline int
 enc_end_object(Encoder* e)
 {
     e->shiftcnt--;
-    return enc_shift(e) && enc_char(e, '}');
+    return MAYBE_PRETTY_INDENT(e) && enc_char(e, '}');
 }
 
 static inline int
@@ -432,14 +439,14 @@ enc_start_array(Encoder* e)
 {
     e->count++;
     e->shiftcnt++;
-    return enc_char(e, '[') && enc_shift(e);
+    return enc_char(e, '[') && MAYBE_PRETTY_INDENT(e);
 }
 
 static inline int
 enc_end_array(Encoder* e)
 {
     e->shiftcnt--;
-    return enc_shift(e) && enc_char(e, ']');
+    return MAYBE_PRETTY_INDENT(e) && enc_char(e, ']');
 }
 
 static inline int
@@ -455,7 +462,7 @@ enc_comma(Encoder* e)
 {
     if (!e->pretty)
         return enc_char(e, ',');
-    return enc_literal(e, ", ", 2) && enc_shift(e);
+    return enc_literal(e, ", ", 2) && MAYBE_PRETTY_INDENT(e);
 }
 
 ERL_NIF_TERM
