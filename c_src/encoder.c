@@ -430,7 +430,8 @@ enc_start_object(Encoder* e)
 static inline int
 enc_end_object(Encoder* e)
 {
-    e->shiftcnt--;
+    if (!e->shiftcnt--)
+        return 0;
     return MAYBE_PRETTY_INDENT(e) && enc_char(e, '}');
 }
 
@@ -445,7 +446,8 @@ enc_start_array(Encoder* e)
 static inline int
 enc_end_array(Encoder* e)
 {
-    e->shiftcnt--;
+    if (!e->shiftcnt--)
+        return 0;
     return MAYBE_PRETTY_INDENT(e) && enc_char(e, ']');
 }
 
