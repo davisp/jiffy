@@ -460,9 +460,7 @@ enc_colon(Encoder* e)
 static inline int
 enc_comma(Encoder* e)
 {
-    if (!e->pretty)
-        return enc_char(e, ',');
-    return enc_literal(e, ", ", 2) && MAYBE_PRETTY_INDENT(e);
+    return enc_char(e, ',') && MAYBE_PRETTY_INDENT(e);
 }
 
 ERL_NIF_TERM
