@@ -91,7 +91,7 @@ init() ->
 
 
 not_loaded(Line) ->
-    exit({not_loaded, [{module, ?MODULE}, {line, Line}]}).
+    erlang:nif_error({not_loaded, [{module, ?MODULE}, {line, Line}]}).
 
 nif_decode(_Data) ->
     ?NOT_LOADED.
