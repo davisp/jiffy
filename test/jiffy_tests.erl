@@ -10,7 +10,7 @@
 proper_test_() ->
     PropErOpts = [
         {to_file, user},
-        {max_size, 60},
+        {max_size, 30},
         {numtests, 1000}
     ],
     {timeout, 3600, ?_assertEqual([], proper:module(jiffy_tests, PropErOpts))}.
