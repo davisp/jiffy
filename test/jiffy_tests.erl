@@ -116,6 +116,9 @@ escaped_char() ->
     ?LET(C, char(),
         case C of
             $" -> "\\\"";
+            C when C == 65534 -> 65533;
+            C when C == 65535 -> 65533;
+            C when C > 1114111 -> 1114111;
             C -> C
         end
     ).
