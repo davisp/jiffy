@@ -17,6 +17,7 @@ typedef struct {
     ERL_NIF_TERM    atom_bigdbl;
     ERL_NIF_TERM    atom_partial;
     ERL_NIF_TERM    atom_uescape;
+    ERL_NIF_TERM    atom_pretty;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;

@@ -24,6 +24,13 @@ prop_encode_decode() ->
         end
     ).
 
+prop_encode_decode_pretty() ->
+    ?FORALL(Data, json(),
+        begin
+            Data == jiffy:decode(jiffy:encode(Data, [pretty]))
+        end
+    ).
+
 prop_encode_not_crash() ->
     ?FORALL(Data, any(), begin catch jiffy:encode(Data), true end).
 
