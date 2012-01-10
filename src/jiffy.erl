@@ -7,7 +7,7 @@
 
 -on_load(init/0).
 
-decode(Data) ->
+decode(Data) when is_binary(Data) ->
     case nif_decode(Data) of
         {error, _} = Error ->
             throw(Error);
@@ -15,7 +15,9 @@ decode(Data) ->
             finish_decode(EJson);
         EJson ->
             EJson
-    end.
+    end;
+decode(Data) when is_list(Data) ->
+    decode(iolist_to_binary(Data)).
 
 
 encode(Data) ->
