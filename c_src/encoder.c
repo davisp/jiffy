@@ -385,15 +385,34 @@ enc_long(Encoder* e, ErlNifSInt64 val)
 static inline int
 enc_double(Encoder* e, double val)
 {
+    char* start;
+    size_t len;
+    size_t i;
+
     if(!enc_ensure(e, 32)) {
         return 0;
     }
 
-    //snprintf(&(e->p[e->i]), 31, "%0.20g", val);
-    sprintf(&(e->p[e->i]), "%.20g", val);
-    e->i += strlen(&(e->p[e->i]));
-    e->count++;
+    start = &(e->p[e->i]);
 
+    sprintf(start, "%0.20g", val);
+    len = strlen(start);
+
+    // Check if we have a decimal point
+    for(i = 0; i < len; i++) {
+        if(start[i] == '.' || start[i] == 'e' || start[i] == 'E')
+            goto done;
+    }
+
+    if(len > 29) return 0;
+
+    // Force a decimal point
+    start[len++] = '.';
+    start[len++] = '0';
+
+done:
+    e->i += len;
+    e->count++;
     return 1;
 }
 
