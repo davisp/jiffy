@@ -234,7 +234,7 @@ unicode_uescape(int val, char* p)
         n = val - 0x10000;
         p[0] = '\\';
         p[1] = 'u';
-        if(int_to_hex((0xD800 | ((n << 10) & 0x03FF)), p+2) < 0) {
+        if(int_to_hex((0xD800 | ((n >> 10) & 0x03FF)), p+2) < 0) {
             return -1;
         }
         p[6] = '\\';
