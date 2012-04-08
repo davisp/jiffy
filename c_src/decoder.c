@@ -16,6 +16,10 @@
 #define STACK_SIZE_INC 64
 #define NUM_BUF_LEN 32
 
+#ifdef WINDOWS || WIN32
+#define snprintf  _snprintf
+#endif
+
 enum {
     st_value=0,
     st_object,
