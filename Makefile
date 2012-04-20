@@ -1,18 +1,19 @@
+REBAR?=./rebar
 
 all: build
 
 clean:
-	./rebar clean
+	$(REBAR) clean
 	rm -rf logs
 	rm -rf .eunit
-	rm test/*.beam
+	rm -f test/*.beam
 
 deps: ./deps/
-	./rebar get-deps update-deps
+	$(REBAR) get-deps update-deps
 
 
 build: deps
-	./rebar compile
+	$(REBAR) compile
 
 
 etap: test/etap.beam test/util.beam
@@ -20,7 +21,7 @@ etap: test/etap.beam test/util.beam
 
 
 eunit:
-	./rebar eunit skip_deps=true
+	$(REBAR) eunit skip_deps=true
 
 
 check: etap eunit
