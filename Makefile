@@ -7,11 +7,17 @@ clean:
 	rm -rf .eunit
 	rm test/*.beam
 
-deps: ./deps/
-	./rebar get-deps update-deps
+depends:
+	@if test ! -d ./deps; then \
+		./rebar get-deps; \
+	else \
+		./rebar update-deps; \
+	fi
 
-
-build: deps
+build:
+	@if test ! -d ./deps; then \
+		./rebar get-deps; \
+	fi
 	./rebar compile
 
 
@@ -23,7 +29,7 @@ eunit:
 	./rebar eunit skip_deps=true
 
 
-check: etap eunit
+check: build etap eunit
 
 
 %.beam: %.erl
