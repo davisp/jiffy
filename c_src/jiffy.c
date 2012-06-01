@@ -22,6 +22,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_partial = make_atom(env, "partial");
     st->atom_uescape = make_atom(env, "uescape");
     st->atom_pretty = make_atom(env, "pretty");
+    st->atom_force_utf8 = make_atom(env, "force_utf8");
 
     // Markers used in encoding
     st->ref_object = make_atom(env, "$object_ref$");

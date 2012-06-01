@@ -81,6 +81,8 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
             e->uescape = 1;
         } else if(enif_compare(val, e->atoms->atom_pretty) == 0) {
             e->pretty = 1;
+        } else if(enif_compare(val, e->atoms->atom_force_utf8) == 0) {
+            // Ignore, handled in Erlang
         } else {
             return 0;
         }

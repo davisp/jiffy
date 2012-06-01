@@ -25,7 +25,11 @@ encode(Data) ->
 
 
 encode(Data, Options) ->
+    ForceUTF8 = lists:member(force_utf8, Options),
     case nif_encode(Data, Options) of
+        {error, invalid_string} when ForceUTF8 == true ->
+            FixedData = jiffy_utf8:fix(Data),
+            encode(FixedData, Options -- [force_utf8]);
         {error, _} = Error ->
             throw(Error);
         {partial, IOData} ->
