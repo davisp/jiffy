@@ -20,7 +20,7 @@ do {                                \
     }                               \
 } while(0)
 
-#ifdef WINDOWS || WIN32
+#if WINDOWS || WIN32
 #define inline __inline
 #define snprintf  _snprintf
 #endif
