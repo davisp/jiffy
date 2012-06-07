@@ -42,7 +42,8 @@ reload(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
 static int
 upgrade(ErlNifEnv* env, void** priv, void** old_priv, ERL_NIF_TERM info)
 {
-    enif_free(*old_priv);
+    if(*old_priv != NULL)
+        enif_free(*old_priv);
     return load(env, priv, info);
 }
 
