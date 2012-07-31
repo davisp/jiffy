@@ -93,7 +93,7 @@ init() ->
         Path ->
             Path
     end,
-    erlang:load_nif(filename:join(PrivDir, "jiffy"), 0).
+    erlang:load_nif(filename:join(PrivDir, "jiffy_drv"), 0).
 
 
 not_loaded(Line) ->
