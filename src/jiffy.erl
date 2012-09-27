@@ -93,7 +93,13 @@ init() ->
         Path ->
             Path
     end,
-    erlang:load_nif(filename:join(PrivDir, "jiffy_drv"), 0).
+    % In some env jiffy_drv.so is generated, in others jiffy.so
+    case filelib:is_file(filename:join(PrivDir, "jiffy_drv.so")) of
+        true ->
+            erlang:load_nif(filename:join(PrivDir, "jiffy_drv"), 0);
+        _ ->
+            erlang:load_nif(filename:join(PrivDir, "jiffy"), 0)
+    end.
 
 
 not_loaded(Line) ->
