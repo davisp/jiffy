@@ -37,3 +37,5 @@ check: build etap eunit
 %.beam: %.erl
 	erlc -o test/ $<
 
+
+.PHONY: all clean distclean depends build etap eunit check
