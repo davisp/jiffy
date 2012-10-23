@@ -1,6 +1,8 @@
 REBAR?=./rebar
 
+
 all: build
+
 
 clean:
 	$(REBAR) clean
@@ -8,8 +10,10 @@ clean:
 	rm -rf .eunit
 	rm -f test/*.beam
 
+
 distclean: clean
 	git clean -fxd
+
 
 depends:
 	@if test ! -d ./deps; then \
