@@ -3,6 +3,8 @@
 
 -module(jiffy_tests).
 
+-ifdef(JIFFY_DEV).
+
 -include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
@@ -130,3 +132,4 @@ escaped_char() ->
         end
     ).
 
+-endif.

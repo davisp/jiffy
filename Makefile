@@ -15,11 +15,13 @@ distclean: clean
 	git clean -fxd
 
 
-depends:
+devmarker:
+	touch .jiffy.dev
+
+
+depends: devmarker
 	@if test ! -d ./deps; then \
 		$(REBAR) get-deps; \
-	else \
-		$(REBAR) update-deps; \
 	fi
 
 
