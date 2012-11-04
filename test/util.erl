@@ -23,9 +23,7 @@ error_mesg(J) ->
     lists:flatten(io_lib:format("Decoding ~p returns an error.", [J])).
 
 check_good({E}, Options) ->
-    J = jiffy:encode(E),
-    etap:is(jiffy:decode(J), E, ok_dec(J, E)),
-    etap:is(do_encode(E, Options), J, ok_enc(E, J));
+    check_good({jiffy:encode(E), E}, Options);
 check_good({J, E}, Options) ->
     etap:is(jiffy:decode(J), E, ok_dec(J, E)),
     etap:is(do_encode(E, Options), J, ok_enc(E, J));
