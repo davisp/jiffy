@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <float.h>
 
 #include "erl_nif.h"
 #include "jiffy.h"
@@ -401,7 +402,12 @@ enc_double(Encoder* e, double val)
 
     start = &(e->p[e->i]);
 
-    sprintf(start, "%0.20g", val);
+    // try to encode doubles using the fewest digits possible...
+    if (snprintf(start, 32, "%.*g", DBL_DIG, val) > FLT_DIG)
+    {
+        // ...fall back to full expansion to be safe
+        snprintf(start, 32, "%.*g", LDBL_DIG, val);
+    }
     len = strlen(start);
 
     // Check if we have a decimal point
