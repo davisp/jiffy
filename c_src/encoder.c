@@ -705,7 +705,7 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
         }
-    } while(!enif_is_empty_list(env, stack));
+    }
 
     if(!enc_done(e, &item)) {
         ret = enc_error(e, "internal_error");
