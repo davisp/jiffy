@@ -6,7 +6,7 @@ main([]) ->
     code:add_pathz("ebin"),
     code:add_pathz("test"),
 
-    etap:plan(116),
+    etap:plan(118),
     util:test_good(good()),
     util:test_good(uescaped(), [uescape]),
     util:test_errors(errors()),
@@ -18,6 +18,7 @@ main([]) ->
 good() ->
     [
         {<<"\"\"">>, <<"">>},
+        {<<"\"/\"">>, <<"/">>},
         {<<"\"0\"">>, <<"0">>},
         {<<"\"foo\"">>, <<"foo">>},
         {<<"\"\\\"foobar\\\"\"">>, <<"\"foobar\"">>},
