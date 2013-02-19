@@ -25,7 +25,7 @@ Errors are raised as exceptions.
     2> Doc = {[{foo, [<<"bing">>, 2.3, true]}]}.
     {[{foo,[<<"bing">>,2.3,true]}]}
     3> jiffy:encode(Doc).
-    <<"{\"foo\":[\"bing\",2.2999999999999998224,true]}">>
+    <<"{\"foo\":[\"bing\",2.3,true]}">>
 
 
 Data Format

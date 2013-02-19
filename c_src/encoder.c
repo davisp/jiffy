@@ -4,11 +4,14 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <float.h>
 
 #include "erl_nif.h"
 #include "jiffy.h"
 
 #define BIN_INC_SIZE 2048
+
+#define FLOAT_BUFLEN (LDBL_DIG*2)
 
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 
@@ -393,13 +396,18 @@ enc_double(Encoder* e, double val)
     size_t len;
     size_t i;
 
-    if(!enc_ensure(e, 32)) {
+    if(!enc_ensure(e, FLOAT_BUFLEN)) {
         return 0;
     }
 
     start = &(e->p[e->i]);
 
-    sprintf(start, "%0.20g", val);
+    // try to encode doubles using the fewest digits possible...
+    if (snprintf(start, FLOAT_BUFLEN, "%.*g", DBL_DIG, val) > FLT_DIG)
+    {
+        // ...fall back to full expansion to be safe
+        snprintf(start, FLOAT_BUFLEN, "%.*g", LDBL_DIG, val);
+    }
     len = strlen(start);
 
     // Check if we have a decimal point
@@ -408,7 +416,7 @@ enc_double(Encoder* e, double val)
             goto done;
     }
 
-    if(len > 29) return 0;
+    if(len >= FLOAT_BUFLEN-2) return 0;
 
     // Force a decimal point
     start[len++] = '.';
