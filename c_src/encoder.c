@@ -391,7 +391,6 @@ enc_double(Encoder* e, double val)
 {
     char* start;
     size_t len;
-    size_t i;
 
     if(!enc_ensure(e, 32)) {
         return 0;
@@ -399,21 +398,10 @@ enc_double(Encoder* e, double val)
 
     start = &(e->p[e->i]);
 
-    len = double_to_shortest(start, e->curr->size, val);
-
-    // Check if we have a decimal point
-    for(i = 0; i < len; i++) {
-        if(start[i] == '.' || start[i] == 'e' || start[i] == 'E')
-            goto done;
+    if(!double_to_shortest(start, e->curr->size, &len, val)) {
+        return 0;
     }
 
-    if(len > 29) return 0;
-
-    // Force a decimal point
-    start[len++] = '.';
-    start[len++] = '0';
-
-done:
     e->i += len;
     e->count++;
     return 1;
