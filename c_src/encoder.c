@@ -399,8 +399,7 @@ enc_double(Encoder* e, double val)
 
     start = &(e->p[e->i]);
 
-    sprintf(start, "%0.20g", val);
-    len = strlen(start);
+    len = double_to_shortest(start, e->curr->size, val);
 
     // Check if we have a decimal point
     for(i = 0; i < len; i++) {

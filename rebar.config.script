@@ -11,16 +11,23 @@ ErlOpts = {erl_opts, [
     {d, 'JIFFY_DEV'}
 ]},
 
-Deps = {deps, [
+Proper = [
     {proper, ".*", {git, "git://github.com/manopapad/proper.git", "master"}}
-]},
+],
 
 ConfigPath = filename:dirname(SCRIPT),
 DevMarker = filename:join([ConfigPath, ".jiffy.dev"]),
 
 case filelib:is_file(DevMarker) of
     true ->
-        CONFIG ++ [ErlOpts, Deps];
+        % Don't override existing dependencies
+        NewConfig = case lists:keyfind(deps, 1, CONFIG) of
+            false ->
+                CONFIG ++ [{deps, Proper}];
+            {deps, DepsList} ->
+                lists:keyreplace(deps, 1, CONFIG, {deps, DepsList ++ Proper})
+        end,
+        NewConfig ++ [ErlOpts];
     false ->
         CONFIG
 end.

@@ -20,7 +20,7 @@ devmarker:
 
 
 depends: devmarker
-	@if test ! -d ./deps; then \
+	@if test ! -d ./deps/proper; then \
 		$(REBAR) get-deps; \
 	fi
 
