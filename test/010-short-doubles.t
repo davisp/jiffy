@@ -21,7 +21,7 @@ main([]) ->
 
 run_tests([]) ->
     ok;
-run_tests([{Double, _, _} | Rest]) ->
+run_tests([Double | Rest]) ->
     RoundTrip = jiffy:decode(jiffy:encode(Double)),
     Desc = lists:flatten(io_lib:format("~e", [Double])),
     etap:is(RoundTrip, Double, "Roundtrip: " ++ Desc),
