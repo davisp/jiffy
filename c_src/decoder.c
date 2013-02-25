@@ -561,7 +561,7 @@ parse:
 
     if(!has_frac && !has_exp) {
         num_type = d->atoms->atom_bignum;
-    } else if(has_exp) {
+    } else if(!has_frac && has_exp) {
         num_type = d->atoms->atom_bignum_e;
     } else {
         num_type = d->atoms->atom_bigdbl;
