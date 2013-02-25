@@ -6,10 +6,21 @@ main([]) ->
     code:add_pathz("ebin"),
     code:add_pathz("test"),
 
-    etap:plan(59),
+    etap:plan(59 + 2 * length(double_conversion_tests())),
     util:test_good(good()),
     util:test_errors(errors()),
+    run_double_conversion_tests(),
     etap:end_tests().
+
+
+run_double_conversion_tests() ->
+    lists:foreach(fun(Double) ->
+        Descr = io_lib:format("~f", [Double]),
+        etap:is(jiffy:decode(jiffy:encode(Double)), Double, Descr),
+        NegDouble = -1.0 * Double,
+        NegDescr = io_lib:format("~f", [NegDouble]),
+        etap:is(jiffy:decode(jiffy:encode(NegDouble)), NegDouble, NegDescr)
+    end, double_conversion_tests()).
 
 good() ->
     [
@@ -55,6 +66,7 @@ good() ->
         {<<"-0.325E+2">>, -32.5, <<"-32.5">>}
     ].
 
+
 errors() ->
     [
         <<"02">>,
@@ -69,3 +81,38 @@ errors() ->
         <<"2E +3">>,
         <<"1EA">>
     ].
+
+
+double_conversion_tests() ->
+    [
+        0.0,
+        0.00000001,
+        0.000000012,
+        0.0000000123,
+        0.0000001,
+        0.00000012,
+        0.000000123,
+        0.000001,
+        0.00001,
+        0.01,
+        0.0123,
+        0.1,
+        0.3,
+        1.0,
+        1.0e20,
+        1.0e21,
+        9.0,
+        10.0,
+        90.0,
+        90.12,
+        10000.0,
+        12345.0,
+        12345.0e23,
+        100000.0,
+        100000000000000000000.0,
+        111111111111111111111.0,
+        1111111111111111111111.0,
+        11111111111111111111111.0
+    ].
+
+
