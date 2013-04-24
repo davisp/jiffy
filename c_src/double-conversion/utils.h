@@ -292,11 +292,24 @@ class StringBuilder {
 // you can use BitCast to cast one pointer type to another.  This confuses gcc
 // enough that it can no longer see that you have cast one pointer type to
 // another thus avoiding the warning.
+//
+// Adding an unused attribute for this static check. Apparently GCC 4.8
+// now throws an error for unused typedefs which triggers -Werror.
+//
+// PJD: 4-24-2013
+//
+
+#if defined(__GCC__)
+#define UNUSED __atribute__((unused))
+#else
+#define UNUSED
+#endif
+
 template <class Dest, class Source>
 inline Dest BitCast(const Source& source) {
   // Compile time assertion: sizeof(Dest) == sizeof(Source)
   // A compile error here means your Dest and Source have different sizes.
-  typedef char VerifySizesAreEqual[sizeof(Dest) == sizeof(Source) ? 1 : -1];
+  UNUSED typedef char VerifySizesAreEqual[sizeof(Dest) == sizeof(Source) ? 1 : -1];
 
   Dest dest;
   memmove(&dest, &source, sizeof(dest));
