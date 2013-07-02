@@ -299,7 +299,7 @@ class StringBuilder {
 // PJD: 4-24-2013
 //
 
-#if defined(__GCC__)
+#if defined(__GNUC__)
 #define UNUSED __attribute__((unused))
 #else
 #define UNUSED
