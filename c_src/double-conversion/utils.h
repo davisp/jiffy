@@ -300,7 +300,7 @@ class StringBuilder {
 //
 
 #if defined(__GCC__)
-#define UNUSED __atribute__((unused))
+#define UNUSED __attribute__((unused))
 #else
 #define UNUSED
 #endif
