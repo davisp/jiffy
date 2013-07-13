@@ -232,10 +232,7 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
     int uval;
     int i;
 
-    if(enif_is_binary(e->env, val)) {
-        if(!enif_inspect_binary(e->env, val, &bin)) {
-            return 0;
-        }
+    if(enif_inspect_iolist_as_binary(e->env, val, &bin)) {
         data = bin.data;
         size = bin.size;
     } else if(enif_is_atom(e->env, val)) {

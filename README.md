@@ -46,7 +46,13 @@ Data Format
     [true, 1.0]                -> [true, 1.0]    -> [true, 1.0]
     {[]}                       -> {}             -> {[]}
     {[{foo, bar}]}             -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
+    {[{"foo", bar}]}           -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
+    {[{"foo", "bar"}]}         -> {"foo": [98,97,114]} -> {[{<<"foo">>, "bar"}]}
     {[{<<"foo">>, <<"bar">>}]} -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
+
+Its important to note that while keys in objects can be an iolist(),
+values will always be treated as arrays of integeres regardless of
+whether Erlang displays them as a string.
 
 Improvements over EEP0018
 -------------------------
