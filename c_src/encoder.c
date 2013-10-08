@@ -514,7 +514,7 @@ enc_yield(Encoder* e, ERL_NIF_TERM stack)
         enc->is_resource = 1;
     }
     ERL_NIF_TERM val = enif_make_resource(e->env, enc);
-    return enif_make_tuple3(e->env, e->atoms->atom_partial, val, stack);
+    return enif_make_tuple4(e->env, e->atoms->atom_partial, val, stack, e->iolist);
 }
 
 
@@ -545,7 +545,15 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         }
         stack = enif_make_list(env, 1, argv[0]);
     } else {
-        stack = argv[1];
+        int arity;
+        ERL_NIF_TERM* args;
+        if(!enif_get_tuple(env, argv[1], &arity, (const ERL_NIF_TERM **) &args)) {
+            return enif_make_badarg(env);
+        } else if(arity != 2) {
+            return enif_make_badarg(env);
+        }
+        stack = args[0];
+        e->iolist = args[1];
         e->env = env;
     }
 

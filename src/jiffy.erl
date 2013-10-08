@@ -116,8 +116,8 @@ nif_decode(_Data, _Options) ->
 
 nif_encode_loop(Data, Options) ->
     case nif_encode(Data, Options) of
-        {partial, Encoder, Stack} ->
-            nif_encode_loop(Encoder, Stack);
+        {partial, Encoder, Stack, IoList} ->
+            nif_encode_loop(Encoder, {Stack, IoList});
         Other ->
             Other
     end.
