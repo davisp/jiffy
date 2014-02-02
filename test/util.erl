@@ -27,7 +27,18 @@ check_good({J, E}, Options) ->
     etap:is(do_encode(E, Options), J, ok_enc(E, J));
 check_good({J, E, J2}, Options) ->
     etap:is(jiffy:decode(J), E, ok_dec(J, E)),
+    check_map({J, J2}, Options),
     etap:is(do_encode(E, Options), J2, ok_enc(E, J2)).
+
+-ifdef(TEST_MAP).
+check_map({J, J2}, Options) ->
+    E2 = jiffy:decode(J, [map]),
+    % etap function breaks all tests because of etap:plan, so stop
+    % if map test failed
+    J2 = do_encode(E2, Options).
+-else.
+check_map(_, _) -> ok.
+-endif.
 
 check_error({J, E}) ->
     etap:fun_is(

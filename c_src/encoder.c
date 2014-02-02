@@ -623,6 +623,7 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
         } else if(enif_get_tuple(env, curr, &arity, &tuple)) {
+            // Old-fasioned object definition: {[{Key1, Val1}, {Key2, Val2}]}
             if(arity != 1) {
                 ret = enc_error(e, "invalid_ejson");
                 goto done;
@@ -665,6 +666,30 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             stack = enif_make_list_cell(env, curr, stack);
             stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
             stack = enif_make_list_cell(env, tuple[1], stack);
+#if MAP_SUPPORT
+        } else if(enif_is_map(env, curr)) {
+            ErlNifMapIterator iter;
+            if(!enif_map_iterator_create(env, curr, &iter, ERL_NIF_MAP_ITERATOR_HEAD)) {
+                ret = enc_error(e, "internal_error");
+                goto done;
+            }
+
+            curr = enif_make_list(env, 0);
+            ERL_NIF_TERM key, val, tup;
+
+            while(!enif_map_iterator_is_tail(env, &iter)) {
+                if(!enif_map_iterator_get_pair(env, &iter, &key, &val)) {
+                    ret = enc_error(e, "internal_error");
+                    goto done;
+                }
+                tup = enif_make_tuple2(env, key, val);
+                curr = enif_make_list_cell(env, tup, curr);
+
+                enif_map_iterator_next(env, &iter);
+            }
+
+            stack = enif_make_list_cell(env, enif_make_tuple1(env, curr), stack);
+#endif
         } else if(enif_is_list(env, curr)) {
             if(!enc_start_array(e)) {
                 ret = enc_error(e, "internal_error");

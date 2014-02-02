@@ -2,22 +2,25 @@
 % See the LICENSE file for more information.
 
 -module(jiffy).
--export([decode/1, encode/1, encode/2]).
+-export([decode/1, decode/2, encode/1, encode/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
 -on_load(init/0).
 
-decode(Data) when is_binary(Data) ->
-    case nif_decode(Data) of
+decode(Data) ->
+    decode(Data, []).
+
+decode(Data, Options) when is_list(Data) ->
+    decode(iolist_to_binary(Data), Options);
+decode(Data, Options) when is_binary(Data) ->
+    case nif_decode(Data, Options) of
         {error, _} = Error ->
             throw(Error);
         {partial, EJson} ->
             finish_decode(EJson);
         EJson ->
             EJson
-    end;
-decode(Data) when is_list(Data) ->
-    decode(iolist_to_binary(Data)).
+    end.
 
 
 encode(Data) ->
@@ -99,7 +102,7 @@ init() ->
 not_loaded(Line) ->
     erlang:nif_error({not_loaded, [{module, ?MODULE}, {line, Line}]}).
 
-nif_decode(_Data) ->
+nif_decode(_Data, _Options) ->
     ?NOT_LOADED.
 
 nif_encode(_Data, _Options) ->

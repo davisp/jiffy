@@ -28,6 +28,10 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->ref_object = make_atom(env, "$object_ref$");
     st->ref_array = make_atom(env, "$array_ref$");
 
+#if MAP_SUPPORT
+    st->atom_map = make_atom(env, "map");
+#endif
+
     *priv = (void*) st;
 
     return 0;
@@ -54,7 +58,7 @@ unload(ErlNifEnv* env, void* priv)
 
 static ErlNifFunc funcs[] =
 {
-    {"nif_decode", 1, decode},
+    {"nif_decode", 2, decode},
     {"nif_encode", 2, encode}
 };
 
