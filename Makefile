@@ -2,7 +2,6 @@ REBAR?=./rebar
 
 all: build
 
-
 clean:
 	$(REBAR) clean
 	rm -rf logs
@@ -40,11 +39,7 @@ check: build etap eunit
 
 
 %.beam: %.erl
-	rm -f .test_map
-	erl -eval '#{}, halt().' -noshell || touch .test_map
-	@if test ! -d .test_map; then \
-		erlc -DTEST_MAP -o test/ $<; \
-	fi
+	erlc -DTEST_MAP -o test/ $<
 
 
 .PHONY: all clean distclean depends build etap eunit check

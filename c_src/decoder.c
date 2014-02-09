@@ -90,7 +90,6 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ERL_NIF_TERM opts, ErlNif
     d->st_data[0] = st_value;
     d->st_top++;
 
-#if MAP_SUPPORT
     ERL_NIF_TERM val;
     while(enif_get_list_cell(env, opts, &val, &opts)) {
         if(enif_compare(val, d->atoms->atom_map) == 0) {
@@ -99,7 +98,6 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ERL_NIF_TERM opts, ErlNif
             return 0;
         }
     }
-#endif
     return 1;
 }
 
@@ -588,12 +586,14 @@ parse:
     return 1;
 }
 
-#if MAP_SUPPORT
 ERL_NIF_TERM
 make_object_map(ErlNifEnv* env, ERL_NIF_TERM pairs)
 {
-    ERL_NIF_TERM ret = enif_make_new_map(env);
+    ERL_NIF_TERM ret;
     ERL_NIF_TERM key, val;
+
+#if MAP_SUPPORT
+    ret = enif_make_new_map(env);
 
     while(enif_get_list_cell(env, pairs, &val, &pairs)) {
         if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
@@ -601,23 +601,32 @@ make_object_map(ErlNifEnv* env, ERL_NIF_TERM pairs)
         }
         enif_make_map_put(env, ret, key, val, &ret);
     }
+#else
+    assert(0 == 1 && "maps not supported");
+#endif
 
     return ret;
 }
+
+
 ERL_NIF_TERM
 make_empty_object_map(ErlNifEnv* env) {
-    return enif_make_new_map(env);
-}
+    ERL_NIF_TERM ret;
+#if MAP_SUPPORT
+    ret = enif_make_new_map(env);
+#else
+    assert(0 == 1 && "maps not supported");
 #endif
+
+    return ret;
+}
 
 ERL_NIF_TERM
 make_empty_object(Decoder* d) {
     ErlNifEnv* env = d->env;
-#if MAP_SUPPORT
     if(d->to_map) {
         return make_empty_object_map(env);
     }
-#endif
 
     return enif_make_tuple1(env, enif_make_list(env, 0));
 }
@@ -626,11 +635,9 @@ ERL_NIF_TERM
 make_object(Decoder* d, ERL_NIF_TERM pairs)
 {
     ErlNifEnv* env = d->env;
-#if MAP_SUPPORT
     if(d->to_map) {
         return make_object_map(env, pairs);
     }
-#endif
 
     ERL_NIF_TERM ret = enif_make_list(env, 0);
     ERL_NIF_TERM key, val;
@@ -682,12 +689,10 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-#if !MAP_SUPPORT
-    if(d->to_map) {
+    if(d->to_map && !maps_enabled()) {
         ret = dec_error(d, "map_unavailable");
         goto done;
     }
-#endif
 
     //fprintf(stderr, "Parsing:\r\n");
     while(d->i < bin.size) {

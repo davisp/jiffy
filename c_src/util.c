@@ -24,3 +24,12 @@ make_error(jiffy_st* st, ErlNifEnv* env, const char* error)
 {
     return enif_make_tuple2(env, st->atom_error, make_atom(env, error));
 }
+
+int
+maps_enabled(void) {
+#if MAP_SUPPORT
+    return 1;
+#else
+    return 0;
+#endif
+}

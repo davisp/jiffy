@@ -23,14 +23,11 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_uescape = make_atom(env, "uescape");
     st->atom_pretty = make_atom(env, "pretty");
     st->atom_force_utf8 = make_atom(env, "force_utf8");
+    st->atom_map = make_atom(env, "map");
 
     // Markers used in encoding
     st->ref_object = make_atom(env, "$object_ref$");
     st->ref_array = make_atom(env, "$array_ref$");
-
-#if MAP_SUPPORT
-    st->atom_map = make_atom(env, "map");
-#endif
 
     *priv = (void*) st;
 
