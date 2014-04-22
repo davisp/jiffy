@@ -62,7 +62,7 @@ utf8_len(int c)
     } else if(c < 0x800) {
         return 2;
     } else if(c < 0x10000) {
-        if(c < 0xD800 || (c > 0xDFFF && c < 0xFFFE)) {
+        if(c < 0xD800 || (c > 0xDFFF)) {
             return 3;
         } else {
             return -1;
@@ -141,8 +141,6 @@ utf8_validate(unsigned char* data, size_t size)
             return -1;
         } else if(ui >= 0xD800 && ui <= 0xDFFF) {
             return -1;
-        } else if(ui == 0xFFFE || ui == 0xFFFF) {
-            return -1;
         } else if(ui > 0x10FFFF) {
             return -1;
         }
@@ -193,7 +191,7 @@ unicode_to_utf8(int c, unsigned char* buf)
         buf[1] = (unsigned char) 0x80 + (c & 0x3F);
         return 2;
     } else if(c < 0x10000) {
-        if(c < 0xD800 || (c > 0xDFFF && c < 0xFFFE)) {
+        if(c < 0xD800 || (c > 0xDFFF)) {
             buf[0] = (unsigned char) 0xE0 + (c >> 12);
             buf[1] = (unsigned char) 0x80 + ((c >> 6) & 0x3F);
             buf[2] = (unsigned char) 0x80 + (c & 0x3F);
