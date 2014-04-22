@@ -6,7 +6,7 @@ main([]) ->
     code:add_pathz("ebin"),
     code:add_pathz("test"),
 
-    etap:plan(119),
+    etap:plan(115),
     util:test_good(good()),
     util:test_good(uescaped(), [uescape]),
     util:test_errors(errors()),
@@ -29,7 +29,9 @@ good() ->
             <<"\"\\uD834\\uDD1E\"">>,
             <<240, 157, 132, 158>>,
             <<34, 240, 157, 132, 158, 34>>
-        }
+        },
+        {<<"\"\\uFFFF\"">>, <<239,191,191>>, <<34,239,191,191,34>>},
+        {<<"\"\\uFFFE\"">>, <<239,191,190>>, <<34,239,191,190,34>>}
     ].
 
 uescaped() ->
@@ -54,8 +56,6 @@ errors() ->
         <<"\"foo">>,
         <<"\"", 0, "\"">>,
         <<"\"\\g\"">>,
-        <<"\"\\uFFFF\"">>,
-        <<"\"\\uFFFE\"">>,
         <<"\"\\uD834foo\\uDD1E\"">>,
         % CouchDB-345
         <<34,78,69,73,77,69,78,32,70,216,82,82,32,70,65,69,78,33,34>>
@@ -87,10 +87,6 @@ utf8_cases() ->
         % Stray continuation byte
         {<<16#C2, 16#81, 16#80>>, <<16#C2, 16#81, 16#EF, 16#BF, 16#BD>>},
         {<<"foo", 16#80, "bar">>, <<"foo", 16#EF, 16#BF, 16#BD, "bar">>},
-
-        % Invalid Unicode code points
-        {<<239, 191, 190>>, <<16#EF, 16#BF, 16#BD>>},
-        {<<237, 160, 129>>, <<16#EF, 16#BF, 16#BD>>},
 
         % Not enough extension bytes
         {<<16#C0>>, <<16#EF, 16#BF, 16#BD>>},
