@@ -23,10 +23,16 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_uescape = make_atom(env, "uescape");
     st->atom_pretty = make_atom(env, "pretty");
     st->atom_force_utf8 = make_atom(env, "force_utf8");
+    st->atom_reductions = make_atom(env, "reductions");
 
     // Markers used in encoding
     st->ref_object = make_atom(env, "$object_ref$");
     st->ref_array = make_atom(env, "$array_ref$");
+
+    st->res_encoder = enif_open_resource_type(env, "jiffy", "encoder",
+        enc_destroy, ERL_NIF_RT_CREATE, NULL);
+    st->res_decoder = enif_open_resource_type(env, "jiffy", "decoder",
+        dec_destroy, ERL_NIF_RT_CREATE, NULL);
 
     *priv = (void*) st;
 
@@ -54,7 +60,7 @@ unload(ErlNifEnv* env, void* priv)
 
 static ErlNifFunc funcs[] =
 {
-    {"nif_decode", 1, decode},
+    {"nif_decode", 2, decode},
     {"nif_encode", 2, encode}
 };
 

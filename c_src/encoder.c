@@ -36,12 +36,16 @@ typedef struct {
 
     int             iolen;
     ERL_NIF_TERM    iolist;
+    size_t          iosize;
     ErlNifBinary*   curr;
 
 
     char*           p;
     unsigned char*  u;
     size_t          i;
+
+    int             is_resource;
+    size_t          reds;
 } Encoder;
 
 
@@ -61,7 +65,7 @@ static char* shifts[NUM_SHIFTS] = {
 
 
 int
-enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
+enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts)
 {
     ERL_NIF_TERM val;
 
@@ -71,6 +75,7 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
     e->pretty = 0;
     e->shiftcnt = 0;
     e->count = 0;
+    e->reds = REDUCTIONS;
 
     if(!enif_is_list(env, opts)) {
         return 0;
@@ -83,15 +88,16 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
             e->pretty = 1;
         } else if(enif_compare(val, e->atoms->atom_force_utf8) == 0) {
             // Ignore, handled in Erlang
-        } else {
+        } else if(!get_reductions(env, val, e->atoms, &e->reds)) {
             return 0;
         }
     }
 
     e->iolen = 0;
     e->iolist = enif_make_list(env, 0);
-    e->curr = bin;
-    if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
+    e->iosize = 0;
+    e->curr = enif_alloc(sizeof(ErlNifBinary));
+    if(!e->curr || !enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
         return 0;
     }
 
@@ -101,15 +107,19 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
     e->u = (unsigned char*) e->curr->data;
     e->i = 0;
 
+    e->is_resource = 0;
+
     return 1;
 }
 
 void
-enc_destroy(Encoder* e)
+enc_destroy(ErlNifEnv* env, void* enc)
 {
+    Encoder *e = enc;
     if(e->curr != NULL) {
         enif_release_binary(e->curr);
     }
+    enif_free(e->curr);
 }
 
 ERL_NIF_TERM
@@ -189,6 +199,7 @@ enc_unknown(Encoder* e, ERL_NIF_TERM value)
 
     e->iolist = enif_make_list_cell(e->env, value, e->iolist);
     e->iolen++;
+    e->iosize += e->i;
 
     // Reinitialize our binary for the next buffer.
     e->curr = bin;
@@ -493,13 +504,26 @@ enc_comma(Encoder* e)
     return 1;
 }
 
+static ERL_NIF_TERM
+enc_yield(Encoder* e, ERL_NIF_TERM stack)
+{
+    Encoder* enc = e;
+    if(!e->is_resource) {
+        enc = enif_alloc_resource(e->atoms->res_encoder, sizeof(Encoder));
+        *enc = *e;
+        enc->is_resource = 1;
+    }
+    ERL_NIF_TERM val = enif_make_resource(e->env, enc);
+    return enif_make_tuple4(e->env, e->atoms->atom_partial, val, stack, e->iolist);
+}
+
+
 ERL_NIF_TERM
 encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     Encoder enc;
     Encoder* e = &enc;
 
-    ErlNifBinary bin;
     ERL_NIF_TERM ret;
 
     ERL_NIF_TERM stack;
@@ -514,11 +538,26 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    if(!enc_init(e, env, argv[1], &bin)) {
-        return enif_make_badarg(env);
+    jiffy_st *priv = enif_priv_data(env);
+    if(!enif_get_resource(env, argv[0], priv->res_encoder, (void **) &e)) {
+        if(!enc_init(e, env, argv[1])) {
+            return enif_make_badarg(env);
+        }
+        stack = enif_make_list(env, 1, argv[0]);
+    } else {
+        int arity;
+        ERL_NIF_TERM* args;
+        if(!enif_get_tuple(env, argv[1], &arity, (const ERL_NIF_TERM **) &args)) {
+            return enif_make_badarg(env);
+        } else if(arity != 2) {
+            return enif_make_badarg(env);
+        }
+        stack = args[0];
+        e->iolist = args[1];
+        e->env = env;
     }
 
-    stack = enif_make_list(env, 1, argv[0]);
+    size_t processed = e->iosize + e->i;
 
     while(!enif_is_empty_list(env, stack)) {
         if(!enif_get_list_cell(env, stack, &curr, &stack)) {
@@ -690,6 +729,9 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
         }
+        if(jiffy_consume_timeslice(env, e->reds, e->iosize + e->i, &processed)) {
+            return enc_yield(e, stack);
+        }
     }
 
     if(!enc_done(e, &item)) {
@@ -704,6 +746,7 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 done:
-    enc_destroy(e);
+    jiffy_consume_timeslice(env, e->reds, e->i, &processed);
+    enc_destroy(env, e);
     return ret;
 }

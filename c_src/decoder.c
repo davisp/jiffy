@@ -47,7 +47,6 @@ typedef struct {
     jiffy_st*       atoms;
 
     ERL_NIF_TERM    arg;
-    ErlNifBinary    bin;
 
     int             is_partial;
 
@@ -59,22 +58,37 @@ typedef struct {
     char*           st_data;
     int             st_size;
     int             st_top;
+
+    int             is_resource;
+    size_t          reds;
 } Decoder;
 
+
 void
-dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
+dec_init_bin(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
 {
-    int i;
-
-    d->env = env;
-    d->atoms = enif_priv_data(env);
     d->arg = arg;
-
-    d->is_partial = 0;
 
     d->p = (char*) bin->data;
     d->u = bin->data;
     d->len = bin->size;
+
+    d->env = env;
+}
+
+int
+dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg,
+                     ERL_NIF_TERM opts, ErlNifBinary* bin)
+{
+    int i;
+    ERL_NIF_TERM val;
+
+    d->env = env;
+    d->atoms = enif_priv_data(env);
+
+    d->is_partial = 0;
+
+    dec_init_bin(d, env, arg, bin);
     d->i = 0;
 
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC * sizeof(char));
@@ -87,11 +101,26 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
 
     d->st_data[0] = st_value;
     d->st_top++;
+
+    d->reds = REDUCTIONS;
+
+    if(!enif_is_list(env, opts)) {
+        return 0;
+    }
+    while(enif_get_list_cell(env, opts, &val, &opts)) {
+        if(!get_reductions(env, val, d->atoms, &d->reds)) {
+            return 0;
+        }
+    }
+
+    d->is_resource = 0;
+    return 1;
 }
 
 void
-dec_destroy(Decoder* d)
+dec_destroy(ErlNifEnv* env, void* dec)
 {
+    Decoder* d = dec;
     if(d->st_data != NULL) {
         enif_free(d->st_data);
     }
@@ -604,26 +633,60 @@ make_array(ErlNifEnv* env, ERL_NIF_TERM list)
     return ret;
 }
 
+static ERL_NIF_TERM
+dec_yield(Decoder* d, ERL_NIF_TERM objs, ERL_NIF_TERM curr)
+{
+    Decoder* dec = d;
+    if(!d->is_resource) {
+        dec = enif_alloc_resource(d->atoms->res_decoder, sizeof(Decoder));
+        *dec = *d;
+        dec->is_resource = 1;
+    }
+    ERL_NIF_TERM val = enif_make_resource(d->env, dec);
+    return enif_make_tuple4(d->env,
+        d->atoms->atom_partial, val, objs, curr);
+}
+
 ERL_NIF_TERM
 decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     Decoder dec;
     Decoder* d = &dec;
-
     ErlNifBinary bin;
 
-    ERL_NIF_TERM objs = enif_make_list(env, 0);
-    ERL_NIF_TERM curr = enif_make_list(env, 0);
+    ERL_NIF_TERM objs;
+    ERL_NIF_TERM curr;
     ERL_NIF_TERM val;
     ERL_NIF_TERM ret;
 
-    if(argc != 1) {
+    if(argc != 2) {
         return enif_make_badarg(env);
     } else if(!enif_inspect_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
     }
 
-    dec_init(d, env, argv[0], &bin);
+    int arity;
+    ERL_NIF_TERM* args;
+    if(enif_get_tuple(env, argv[1], &arity, (const ERL_NIF_TERM **) &args)) {
+        jiffy_st *priv = enif_priv_data(env);
+        if(arity != 3 ) {
+            return enif_make_badarg(env);
+        }
+        if(!enif_get_resource(env, args[0], priv->res_decoder, (void **) &d)) {
+            return enif_make_badarg(env);
+        }
+        objs = args[1];
+        curr = args[2];
+        dec_init_bin(d, env, argv[0], &bin);
+    } else {
+        objs = enif_make_list(env, 0);
+        curr = enif_make_list(env, 0);
+        if (!dec_init(d, env, argv[0], argv[1], &bin)) {
+            return enif_make_badarg(env);
+        }
+    }
+
+    size_t processed = d->i;
 
     //fprintf(stderr, "Parsing:\r\n");
     while(d->i < bin.size) {
@@ -897,6 +960,11 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = dec_error(d, "invalid_internal_state");
                 goto done;
         }
+        if(dec_curr(d) != st_done) {
+            if(jiffy_consume_timeslice(env, d->reds, d->i, &processed)) {
+                return dec_yield(d, objs, curr);
+            }
+        }
     }
 
     if(dec_curr(d) != st_done) {
@@ -908,7 +976,8 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 done:
-    dec_destroy(d);
+    jiffy_consume_timeslice(env, d->reds, d->i, &processed);
+    dec_destroy(env, d);
 
     return ret;
 }

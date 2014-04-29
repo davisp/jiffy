@@ -2,13 +2,17 @@
 % See the LICENSE file for more information.
 
 -module(jiffy).
--export([decode/1, encode/1, encode/2]).
+-export([decode/1, decode/2, encode/1, encode/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
 -on_load(init/0).
 
-decode(Data) when is_binary(Data) ->
-    case nif_decode(Data) of
+decode(Data) ->
+    decode(Data, []).
+
+
+decode(Data, Options) when is_binary(Data) ->
+    case nif_decode_loop(Data, Options) of
         {error, _} = Error ->
             throw(Error);
         {partial, EJson} ->
@@ -16,8 +20,8 @@ decode(Data) when is_binary(Data) ->
         EJson ->
             EJson
     end;
-decode(Data) when is_list(Data) ->
-    decode(iolist_to_binary(Data)).
+decode(Data, Options) when is_list(Data) ->
+    decode(iolist_to_binary(Data), Options).
 
 
 encode(Data) ->
@@ -26,7 +30,7 @@ encode(Data) ->
 
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
-    case nif_encode(Data, Options) of
+    case nif_encode_loop(Data, Options) of
         {error, invalid_string} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
             encode(FixedData, Options -- [force_utf8]);
@@ -99,8 +103,24 @@ init() ->
 not_loaded(Line) ->
     erlang:nif_error({not_loaded, [{module, ?MODULE}, {line, Line}]}).
 
-nif_decode(_Data) ->
+nif_decode_loop(Data, Options) ->
+    case nif_decode(Data, Options) of
+        {partial, Decoder, Objs, Curr} ->
+            nif_decode_loop(Data, {Decoder, Objs, Curr});
+        Other ->
+            Other
+    end.
+
+nif_decode(_Data, _Options) ->
     ?NOT_LOADED.
+
+nif_encode_loop(Data, Options) ->
+    case nif_encode(Data, Options) of
+        {partial, Encoder, Stack, IoList} ->
+            nif_encode_loop(Encoder, {Stack, IoList});
+        Other ->
+            Other
+    end.
 
 nif_encode(_Data, _Options) ->
     ?NOT_LOADED.
