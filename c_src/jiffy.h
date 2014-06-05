@@ -6,6 +6,8 @@
 
 #include "erl_nif.h"
 
+#define MAP_SUPPORT ((ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION >= 6) || (ERL_NIF_MAJOR_VERSION > 2))
+
 typedef struct {
     ERL_NIF_TERM    atom_ok;
     ERL_NIF_TERM    atom_error;
@@ -19,6 +21,7 @@ typedef struct {
     ERL_NIF_TERM    atom_uescape;
     ERL_NIF_TERM    atom_pretty;
     ERL_NIF_TERM    atom_force_utf8;
+    ERL_NIF_TERM    atom_map;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
@@ -27,6 +30,7 @@ typedef struct {
 ERL_NIF_TERM make_atom(ErlNifEnv* env, const char* name);
 ERL_NIF_TERM make_ok(jiffy_st* st, ErlNifEnv* env, ERL_NIF_TERM data);
 ERL_NIF_TERM make_error(jiffy_st* st, ErlNifEnv* env, const char* error);
+int maps_enabled(void);
 
 ERL_NIF_TERM decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
@@ -41,5 +45,6 @@ int unicode_to_utf8(int c, unsigned char* buf);
 int unicode_from_pair(int hi, int lo);
 int unicode_uescape(int c, char* buf);
 int double_to_shortest(char *buf, size_t size, size_t* len, double val);
+
 
 #endif // Included JIFFY_H

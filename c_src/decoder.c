@@ -59,10 +59,11 @@ typedef struct {
     char*           st_data;
     int             st_size;
     int             st_top;
+    int             to_map;
 } Decoder;
 
-void
-dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
+int
+dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ERL_NIF_TERM opts, ErlNifBinary* bin)
 {
     int i;
 
@@ -80,6 +81,7 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC * sizeof(char));
     d->st_size = STACK_SIZE_INC;
     d->st_top = 0;
+    d->to_map = 0;
 
     for(i = 0; i < d->st_size; i++) {
         d->st_data[i] = st_invalid;
@@ -87,6 +89,16 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
 
     d->st_data[0] = st_value;
     d->st_top++;
+
+    ERL_NIF_TERM val;
+    while(enif_get_list_cell(env, opts, &val, &opts)) {
+        if(enif_compare(val, d->atoms->atom_map) == 0) {
+            d->to_map = 1;
+        } else {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 void
@@ -575,8 +587,58 @@ parse:
 }
 
 ERL_NIF_TERM
-make_object(ErlNifEnv* env, ERL_NIF_TERM pairs)
+make_object_map(ErlNifEnv* env, ERL_NIF_TERM pairs)
 {
+    ERL_NIF_TERM ret;
+    ERL_NIF_TERM key, val;
+
+#if MAP_SUPPORT
+    ret = enif_make_new_map(env);
+
+    while(enif_get_list_cell(env, pairs, &val, &pairs)) {
+        if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
+            assert(0 == 1 && "Unbalanced object pairs.");
+        }
+        enif_make_map_put(env, ret, key, val, &ret);
+    }
+#else
+    assert(0 == 1 && "maps not supported");
+#endif
+
+    return ret;
+}
+
+
+ERL_NIF_TERM
+make_empty_object_map(ErlNifEnv* env) {
+    ERL_NIF_TERM ret;
+#if MAP_SUPPORT
+    ret = enif_make_new_map(env);
+#else
+    assert(0 == 1 && "maps not supported");
+#endif
+
+    return ret;
+}
+
+ERL_NIF_TERM
+make_empty_object(Decoder* d) {
+    ErlNifEnv* env = d->env;
+    if(d->to_map) {
+        return make_empty_object_map(env);
+    }
+
+    return enif_make_tuple1(env, enif_make_list(env, 0));
+}
+
+ERL_NIF_TERM
+make_object(Decoder* d, ERL_NIF_TERM pairs)
+{
+    ErlNifEnv* env = d->env;
+    if(d->to_map) {
+        return make_object_map(env, pairs);
+    }
+
     ERL_NIF_TERM ret = enif_make_list(env, 0);
     ERL_NIF_TERM key, val;
 
@@ -617,13 +679,20 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM val;
     ERL_NIF_TERM ret;
 
-    if(argc != 1) {
+    if(argc != 2) {
         return enif_make_badarg(env);
     } else if(!enif_inspect_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
     }
 
-    dec_init(d, env, argv[0], &bin);
+    if(!dec_init(d, env, argv[0], argv[1], &bin)) {
+        return enif_make_badarg(env);
+    }
+
+    if(d->to_map && !maps_enabled()) {
+        ret = dec_error(d, "map_unavailable");
+        goto done;
+    }
 
     //fprintf(stderr, "Parsing:\r\n");
     while(d->i < bin.size) {
@@ -770,7 +839,7 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         dec_pop(d, st_key);
                         dec_pop(d, st_object);
                         dec_pop(d, st_value);
-                        val = enif_make_tuple1(env, curr);
+                        val = make_empty_object(d);
                         if(!enif_get_list_cell(env, objs, &curr, &objs)) {
                             ret = dec_error(d, "internal_error");
                             goto done;
@@ -839,7 +908,7 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         }
                         dec_pop(d, st_object);
                         dec_pop(d, st_value);
-                        val = make_object(env, curr);
+                        val = make_object(d, curr);
                         if(!enif_get_list_cell(env, objs, &curr, &objs)) {
                             ret = dec_error(d, "internal_error");
                             goto done;

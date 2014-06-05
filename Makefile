@@ -1,8 +1,6 @@
 REBAR?=./rebar
 
-
 all: build
-
 
 clean:
 	$(REBAR) clean
@@ -41,7 +39,7 @@ check: build etap eunit
 
 
 %.beam: %.erl
-	erlc -o test/ $<
+	erlc -DTEST_MAP -o test/ $<
 
 
 .PHONY: all clean distclean depends build etap eunit check
