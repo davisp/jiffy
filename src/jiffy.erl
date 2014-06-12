@@ -26,7 +26,7 @@ encode(Data) ->
 
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
-    case nif_encode(Data, Options) of
+    case nif_encode_init(Data, Options) of
         {error, invalid_string} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
             encode(FixedData, Options -- [force_utf8]);
@@ -106,6 +106,9 @@ nif_decode_init(_Data) ->
 nif_decode_iter(_Data, _Decoder, _, _) ->
     ?NOT_LOADED.
 
-nif_encode(_Data, _Options) ->
-    ?NOT_LOADED.
+nif_encode_init(_Data, _Options) ->
+    ?NOT_LOADED,
+    nif_encode_iter(x, y, z).
 
+nif_encode_iter(_Encoder, _Stack, _IoList) ->
+    ?NOT_LOADED.

@@ -24,6 +24,7 @@ typedef struct {
     ERL_NIF_TERM    ref_array;
 
     ErlNifResourceType* res_dec;
+    ErlNifResourceType* res_enc;
 } jiffy_st;
 
 ERL_NIF_TERM make_atom(ErlNifEnv* env, const char* name);
@@ -32,9 +33,11 @@ ERL_NIF_TERM make_error(jiffy_st* st, ErlNifEnv* env, const char* error);
 
 ERL_NIF_TERM decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 
 void dec_destroy(ErlNifEnv* env, void* obj);
+void enc_destroy(ErlNifEnv* env, void* obj);
 
 int int_from_hex(const unsigned char* p);
 int int_to_hex(int val, char* p);

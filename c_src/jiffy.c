@@ -37,6 +37,15 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
             NULL
         );
 
+    st->res_enc = enif_open_resource_type(
+            env,
+            NULL,
+            "encoder",
+            enc_destroy,
+            ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER,
+            NULL
+        );
+
     *priv = (void*) st;
 
     return 0;
@@ -65,7 +74,8 @@ static ErlNifFunc funcs[] =
 {
     {"nif_decode_init", 1, decode_init},
     {"nif_decode_iter", 4, decode_iter},
-    {"nif_encode", 2, encode}
+    {"nif_encode_init", 2, encode_init},
+    {"nif_encode_iter", 3, encode_iter}
 };
 
 ERL_NIF_INIT(jiffy, funcs, &load, &reload, &upgrade, &unload);

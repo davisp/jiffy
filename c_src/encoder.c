@@ -36,6 +36,7 @@ typedef struct {
 
     int             iolen;
     ERL_NIF_TERM    iolist;
+    ErlNifBinary    bin;
     ErlNifBinary*   curr;
 
 
@@ -60,39 +61,24 @@ static char* shifts[NUM_SHIFTS] = {
 };
 
 
-int
-enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
+Encoder*
+enc_new(ErlNifEnv* env)
 {
-    ERL_NIF_TERM val;
+    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    Encoder* e = enif_alloc_resource(st->res_enc, sizeof(Encoder));
 
-    e->env = env;
-    e->atoms = enif_priv_data(env);
+    e->atoms = st;
     e->uescape = 0;
     e->pretty = 0;
     e->shiftcnt = 0;
     e->count = 0;
 
-    if(!enif_is_list(env, opts)) {
-        return 0;
-    }
-
-    while(enif_get_list_cell(env, opts, &val, &opts)) {
-        if(enif_compare(val, e->atoms->atom_uescape) == 0) {
-            e->uescape = 1;
-        } else if(enif_compare(val, e->atoms->atom_pretty) == 0) {
-            e->pretty = 1;
-        } else if(enif_compare(val, e->atoms->atom_force_utf8) == 0) {
-            // Ignore, handled in Erlang
-        } else {
-            return 0;
-        }
-    }
-
     e->iolen = 0;
-    e->iolist = enif_make_list(env, 0);
-    e->curr = bin;
+    e->curr = &(e->bin);
     if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
-        return 0;
+        e->curr = NULL;
+        enif_release_resource(e);
+        return NULL;
     }
 
     memset(e->curr->data, 0, e->curr->size);
@@ -101,12 +87,21 @@ enc_init(Encoder* e, ErlNifEnv* env, ERL_NIF_TERM opts, ErlNifBinary* bin)
     e->u = (unsigned char*) e->curr->data;
     e->i = 0;
 
+    return e;
+}
+
+int
+enc_init(Encoder* e, ErlNifEnv* env)
+{
+    e->env = env;
     return 1;
 }
 
 void
-enc_destroy(Encoder* e)
+enc_destroy(ErlNifEnv* env, void* obj)
 {
+    Encoder* e = (Encoder*) obj;
+
     if(e->curr != NULL) {
         enif_release_binary(e->curr);
     }
@@ -494,13 +489,57 @@ enc_comma(Encoder* e)
 }
 
 ERL_NIF_TERM
-encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    Encoder enc;
-    Encoder* e = &enc;
+    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    Encoder* e;
 
-    ErlNifBinary bin;
-    ERL_NIF_TERM ret;
+    ERL_NIF_TERM opts;
+    ERL_NIF_TERM val;
+    ERL_NIF_TERM tmp_argv[3];
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    e = enc_new(env);
+    if(e == NULL) {
+        return make_error(st, env, "internal_error");
+    }
+
+    tmp_argv[0] = enif_make_resource(env, e);
+    tmp_argv[1] = enif_make_list(env, 1, argv[0]);
+    tmp_argv[2] = enif_make_list(env, 0);
+
+    enif_release_resource(e);
+
+    opts = argv[1];
+    if(!enif_is_list(env, opts)) {
+        return enif_make_badarg(env);
+    }
+
+    while(enif_get_list_cell(env, opts, &val, &opts)) {
+        if(enif_compare(val, e->atoms->atom_uescape) == 0) {
+            e->uescape = 1;
+        } else if(enif_compare(val, e->atoms->atom_pretty) == 0) {
+            e->pretty = 1;
+        } else if(enif_compare(val, e->atoms->atom_force_utf8) == 0) {
+            // Ignore, handled in Erlang
+        } else {
+            return enif_make_badarg(env);
+        }
+    }
+
+    return encode_iter(env, 3, tmp_argv);
+}
+
+ERL_NIF_TERM
+encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    Encoder* e;
+    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+
+    ERL_NIF_TERM ret = 0;
 
     ERL_NIF_TERM stack;
     ERL_NIF_TERM curr;
@@ -510,15 +549,22 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ErlNifSInt64 lval;
     double dval;
 
-    if(argc != 2) {
+    if(argc != 3) {
+        return enif_make_badarg(env);
+    } else if(!enif_get_resource(env, argv[0], st->res_enc, (void**) &e)) {
+        return enif_make_badarg(env);
+    } else if(!enif_is_list(env, argv[1])) {
+        return enif_make_badarg(env);
+    } else if(!enif_is_list(env, argv[2])) {
         return enif_make_badarg(env);
     }
 
-    if(!enc_init(e, env, argv[1], &bin)) {
+    if(!enc_init(e, env)) {
         return enif_make_badarg(env);
     }
 
-    stack = enif_make_list(env, 1, argv[0]);
+    stack = argv[1];
+    e->iolist = argv[2];
 
     while(!enif_is_empty_list(env, stack)) {
         if(!enif_get_list_cell(env, stack, &curr, &stack)) {
@@ -704,6 +750,5 @@ encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 done:
-    enc_destroy(e);
     return ret;
 }
