@@ -61,21 +61,25 @@ typedef struct {
     int             st_top;
 } Decoder;
 
-void
-dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
+Decoder*
+dec_new(ErlNifEnv* env)
 {
+    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    Decoder* d = enif_alloc_resource(st->res_dec, sizeof(Decoder));
     int i;
 
-    d->env = env;
-    d->atoms = enif_priv_data(env);
-    d->arg = arg;
+    if(d == NULL) {
+        return NULL;
+    }
+
+    d->atoms = st;
 
     d->is_partial = 0;
 
-    d->p = (char*) bin->data;
-    d->u = bin->data;
-    d->len = bin->size;
-    d->i = 0;
+    d->p = NULL;
+    d->u = NULL;
+    d->len = -1;
+    d->i = -1;
 
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC * sizeof(char));
     d->st_size = STACK_SIZE_INC;
@@ -87,11 +91,36 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
 
     d->st_data[0] = st_value;
     d->st_top++;
+
+    return d;
 }
 
 void
-dec_destroy(Decoder* d)
+dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
 {
+    d->env = env;
+    d->arg = arg;
+
+    d->p = (char*) bin->data;
+    d->u = bin->data;
+    d->len = bin->size;
+
+    // I'd like to be more forceful on this check so that when
+    // we run a second iteration of the decoder we are sure
+    // that we're using the same binary. Unfortunately, I don't
+    // think there's a value to base this assertion on.
+    if(d->i < 0) {
+        d->i = 0;
+    } else {
+        assert(d->i <= d->len && "mismatched binary lengths");
+    }
+}
+
+void
+dec_destroy(ErlNifEnv* env, void* obj)
+{
+    Decoder* d = (Decoder*) obj;
+
     if(d->st_data != NULL) {
         enif_free(d->st_data);
     }
@@ -605,25 +634,59 @@ make_array(ErlNifEnv* env, ERL_NIF_TERM list)
 }
 
 ERL_NIF_TERM
-decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    Decoder dec;
-    Decoder* d = &dec;
-
-    ErlNifBinary bin;
-
-    ERL_NIF_TERM objs = enif_make_list(env, 0);
-    ERL_NIF_TERM curr = enif_make_list(env, 0);
-    ERL_NIF_TERM val;
-    ERL_NIF_TERM ret;
+    Decoder* d;
+    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    ERL_NIF_TERM tmp_argv[4];
 
     if(argc != 1) {
         return enif_make_badarg(env);
+    }
+
+    d = dec_new(env);
+    if(d == NULL) {
+        return make_error(st, env, "internal_error");
+    }
+
+    tmp_argv[0] = argv[0];
+    tmp_argv[1] = enif_make_resource(env, d);
+    tmp_argv[2] = enif_make_list(env, 0);
+    tmp_argv[3] = enif_make_list(env, 0);
+
+    enif_release_resource(d);
+
+    return decode_iter(env, 4, tmp_argv);
+}
+
+ERL_NIF_TERM
+decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    Decoder* d;
+    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+
+    ErlNifBinary bin;
+
+    ERL_NIF_TERM objs;
+    ERL_NIF_TERM curr;
+    ERL_NIF_TERM val;
+    ERL_NIF_TERM ret;
+
+    if(argc != 4) {
+        return enif_make_badarg(env);
     } else if(!enif_inspect_binary(env, argv[0], &bin)) {
+        return enif_make_badarg(env);
+    } else if(!enif_get_resource(env, argv[1], st->res_dec, (void**) &d)) {
+        return enif_make_badarg(env);
+    } else if(!enif_is_list(env, argv[2])) {
+        return enif_make_badarg(env);
+    } else if(!enif_is_list(env, argv[3])) {
         return enif_make_badarg(env);
     }
 
     dec_init(d, env, argv[0], &bin);
+    objs = argv[2];
+    curr = argv[3];
 
     //fprintf(stderr, "Parsing:\r\n");
     while(d->i < bin.size) {
@@ -908,7 +971,5 @@ decode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 done:
-    dec_destroy(d);
-
     return ret;
 }

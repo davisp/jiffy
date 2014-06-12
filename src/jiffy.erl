@@ -8,7 +8,7 @@
 -on_load(init/0).
 
 decode(Data) when is_binary(Data) ->
-    case nif_decode(Data) of
+    case nif_decode_init(Data) of
         {error, _} = Error ->
             throw(Error);
         {partial, EJson} ->
@@ -99,7 +99,11 @@ init() ->
 not_loaded(Line) ->
     erlang:nif_error({not_loaded, [{module, ?MODULE}, {line, Line}]}).
 
-nif_decode(_Data) ->
+nif_decode_init(_Data) ->
+    ?NOT_LOADED,
+    nif_decode_iter(w, x, y, z).
+
+nif_decode_iter(_Data, _Decoder, _, _) ->
     ?NOT_LOADED.
 
 nif_encode(_Data, _Options) ->

@@ -28,6 +28,15 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->ref_object = make_atom(env, "$object_ref$");
     st->ref_array = make_atom(env, "$array_ref$");
 
+    st->res_dec = enif_open_resource_type(
+            env,
+            NULL,
+            "decoder",
+            dec_destroy,
+            ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER,
+            NULL
+        );
+
     *priv = (void*) st;
 
     return 0;
@@ -54,7 +63,8 @@ unload(ErlNifEnv* env, void* priv)
 
 static ErlNifFunc funcs[] =
 {
-    {"nif_decode", 1, decode},
+    {"nif_decode_init", 1, decode_init},
+    {"nif_decode_iter", 4, decode_iter},
     {"nif_encode", 2, encode}
 };
 
