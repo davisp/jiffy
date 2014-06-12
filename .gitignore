@@ -5,3 +5,4 @@
 *.so
 .eunit
 deps
+erln8.config
