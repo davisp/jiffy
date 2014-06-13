@@ -16,7 +16,7 @@ distclean: clean
 
 
 devmarker:
-	touch .jiffy.dev
+	@touch .jiffy.dev
 
 
 depends: devmarker
