@@ -6,6 +6,8 @@
 
 #include "erl_nif.h"
 
+#define DEFAULT_BYTES_PER_ITER 2048
+
 typedef struct {
     ERL_NIF_TERM    atom_ok;
     ERL_NIF_TERM    atom_error;
@@ -19,6 +21,8 @@ typedef struct {
     ERL_NIF_TERM    atom_uescape;
     ERL_NIF_TERM    atom_pretty;
     ERL_NIF_TERM    atom_force_utf8;
+    ERL_NIF_TERM    atom_iter;
+    ERL_NIF_TERM    atom_bytes_per_iter;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
@@ -30,6 +34,9 @@ typedef struct {
 ERL_NIF_TERM make_atom(ErlNifEnv* env, const char* name);
 ERL_NIF_TERM make_ok(jiffy_st* st, ErlNifEnv* env, ERL_NIF_TERM data);
 ERL_NIF_TERM make_error(jiffy_st* st, ErlNifEnv* env, const char* error);
+int get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi);
+int should_yield(size_t used, size_t limit);
+int consume_timeslice(ErlNifEnv* env, size_t used, size_t limit);
 
 ERL_NIF_TERM decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);

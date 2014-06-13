@@ -49,6 +49,7 @@ typedef struct {
     ERL_NIF_TERM    arg;
     ErlNifBinary    bin;
 
+    size_t          bytes_per_iter;
     int             is_partial;
 
     char*           p;
@@ -74,6 +75,7 @@ dec_new(ErlNifEnv* env)
 
     d->atoms = st;
 
+    d->bytes_per_iter = DEFAULT_BYTES_PER_ITER;
     d->is_partial = 0;
 
     d->p = NULL;
@@ -639,8 +641,10 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     Decoder* d;
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
     ERL_NIF_TERM tmp_argv[4];
+    ERL_NIF_TERM opts;
+    ERL_NIF_TERM val;
 
-    if(argc != 1) {
+    if(argc != 2) {
         return enif_make_badarg(env);
     }
 
@@ -655,6 +659,19 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     tmp_argv[3] = enif_make_list(env, 0);
 
     enif_release_resource(d);
+
+    opts = argv[1];
+    if(!enif_is_list(env, opts)) {
+        return enif_make_badarg(env);
+    }
+
+    while(enif_get_list_cell(env, opts, &val, &opts)) {
+        if(get_bytes_per_iter(env, val, &(d->bytes_per_iter))) {
+            continue;
+        } else {
+            return enif_make_badarg(env);
+        }
+    }
 
     return decode_iter(env, 4, tmp_argv);
 }
@@ -671,6 +688,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM curr;
     ERL_NIF_TERM val;
     ERL_NIF_TERM ret;
+    size_t start;
 
     if(argc != 4) {
         return enif_make_badarg(env);
@@ -689,8 +707,19 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     curr = argv[3];
 
     //fprintf(stderr, "Parsing:\r\n");
+    start = d->i;
     while(d->i < bin.size) {
         //fprintf(stderr, "state: %d\r\n", dec_curr(d));
+        if(should_yield(d->i - start, d->bytes_per_iter)) {
+            consume_timeslice(env, d->i - start, d->bytes_per_iter);
+            return enif_make_tuple4(
+                    env,
+                    st->atom_iter,
+                    argv[1],
+                    objs,
+                    curr
+                );
+        }
         switch(dec_curr(d)) {
             case st_value:
                 switch(d->p[d->i]) {
@@ -971,5 +1000,6 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 done:
+    consume_timeslice(env, d->i - start, d->bytes_per_iter);
     return ret;
 }
