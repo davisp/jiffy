@@ -10,12 +10,11 @@ Usage
 -----
 
 Jiffy is a simple API. The only thing that might catch you off guard
-is that the return type of jiffy:encode/1 is an iolist even though it
-returns a binary most of the time.
+is that the return type of `jiffy:encode/1` is an iolist even though
+it returns a binary most of the time.
 
-A quick note on unicode. Jiffy only understands utf-8 in binaries. End
-of story. Also, there is a jiffy:encode/2 that takes a list of options
-for encoding. Currently the only supported option is `uescape`.
+A quick note on unicode. Jiffy only understands UTF-8 in binaries. End
+of story.
 
 Errors are raised as exceptions.
 
@@ -27,6 +26,37 @@ Errors are raised as exceptions.
     3> jiffy:encode(Doc).
     <<"{\"foo\":[\"bing\",2.3,true]}">>
 
+`jiffy:decode/1,2`
+------------------
+
+* `jiffy:decode(IoData)`
+* `jiffy:decode(IoData, Options)`
+
+The options for decode are:
+
+* `{bytes_per_iter, N}` where N &gt;= 0 - This controls the number of
+  bytes that Jiffy will process before yielding back to the VM. The
+  mechanics of this yield are completely hidden from the end user.
+
+`jiffy:encode/1,2`
+------------------
+
+* `jiffy:encode(EJSON)`
+* `jiffy:encode(EJSON, Options)`
+
+where EJSON is a valid representation of JSON in Erlang according to
+the table below.
+
+The options for encode are:
+
+* `uescape` - Escapes UTF-8 sequences to produce a 7-bit clean output
+* `pretty` - Produce JSON using two-space indentation
+* `force_utf8` - Force strings to encode as UTF-8 by fixing broken
+  surrogate pairs and/or using the replacement character to remove
+  broken UTF-8 sequences in data.
+* `{bytes_per_iter, N}` where N &gt;= 0 - This controls the number of
+  bytes that Jiffy will generate before yielding back to the VM. The
+  mechanics of this yield are completely hidden from the end user.
 
 Data Format
 -----------
