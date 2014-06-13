@@ -28,13 +28,17 @@ do {                                \
 typedef struct {
     ErlNifEnv*      env;
     jiffy_st*       atoms;
+
+    size_t          bytes_per_iter;
+
     int             uescape;
     int             pretty;
 
     int             shiftcnt;
     int             count;
 
-    int             iolen;
+    size_t          iolen;
+    size_t          iosize;
     ERL_NIF_TERM    iolist;
     ErlNifBinary    bin;
     ErlNifBinary*   curr;
@@ -68,12 +72,14 @@ enc_new(ErlNifEnv* env)
     Encoder* e = enif_alloc_resource(st->res_enc, sizeof(Encoder));
 
     e->atoms = st;
+    e->bytes_per_iter = DEFAULT_BYTES_PER_ITER;
     e->uescape = 0;
     e->pretty = 0;
     e->shiftcnt = 0;
     e->count = 0;
 
     e->iolen = 0;
+    e->iosize = 0;
     e->curr = &(e->bin);
     if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
         e->curr = NULL;
@@ -184,6 +190,12 @@ enc_unknown(Encoder* e, ERL_NIF_TERM value)
 
     e->iolist = enif_make_list_cell(e->env, value, e->iolist);
     e->iolen++;
+    
+    // Track the total number of bytes produced before
+    // splitting our IO buffer. We add 16 to this value
+    // as a rough estimate of the number of bytes that
+    // a bignum might produce when encoded.
+    e->iosize += e->i + 16;
 
     // Reinitialize our binary for the next buffer.
     e->curr = bin;
@@ -525,6 +537,8 @@ encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             e->pretty = 1;
         } else if(enif_compare(val, e->atoms->atom_force_utf8) == 0) {
             // Ignore, handled in Erlang
+        } else if(get_bytes_per_iter(env, val, &(e->bytes_per_iter))) {
+            continue;
         } else {
             return enif_make_badarg(env);
         }
@@ -549,6 +563,9 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ErlNifSInt64 lval;
     double dval;
 
+    size_t start;
+    size_t processed;
+
     if(argc != 3) {
         return enif_make_badarg(env);
     } else if(!enif_get_resource(env, argv[0], st->res_enc, (void**) &e)) {
@@ -566,7 +583,22 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     stack = argv[1];
     e->iolist = argv[2];
 
+    start = e->iosize + e->i;
+
     while(!enif_is_empty_list(env, stack)) {
+
+        processed = (e->iosize + e->i) - start;
+        if(should_yield(processed, e->bytes_per_iter)) {
+            consume_timeslice(env, processed, e->bytes_per_iter);
+            return enif_make_tuple4(
+                    env,
+                    st->atom_iter,
+                    argv[0],
+                    stack,
+                    e->iolist
+                );
+        }
+
         if(!enif_get_list_cell(env, stack, &curr, &stack)) {
             ret = enc_error(e, "internal_error");
             goto done;
@@ -750,5 +782,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 done:
+    processed = (e->iosize + e->i) - start;
+    consume_timeslice(env, processed, e->bytes_per_iter);
+
     return ret;
 }

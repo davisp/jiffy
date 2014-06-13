@@ -41,6 +41,8 @@ encode(Data, Options) ->
             throw(Error);
         {partial, IOData} ->
             finish_encode(IOData, []);
+        {iter, Encoder, Stack, IOBuf} ->
+            encode_loop(Data, Options, Encoder, Stack, IOBuf);
         IOData ->
             IOData
     end.
@@ -116,6 +118,23 @@ decode_loop(Data, Decoder, Objs, Curr) ->
     end.
 
 
+encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
+    ForceUTF8 = lists:member(force_utf8, Options),
+    case nif_encode_iter(Encoder, Stack, IOBuf) of
+        {error, invalid_string} when ForceUTF8 == true ->
+            FixedData = jiffy_utf8:fix(Data),
+            encode(FixedData, Options -- [force_utf8]);
+        {error, _} = Error ->
+            throw(Error);
+        {partial, IOData} ->
+            finish_encode(IOData, []);
+        {iter, NewEncoder, NewStack, NewIOBuf} ->
+            encode_loop(Data, Options, NewEncoder, NewStack, NewIOBuf);
+        IOData ->
+            IOData
+    end.
+
+
 not_loaded(Line) ->
     erlang:nif_error({not_loaded, [{module, ?MODULE}, {line, Line}]}).
 
@@ -126,8 +145,7 @@ nif_decode_iter(_Data, _Decoder, _, _) ->
     ?NOT_LOADED.
 
 nif_encode_init(_Data, _Options) ->
-    ?NOT_LOADED,
-    nif_encode_iter(x, y, z).
+    ?NOT_LOADED.
 
 nif_encode_iter(_Encoder, _Stack, _IoList) ->
     ?NOT_LOADED.
