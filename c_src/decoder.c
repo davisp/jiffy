@@ -51,6 +51,7 @@ typedef struct {
 
     size_t          bytes_per_iter;
     int             is_partial;
+    int             return_maps;
 
     char*           p;
     unsigned char*  u;
@@ -77,6 +78,7 @@ dec_new(ErlNifEnv* env)
 
     d->bytes_per_iter = DEFAULT_BYTES_PER_ITER;
     d->is_partial = 0;
+    d->return_maps = 0;
 
     d->p = NULL;
     d->u = NULL;
@@ -606,11 +608,41 @@ parse:
 }
 
 ERL_NIF_TERM
-make_object(ErlNifEnv* env, ERL_NIF_TERM pairs)
+make_empty_object(ErlNifEnv* env, int ret_map)
 {
-    ERL_NIF_TERM ret = enif_make_list(env, 0);
-    ERL_NIF_TERM key, val;
+#if MAP_TYPE_PRESENT
+    if(ret_map) {
+        return enif_make_new_map(env);
+    }
+#endif
 
+    return enif_make_tuple1(env, enif_make_list(env, 0));
+}
+
+int
+make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out, int ret_map)
+{
+    ERL_NIF_TERM ret;
+    ERL_NIF_TERM key;
+    ERL_NIF_TERM val;
+
+#if MAP_TYPE_PRESENT
+    if(ret_map) {
+        ret = enif_make_new_map(env);
+        while(enif_get_list_cell(env, pairs, &val, &pairs)) {
+            if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
+                assert(0 == 1 && "Unbalanced object pairs.");
+            }
+            if(!enif_make_map_put(env, ret, key, val, &ret)) {
+                return 0;
+            }
+        }
+        *out = ret;
+        return 1;
+    }
+#endif
+
+    ret = enif_make_list(env, 0);
     while(enif_get_list_cell(env, pairs, &val, &pairs)) {
         if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
             assert(0 == 1 && "Unbalanced object pairs.");
@@ -618,8 +650,9 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs)
         val = enif_make_tuple2(env, key, val);
         ret = enif_make_list_cell(env, val, ret);
     }
+    *out = enif_make_tuple1(env, ret);
 
-    return enif_make_tuple1(env, ret);
+    return 1;
 }
 
 ERL_NIF_TERM
@@ -668,6 +701,12 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     while(enif_get_list_cell(env, opts, &val, &opts)) {
         if(get_bytes_per_iter(env, val, &(d->bytes_per_iter))) {
             continue;
+        } else if(enif_compare(val, d->atoms->atom_return_maps) == 0) {
+#if MAP_TYPE_PRESENT
+            d->return_maps = 1;
+#else
+            return enif_make_badarg(env);
+#endif
         } else {
             return enif_make_badarg(env);
         }
@@ -862,7 +901,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         dec_pop(d, st_key);
                         dec_pop(d, st_object);
                         dec_pop(d, st_value);
-                        val = enif_make_tuple1(env, curr);
+                        val = make_empty_object(env, d->return_maps);
                         if(!enif_get_list_cell(env, objs, &curr, &objs)) {
                             ret = dec_error(d, "internal_error");
                             goto done;
@@ -931,7 +970,10 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         }
                         dec_pop(d, st_object);
                         dec_pop(d, st_value);
-                        val = make_object(env, curr);
+                        if(!make_object(env, curr, &val, d->return_maps)) {
+                            ret = dec_error(d, "internal_object_error");
+                            goto done;
+                        }
                         if(!enif_get_list_cell(env, objs, &curr, &objs)) {
                             ret = dec_error(d, "internal_error");
                             goto done;

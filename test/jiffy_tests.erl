@@ -26,6 +26,24 @@ prop_encode_decode() ->
         end
     ).
 
+-ifndef(JIFFY_NO_MAPS).
+to_map_ejson({Props}) ->
+    NewProps = [{K, to_map_ejson(V)} || {K, V} <- Props],
+    maps:from_list(NewProps);
+to_map_ejson(Vals) when is_list(Vals) ->
+    [to_map_ejson(V) || V <- Vals];
+to_map_ejson(Val) ->
+    Val.
+
+prop_map_encode_decode() ->
+    ?FORALL(Data, json(),
+        begin
+            MapData = to_map_ejson(Data),
+            MapData == jiffy:decode(jiffy:encode(MapData), [return_maps])
+        end
+    ).
+-endif.
+
 prop_encode_decode_pretty() ->
     ?FORALL(Data, json(),
         begin

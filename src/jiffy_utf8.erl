@@ -12,8 +12,20 @@ fix(Values) when is_list(Values) ->
 fix(Bin) when is_binary(Bin) ->
     fix_bin(Bin);
 fix(Val) ->
+    maybe_map(Val).
+
+-ifndef(JIFFY_NO_MAPS).
+maybe_map(Obj) when is_map(Obj) ->
+    maps:fold(fun fix_map/3, maps:new(), Obj);
+maybe_map(Val) ->
     Val.
 
+fix_map(K, V, Acc) ->
+    maps:put(fix(K), fix(V), Acc).
+-else.
+maybe_map(Val) ->
+    Val.
+-endif.
 
 fix_props([], Acc) ->
     {lists:reverse(Acc)};

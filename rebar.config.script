@@ -7,9 +7,7 @@
 %
 % This script is based on the example provided with Rebar.
 
-ErlOpts = {erl_opts, [
-    {d, 'JIFFY_DEV'}
-]},
+ErlOpts = [{d, 'JIFFY_DEV'}],
 
 Proper = [
     {proper, ".*", {git, "git://github.com/manopapad/proper.git", "master"}}
@@ -21,13 +19,19 @@ DevMarker = filename:join([ConfigPath, ".jiffy.dev"]),
 case filelib:is_file(DevMarker) of
     true ->
         % Don't override existing dependencies
-        NewConfig = case lists:keyfind(deps, 1, CONFIG) of
+        Config0 = case lists:keyfind(deps, 1, CONFIG) of
             false ->
                 CONFIG ++ [{deps, Proper}];
             {deps, DepsList} ->
                 lists:keyreplace(deps, 1, CONFIG, {deps, DepsList ++ Proper})
         end,
-        NewConfig ++ [ErlOpts];
+        Config1 = case lists:keyfind(erl_opts, 1, Config0) of
+            false ->
+                Config0 ++ [{erl_opts, ErlOpts}];
+            {erl_opts, Opts} ->
+                NewOpts = {erl_opts, Opts ++ ErlOpts},
+                lists:keyreplace(erl_opts, 1, Config0, NewOpts)
+        end;
     false ->
         CONFIG
 end.

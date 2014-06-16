@@ -8,6 +8,10 @@
 
 #define DEFAULT_BYTES_PER_ITER 2048
 
+#define MAP_TYPE_PRESENT \
+    ((ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION >= 6) \
+    || (ERL_NIF_MAJOR_VERSION > 2))
+
 typedef struct {
     ERL_NIF_TERM    atom_ok;
     ERL_NIF_TERM    atom_error;
@@ -23,6 +27,7 @@ typedef struct {
     ERL_NIF_TERM    atom_force_utf8;
     ERL_NIF_TERM    atom_iter;
     ERL_NIF_TERM    atom_bytes_per_iter;
+    ERL_NIF_TERM    atom_return_maps;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;

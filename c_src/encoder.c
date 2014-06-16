@@ -500,6 +500,49 @@ enc_comma(Encoder* e)
     return 1;
 }
 
+#if MAP_TYPE_PRESENT
+int
+enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
+{
+    ErlNifMapIterator iter;
+    size_t size;
+
+    ERL_NIF_TERM list;
+    ERL_NIF_TERM tuple;
+    ERL_NIF_TERM key;
+    ERL_NIF_TERM val;
+
+    if(!enif_get_map_size(env, map, &size)) {
+        fprintf(stderr, "bad map size\r\n");
+        return 0;
+    }
+
+    list = enif_make_list(env, 0);
+
+    if(size == 0) {
+        *out = enif_make_tuple1(env, list);
+        return 1;
+    }
+
+    if(!enif_map_iterator_create(env, map, &iter, ERL_NIF_MAP_ITERATOR_HEAD)) {
+        fprintf(stderr, "bad iterator create\r\n");
+        return 0;
+    }
+
+    do {
+        if(!enif_map_iterator_get_pair(env, &iter, &key, &val)) {
+            fprintf(stderr, "bad get pair\r\n");
+            return 0;
+        }
+        tuple = enif_make_tuple2(env, key, val);
+        list = enif_make_list_cell(env, tuple, list);
+    } while(enif_map_iterator_next(env, &iter));
+
+    *out = enif_make_tuple1(env, list);
+    return 1;
+}
+#endif
+
 ERL_NIF_TERM
 encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
@@ -743,6 +786,14 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             stack = enif_make_list_cell(env, curr, stack);
             stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
             stack = enif_make_list_cell(env, tuple[1], stack);
+#if MAP_TYPE_PRESENT
+        } else if(enif_is_map(env, curr)) {
+            if(!enc_map_to_ejson(env, curr, &curr)) {
+                ret = enc_error(e, "internal_error");
+                goto done;
+            }
+            stack = enif_make_list_cell(env, curr, stack);
+#endif
         } else if(enif_is_list(env, curr)) {
             if(!enc_start_array(e)) {
                 ret = enc_error(e, "internal_error");

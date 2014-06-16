@@ -67,7 +67,20 @@ finish_decode({Pairs}) when is_list(Pairs) ->
 finish_decode(Vals) when is_list(Vals) ->
     finish_decode_arr(Vals, []);
 finish_decode(Val) ->
+    maybe_map(Val).
+
+-ifndef(JIFFY_NO_MAPS).
+maybe_map(Obj) when is_map(Obj) ->
+    maps:map(fun finish_decode_map/2, Obj);
+maybe_map(Val) ->
     Val.
+
+finish_decode_map(_, V) ->
+    finish_decode(V).
+-else.
+maybe_map(Val) ->
+    Val.
+-endif.
 
 finish_decode_obj([], Acc) ->
     {lists:reverse(Acc)};
