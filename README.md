@@ -39,6 +39,9 @@ The options for decode are:
 * `{bytes_per_iter, N}` where N &gt;= 0 - This controls the number of
   bytes that Jiffy will process before yielding back to the VM. The
   mechanics of this yield are completely hidden from the end user.
+* `return_maps` - Tell Jiffy to return objects using the maps data type
+  on VMs that support it. This raises an error on VMs that don't support
+  maps.
 
 `jiffy:encode/1,2`
 ------------------
@@ -79,6 +82,11 @@ Data Format
     {[]}                       -> {}             -> {[]}
     {[{foo, bar}]}             -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
     {[{<<"foo">>, <<"bar">>}]} -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
+    #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{<<"foo">> -> <<"bar">>}
+
+N.B. The last entry in this table is only valid for VM's that support
+the `maps` data type (i.e., 17.0 and newer) and client code must pass
+the `return_maps` option to `jiffy:decode/2`.
 
 Improvements over EEP0018
 -------------------------
