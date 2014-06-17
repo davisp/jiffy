@@ -6,6 +6,8 @@ in EEP0018 that was based on Yajl. This new version is a hand crafted
 state machine that does its best to be as quick and efficient as
 possible while not placing any constraints on the parsed JSON.
 
+[![Build Status](https://travis-ci.org/davisp/jiffy.svg?branch=master)](https://travis-ci.org/davisp/jiffy)
+
 Usage
 -----
 
