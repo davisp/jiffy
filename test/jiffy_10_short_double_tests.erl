@@ -14,7 +14,7 @@ filename() -> "../test/cases/short-doubles.txt".
 
 short_double_test() ->
     {ok, Fd} = file:open(filename(), [read, binary, raw]),
-    {"all doubles round trip", ?assertEqual(0, run(Fd, 0))}.
+    {"all doubles round trip", {timeout, 300, ?assertEqual(0, run(Fd, 0))}}.
 
 
 run(Fd, Acc) ->

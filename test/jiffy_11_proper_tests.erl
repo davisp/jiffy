@@ -17,17 +17,17 @@ opts() ->
 
 run(Name) ->
     {msg("~s", [Name]), [
-        {timeout, 3600, ?_assert(proper:quickcheck(?MODULE:Name(), opts()))}
+        {timeout, 300, ?_assert(proper:quickcheck(?MODULE:Name(), opts()))}
     ]}.
 
 proper_encode_decode_test_() ->
-    {timeout, 3600, [
+    [
         run(prop_enc_dec),
         run(prop_enc_dec_pretty),
         run(prop_enc_no_crash),
         run(prop_dec_no_crash_bin),
         run(prop_dec_no_crash_any)
-    ]}.
+    ].
 
 prop_enc_dec() ->
     ?FORALL(Data, json(),
