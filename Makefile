@@ -29,15 +29,11 @@ build: depends
 	$(REBAR) compile
 
 
-etap: test/etap.beam test/util.beam
-	prove test/*.t
-
-
 eunit:
 	$(REBAR) eunit skip_deps=true
 
 
-check: build etap eunit
+check: build eunit
 
 
 %.beam: %.erl
