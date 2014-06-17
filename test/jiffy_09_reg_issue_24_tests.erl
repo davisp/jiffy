@@ -1,15 +1,18 @@
-#! /usr/bin/env escript
 % This file is part of Jiffy released under the MIT license.
 % See the LICENSE file for more information.
 
-main([]) ->
-    code:add_pathz("ebin"),
-    code:add_pathz("test"),
+-module(jiffy_09_reg_issue_24_tests).
 
-    etap:plan(1),
-    jiffy:encode(big_doc(), [uescape]),
-    etap:is(1, 1, "No segfault encoding large doc with uescapes."),
-    etap:end_tests().
+
+-include_lib("proper/include/proper.hrl").
+-include_lib("eunit/include/eunit.hrl").
+-include("jiffy_util.hrl").
+
+
+no_segfault_test_() ->
+    {"no segfault", [
+        ?_assert(begin jiffy:encode(big_doc(), [uescape]), true end)
+    ]}.
 
 
 big_doc() ->

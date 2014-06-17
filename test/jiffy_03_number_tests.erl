@@ -1,28 +1,48 @@
-#! /usr/bin/env escript
 % This file is part of Jiffy released under the MIT license.
 % See the LICENSE file for more information.
 
-main([]) ->
-    code:add_pathz("ebin"),
-    code:add_pathz("test"),
-
-    etap:plan(59 + 2 * length(double_conversion_tests())),
-    util:test_good(good()),
-    util:test_errors(errors()),
-    run_double_conversion_tests(),
-    etap:end_tests().
+-module(jiffy_03_number_tests).
 
 
-run_double_conversion_tests() ->
-    lists:foreach(fun(Double) ->
-        Descr = io_lib:format("~f", [Double]),
-        etap:is(jiffy:decode(jiffy:encode(Double)), Double, Descr),
-        NegDouble = -1.0 * Double,
-        NegDescr = io_lib:format("~f", [NegDouble]),
-        etap:is(jiffy:decode(jiffy:encode(NegDouble)), NegDouble, NegDescr)
-    end, double_conversion_tests()).
+-include_lib("proper/include/proper.hrl").
+-include_lib("eunit/include/eunit.hrl").
+-include("jiffy_util.hrl").
 
-good() ->
+
+number_success_test_() ->
+    [gen(ok, Case) || Case <- cases(ok)].
+
+
+number_failure_test_() ->
+    [gen(error, Case) || Case <- cases(error)].
+
+
+number_double_test_() ->
+    [gen(floats, Case) || Case <- cases(floats)].
+
+
+gen(ok, {J, E}) ->
+    gen(ok, {J, E, J});
+gen(ok, {J1, E, J2}) ->
+    {msg("~s", [J1]), [
+        {"Decode", ?_assertEqual(E, dec(J1))},
+        {"Encode", ?_assertEqual(J2, enc(E))}
+    ]};
+
+gen(error, J) ->
+    {msg("Error: ~s", [J]), [
+        ?_assertThrow({error, _}, dec(J))
+    ]};
+
+gen(floats, F) ->
+    NegF = -1.0 * F,
+    {msg("float round trip - ~p", [F]), [
+        {"Pos", ?_assertEqual(F, dec(enc(F)))},
+        {"Neg", ?_assertEqual(NegF, dec(enc(NegF)))}
+    ]}.
+
+
+cases(ok) ->
     [
         {<<"0">>, 0},
         {<<"-0">>, 0, <<"0">>},
@@ -64,10 +84,9 @@ good() ->
         {<<"1.5E3">>, 1500.0, <<"1500.0">>},
         {<<"2.5E-1">>, 0.25, <<"0.25">>},
         {<<"-0.325E+2">>, -32.5, <<"-32.5">>}
-    ].
+    ];
 
-
-errors() ->
+cases(error) ->
     [
         <<"02">>,
         <<"-01">>,
@@ -80,10 +99,9 @@ errors() ->
         <<"1-E2">>,
         <<"2E +3">>,
         <<"1EA">>
-    ].
+    ];
 
-
-double_conversion_tests() ->
+cases(floats) ->
     [
         0.0,
         0.00000001,
@@ -114,5 +132,3 @@ double_conversion_tests() ->
         1111111111111111111111.0,
         11111111111111111111111.0
     ].
-
-

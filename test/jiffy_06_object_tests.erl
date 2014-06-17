@@ -1,17 +1,37 @@
-#! /usr/bin/env escript
 % This file is part of Jiffy released under the MIT license.
 % See the LICENSE file for more information.
 
-main([]) ->
-    code:add_pathz("ebin"),
-    code:add_pathz("test"),
+-module(jiffy_06_object_tests).
 
-    etap:plan(15),
-    util:test_good(good()),
-    util:test_errors(errors()),
-    etap:end_tests().
 
-good() ->
+-include_lib("proper/include/proper.hrl").
+-include_lib("eunit/include/eunit.hrl").
+-include("jiffy_util.hrl").
+
+
+object_success_test_() ->
+    [gen(ok, Case) || Case <- cases(ok)].
+
+
+object_failure_test_() ->
+    [gen(error, Case) || Case <- cases(error)].
+
+
+gen(ok, {J, E}) ->
+    gen(ok, {J, E, J});
+gen(ok, {J1, E, J2}) ->
+    {msg("~s", [J1]), [
+        {"Decode", ?_assertEqual(E, dec(J1))},
+        {"Encode", ?_assertEqual(J2, enc(E))}
+    ]};
+
+gen(error, J) ->
+    {msg("Error: ~s", [J]), [
+        ?_assertThrow({error, _}, dec(J))
+    ]}.
+
+
+cases(ok) ->
     [
         {<<"{}">>, {[]}},
         {<<"{\"foo\": \"bar\"}">>,
@@ -20,9 +40,9 @@ good() ->
         {<<"\n\n{\"foo\":\r \"bar\",\n \"baz\"\t: 123 }">>,
             {[{<<"foo">>, <<"bar">>}, {<<"baz">>, 123}]},
             <<"{\"foo\":\"bar\",\"baz\":123}">>}
-    ].
+    ];
 
-errors() ->
+cases(error) ->
     [
         <<"{">>,
         <<"{,}">>,

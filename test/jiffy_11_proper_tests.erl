@@ -1,24 +1,35 @@
 % This file is part of Jiffy released under the MIT license.
 % See the LICENSE file for more information.
 
--module(jiffy_tests).
+-module(jiffy_11_proper_tests).
 
 -ifdef(JIFFY_DEV).
 
 -include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("jiffy_util.hrl").
 
-
-proper_test_() ->
-    PropErOpts = [
-        {to_file, user},
+opts() ->
+    [
         {max_size, 15},
         {numtests, 1000}
-    ],
-    {timeout, 3600, ?_assertEqual([], proper:module(jiffy_tests, PropErOpts))}.
+    ].
 
+run(Name) ->
+    {msg("~s", [Name]), [
+        {timeout, 3600, ?_assert(proper:quickcheck(?MODULE:Name(), opts()))}
+    ]}.
 
-prop_encode_decode() ->
+proper_encode_decode_test_() ->
+    {timeout, 3600, [
+        run(prop_enc_dec),
+        run(prop_enc_dec_pretty),
+        run(prop_enc_no_crash),
+        run(prop_dec_no_crash_bin),
+        run(prop_dec_no_crash_any)
+    ]}.
+
+prop_enc_dec() ->
     ?FORALL(Data, json(),
         begin
             %io:format(standard_error, "Data: ~p~n", [Data]),
@@ -35,7 +46,7 @@ to_map_ejson(Vals) when is_list(Vals) ->
 to_map_ejson(Val) ->
     Val.
 
-prop_map_encode_decode() ->
+prop_map_enc_dec() ->
     ?FORALL(Data, json(),
         begin
             MapData = to_map_ejson(Data),
@@ -44,20 +55,20 @@ prop_map_encode_decode() ->
     ).
 -endif.
 
-prop_encode_decode_pretty() ->
+prop_enc_dec_pretty() ->
     ?FORALL(Data, json(),
         begin
             Data == jiffy:decode(jiffy:encode(Data, [pretty]))
         end
     ).
 
-prop_encode_not_crash() ->
+prop_enc_no_crash() ->
     ?FORALL(Data, any(), begin catch jiffy:encode(Data), true end).
 
-prop_decode_not_crash_bin() ->
+prop_dec_no_crash_bin() ->
     ?FORALL(Data, binary(), begin catch jiffy:decode(Data), true end).
 
-prop_decode_not_crash_any() ->
+prop_dec_no_crash_any() ->
     ?FORALL(Data, any(), begin catch jiffy:decode(Data), true end).
 
 

@@ -1,17 +1,37 @@
-#! /usr/bin/env escript
 % This file is part of Jiffy released under the MIT license.
 % See the LICENSE file for more information.
 
-main([]) ->
-    code:add_pathz("ebin"),
-    code:add_pathz("test"),
+-module(jiffy_07_compound_tests).
 
-    etap:plan(12),
-    util:test_good(good()),
-    util:test_errors(errors()),
-    etap:end_tests().
 
-good() ->
+-include_lib("proper/include/proper.hrl").
+-include_lib("eunit/include/eunit.hrl").
+-include("jiffy_util.hrl").
+
+
+compound_success_test_() ->
+    [gen(ok, Case) || Case <- cases(ok)].
+
+
+compound_failure_test_() ->
+    [gen(error, Case) || Case <- cases(error)].
+
+
+gen(ok, {J, E}) ->
+    gen(ok, {J, E, J});
+gen(ok, {J1, E, J2}) ->
+    {msg("~s", [J1]), [
+        {"Decode", ?_assertEqual(E, dec(J1))},
+        {"Encode", ?_assertEqual(J2, enc(E))}
+    ]};
+
+gen(error, J) ->
+    {msg("Error: ~s", [J]), [
+        ?_assertThrow({error, _}, dec(J))
+    ]}.
+
+
+cases(ok) ->
     [
         {<<"[{}]">>, [{[]}]},
         {<<"{\"foo\":[123]}">>, {[{<<"foo">>, [123]}]}},
@@ -32,9 +52,9 @@ good() ->
                 null
             ]
         }
-    ].
+    ];
 
-errors() ->
+cases(error) ->
     [
         <<"[{}">>,
         <<"}]">>
