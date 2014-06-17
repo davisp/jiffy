@@ -1,4 +1,6 @@
 
+-compile(export_all).
+
 msg(Fmt, Args) ->
     M1 = io_lib:format(Fmt, Args),
     M2 = re:replace(M1, <<"\r">>, <<"\\\\r">>, [global]),
