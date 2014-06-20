@@ -31,6 +31,7 @@ get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
     const ERL_NIF_TERM* tuple;
     int arity;
+    unsigned int bytes;
 
     if(!enif_get_tuple(env, val, &arity, &tuple)) {
         return 0;
@@ -44,9 +45,11 @@ get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
         return 0;
     }
 
-    if(!enif_get_uint64(env, tuple[1], bpi)) {
+    if(!enif_get_uint(env, tuple[1], &bytes)) {
         return 0;
     }
+
+    *bpi = (size_t) bytes;
 
     return 1;
 }
