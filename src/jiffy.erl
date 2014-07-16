@@ -5,6 +5,8 @@
 -export([decode/1, decode/2, encode/1, encode/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
+-compile([no_native]).
+
 -on_load(init/0).
 
 
