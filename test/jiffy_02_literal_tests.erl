@@ -26,3 +26,9 @@ null_test_() ->
         {"Decode", ?_assertEqual(null, jiffy:decode(<<"null">>))},
         {"Encode", ?_assertEqual(<<"null">>, jiffy:encode(null))}
     ]}.
+
+nil_test_() ->
+    {"null", [
+        {"Decode", ?_assertEqual(nil, jiffy:decode(<<"null">>, [use_nil]))},
+        {"Encode", ?_assertEqual(<<"null">>, jiffy:encode(nil, [use_nil]))}
+    ]}.

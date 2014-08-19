@@ -28,6 +28,8 @@ typedef struct {
     ERL_NIF_TERM    atom_iter;
     ERL_NIF_TERM    atom_bytes_per_iter;
     ERL_NIF_TERM    atom_return_maps;
+    ERL_NIF_TERM    atom_nil;
+    ERL_NIF_TERM    atom_use_nil;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
