@@ -712,12 +712,12 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             stack = enif_make_list_cell(env, curr, stack);
             stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
             stack = enif_make_list_cell(env, item, stack);
-        } else if(e->use_nil && enif_compare(curr, e->atoms->atom_nil) == 0)) {
+        } else if(e->use_nil && enif_compare(curr, e->atoms->atom_nil) == 0) {
             if(!enc_literal(e, "null", 4)) {
                 ret = enc_error(e, "null");
                 goto done;
             }
-        } else if(enif_compare(curr, e->atoms->atom_null) == 0 {
+        } else if(enif_compare(curr, e->atoms->atom_null) == 0) {
             if(!enc_literal(e, "null", 4)) {
                 ret = enc_error(e, "null");
                 goto done;
