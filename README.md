@@ -42,6 +42,7 @@ The options for decode are:
 * `return_maps` - Tell Jiffy to return objects using the maps data type
   on VMs that support it. This raises an error on VMs that don't support
   maps.
+* `use_nil` - Decodes null value as the nil atom for Elixir compatibility.
 
 `jiffy:encode/1,2`
 ------------------
@@ -62,6 +63,7 @@ The options for encode are:
 * `{bytes_per_iter, N}` where N &gt;= 0 - This controls the number of
   bytes that Jiffy will generate before yielding back to the VM. The
   mechanics of this yield are completely hidden from the end user.
+* `use_nil` - Encodes nil atom as null value for Elixir compatibility.
 
 Data Format
 -----------
