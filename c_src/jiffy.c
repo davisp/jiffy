@@ -78,7 +78,7 @@ unload(ErlNifEnv* env, void* priv)
 static ErlNifFunc funcs[] =
 {
     {"nif_decode_init", 2, decode_init},
-    {"nif_decode_iter", 4, decode_iter},
+    {"nif_decode_iter", 5, decode_iter},
     {"nif_encode_init", 2, encode_init},
     {"nif_encode_iter", 3, encode_iter}
 };

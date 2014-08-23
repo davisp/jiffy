@@ -675,7 +675,7 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     Decoder* d;
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
-    ERL_NIF_TERM tmp_argv[4];
+    ERL_NIF_TERM tmp_argv[5];
     ERL_NIF_TERM opts;
     ERL_NIF_TERM val;
 
@@ -690,8 +690,9 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     tmp_argv[0] = argv[0];
     tmp_argv[1] = enif_make_resource(env, d);
-    tmp_argv[2] = enif_make_list(env, 0);
+    tmp_argv[2] = st->atom_error;
     tmp_argv[3] = enif_make_list(env, 0);
+    tmp_argv[4] = enif_make_list(env, 0);
 
     enif_release_resource(d);
 
@@ -716,7 +717,7 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         }
     }
 
-    return decode_iter(env, 4, tmp_argv);
+    return decode_iter(env, 5, tmp_argv);
 }
 
 ERL_NIF_TERM
@@ -729,25 +730,25 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     ERL_NIF_TERM objs;
     ERL_NIF_TERM curr;
-    ERL_NIF_TERM val;
+    ERL_NIF_TERM val = argv[2];
     ERL_NIF_TERM ret;
     size_t start;
 
-    if(argc != 4) {
+    if(argc != 5) {
         return enif_make_badarg(env);
     } else if(!enif_inspect_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
     } else if(!enif_get_resource(env, argv[1], st->res_dec, (void**) &d)) {
         return enif_make_badarg(env);
-    } else if(!enif_is_list(env, argv[2])) {
-        return enif_make_badarg(env);
     } else if(!enif_is_list(env, argv[3])) {
+        return enif_make_badarg(env);
+    } else if(!enif_is_list(env, argv[4])) {
         return enif_make_badarg(env);
     }
 
     dec_init(d, env, argv[0], &bin);
-    objs = argv[2];
-    curr = argv[3];
+    objs = argv[3];
+    curr = argv[4];
 
     //fprintf(stderr, "Parsing:\r\n");
     start = d->i;
@@ -755,10 +756,11 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         //fprintf(stderr, "state: %d\r\n", dec_curr(d));
         if(should_yield(d->i - start, d->bytes_per_iter)) {
             consume_timeslice(env, d->i - start, d->bytes_per_iter);
-            return enif_make_tuple4(
+            return enif_make_tuple5(
                     env,
                     st->atom_iter,
                     argv[1],
+                    val,
                     objs,
                     curr
                 );

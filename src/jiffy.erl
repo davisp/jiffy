@@ -18,8 +18,8 @@ decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
             throw(Error);
         {partial, EJson} ->
             finish_decode(EJson);
-        {iter, Decoder, Objs, Curr} ->
-            decode_loop(Data, Decoder, Objs, Curr);
+        {iter, Decoder, Val, Objs, Curr} ->
+            decode_loop(Data, Decoder, Val, Objs, Curr);
         EJson ->
             EJson
     end;
@@ -120,14 +120,14 @@ init() ->
     erlang:load_nif(filename:join(PrivDir, "jiffy"), 0).
 
 
-decode_loop(Data, Decoder, Objs, Curr) ->
-    case nif_decode_iter(Data, Decoder, Objs, Curr) of
+decode_loop(Data, Decoder, Val, Objs, Curr) ->
+    case nif_decode_iter(Data, Decoder, Val, Objs, Curr) of
         {error, _} = Error ->
             throw(Error);
         {partial, EJson} ->
             finish_decode(EJson);
-        {iter, NewDecoder, NewObjs, NewCurr} ->
-            decode_loop(Data, NewDecoder, NewObjs, NewCurr);
+        {iter, NewDecoder, NewVal, NewObjs, NewCurr} ->
+            decode_loop(Data, NewDecoder, NewVal, NewObjs, NewCurr);
         EJson ->
             EJson
     end.
@@ -156,7 +156,7 @@ not_loaded(Line) ->
 nif_decode_init(_Data, _Opts) ->
     ?NOT_LOADED.
 
-nif_decode_iter(_Data, _Decoder, _, _) ->
+nif_decode_iter(_Data, _Decoder, _, _, _) ->
     ?NOT_LOADED.
 
 nif_encode_init(_Data, _Options) ->
