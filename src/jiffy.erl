@@ -34,7 +34,7 @@ encode(Data) ->
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
     case nif_encode_init(Data, Options) of
-        {error, invalid_string} when ForceUTF8 == true ->
+        {error, {invalid_string, _}} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
             encode(FixedData, Options -- [force_utf8]);
         {error, _} = Error ->
@@ -102,6 +102,8 @@ finish_encode([<<_/binary>>=B | Rest], Acc) ->
 finish_encode([Val | Rest], Acc) when is_integer(Val) ->
     Bin = list_to_binary(integer_to_list(Val)),
     finish_encode(Rest, [Bin | Acc]);
+finish_encode([InvalidEjson | _], _) ->
+    throw({error, {invalid_ejson, InvalidEjson}});
 finish_encode(_, _) ->
     throw({error, invalid_ejson}).
 
@@ -134,7 +136,7 @@ decode_loop(Data, Decoder, Objs, Curr) ->
 encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
     ForceUTF8 = lists:member(force_utf8, Options),
     case nif_encode_iter(Encoder, Stack, IOBuf) of
-        {error, invalid_string} when ForceUTF8 == true ->
+        {error, {invalid_string, _}} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
             encode(FixedData, Options -- [force_utf8]);
         {error, _} = Error ->

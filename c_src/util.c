@@ -25,6 +25,14 @@ make_error(jiffy_st* st, ErlNifEnv* env, const char* error)
     return enif_make_tuple2(env, st->atom_error, make_atom(env, error));
 }
 
+ERL_NIF_TERM
+make_obj_error(jiffy_st* st, ErlNifEnv* env,
+        const char* error, ERL_NIF_TERM obj)
+{
+    ERL_NIF_TERM reason = enif_make_tuple2(env, make_atom(env, error), obj);
+    return enif_make_tuple2(env, st->atom_error, reason);
+}
+
 int
 get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
 {

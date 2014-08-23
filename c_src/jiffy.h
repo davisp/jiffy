@@ -41,6 +41,8 @@ typedef struct {
 ERL_NIF_TERM make_atom(ErlNifEnv* env, const char* name);
 ERL_NIF_TERM make_ok(jiffy_st* st, ErlNifEnv* env, ERL_NIF_TERM data);
 ERL_NIF_TERM make_error(jiffy_st* st, ErlNifEnv* env, const char* error);
+ERL_NIF_TERM make_obj_error(jiffy_st* st, ErlNifEnv* env, const char* error,
+        ERL_NIF_TERM obj);
 int get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi);
 int should_yield(size_t used, size_t limit);
 int consume_timeslice(ErlNifEnv* env, size_t used, size_t limit);

@@ -122,6 +122,12 @@ enc_error(Encoder* e, const char* msg)
     return make_error(e->atoms, e->env, msg);
 }
 
+ERL_NIF_TERM
+enc_obj_error(Encoder* e, const char* msg, ERL_NIF_TERM obj)
+{
+    return make_obj_error(e->atoms, e->env, msg, obj);
+}
+
 static inline int
 enc_ensure(Encoder* e, size_t req)
 {
@@ -667,11 +673,11 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
             if(!enif_get_tuple(env, item, &arity, &tuple)) {
-                ret = enc_error(e, "invalid_object_pair");
+                ret = enc_obj_error(e, "invalid_object_member", item);
                 goto done;
             }
             if(arity != 2) {
-                ret = enc_error(e, "invalid_object_pair");
+                ret = enc_obj_error(e, "invalid_object_member_arity", item);
                 goto done;
             }
             if(!enc_comma(e)) {
@@ -679,7 +685,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
             if(!enc_string(e, tuple[0])) {
-                ret = enc_error(e, "invalid_object_key");
+                ret = enc_obj_error(e, "invalid_object_member_key", tuple[0]);
                 goto done;
             }
             if(!enc_colon(e)) {
@@ -712,12 +718,12 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             stack = enif_make_list_cell(env, curr, stack);
             stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
             stack = enif_make_list_cell(env, item, stack);
-        } else if(enif_compare(curr, e->atoms->atom_null) == 0 
+        } else if(enif_compare(curr, e->atoms->atom_null) == 0) {
             if(!enc_literal(e, "null", 4)) {
                 ret = enc_error(e, "null");
                 goto done;
             }
-        } else if(e->use_nil && enif_compare(curr, e->atoms->atom_nil) == 0)) {
+        } else if(e->use_nil && enif_compare(curr, e->atoms->atom_nil) == 0) {
             if(!enc_literal(e, "null", 4)) {
                 ret = enc_error(e, "null");
                 goto done;
@@ -734,12 +740,12 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             }
         } else if(enif_is_binary(env, curr)) {
             if(!enc_string(e, curr)) {
-                ret = enc_error(e, "invalid_string");
+                ret = enc_obj_error(e, "invalid_string", curr);
                 goto done;
             }
         } else if(enif_is_atom(env, curr)) {
             if(!enc_string(e, curr)) {
-                ret = enc_error(e, "invalid_string");
+                ret = enc_obj_error(e, "invalid_string", curr);
                 goto done;
             }
         } else if(enif_get_int64(env, curr, &lval)) {
@@ -754,11 +760,11 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             }
         } else if(enif_get_tuple(env, curr, &arity, &tuple)) {
             if(arity != 1) {
-                ret = enc_error(e, "invalid_ejson");
+                ret = enc_obj_error(e, "invalid_ejson", curr);
                 goto done;
             }
             if(!enif_is_list(env, tuple[0])) {
-                ret = enc_error(e, "invalid_object");
+                ret = enc_obj_error(e, "invalid_object", curr);
                 goto done;
             }
             if(!enc_start_object(e)) {
@@ -777,15 +783,15 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
             if(!enif_get_tuple(env, item, &arity, &tuple)) {
-                ret = enc_error(e, "invalid_object_member");
+                ret = enc_obj_error(e, "invalid_object_member", item);
                 goto done;
             }
             if(arity != 2) {
-                ret = enc_error(e, "invalid_object_member_arity");
+                ret = enc_obj_error(e, "invalid_object_member_arity", item);
                 goto done;
             }
             if(!enc_string(e, tuple[0])) {
-                ret = enc_error(e, "invalid_object_member_key");
+                ret = enc_obj_error(e, "invalid_object_member_key", tuple[0]);
                 goto done;
             }
             if(!enc_colon(e)) {

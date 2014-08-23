@@ -48,7 +48,7 @@ gen(utf8, {Case, Fixed}) ->
     Case2 = <<34, Case/binary, 34>>,
     Fixed2 = <<34, Fixed/binary, 34>>,
     {msg("UTF-8: ~s", [hex(Case)]), [
-        ?_assertThrow({error, invalid_string}, jiffy:encode(Case)),
+        ?_assertThrow({error, {invalid_string, _}}, jiffy:encode(Case)),
         ?_assertEqual(Fixed2, jiffy:encode(Case, [force_utf8])),
         ?_assertThrow({error, {_, invalid_string}}, jiffy:decode(Case2))
     ]}.
