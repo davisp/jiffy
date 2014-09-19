@@ -3,7 +3,6 @@
 
 -module(jiffy_02_literal_tests).
 
--include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 

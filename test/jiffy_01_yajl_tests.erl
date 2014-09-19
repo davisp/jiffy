@@ -4,7 +4,6 @@
 -module(jiffy_01_yajl_tests).
 
 
--include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 

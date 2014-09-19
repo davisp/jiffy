@@ -4,7 +4,6 @@
 -module(jiffy_09_reg_issue_24_tests).
 
 
--include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("jiffy_util.hrl").
 
