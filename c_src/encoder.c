@@ -205,17 +205,22 @@ enc_unknown(Encoder* e, ERL_NIF_TERM value)
     // a bignum might produce when encoded.
     e->iosize += e->i + 16;
 
-    // Reinitialize our binary for the next buffer.
-    e->curr = bin;
-    if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
-        return 0;
+    // Reinitialize our binary for the next buffer if we
+    // used any data in the buffer. If we haven't used any
+    // bytes in the buffer then we can safely reuse it
+    // for anything following the unknown value.
+    if(e->i > 0) {
+        e->curr = bin;
+        if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
+            return 0;
+        }
+
+        memset(e->curr->data, 0, e->curr->size);
+
+        e->p = (char*) e->curr->data;
+        e->u = (unsigned char*) e->curr->data;
+        e->i = 0;        
     }
-
-    memset(e->curr->data, 0, e->curr->size);
-
-    e->p = (char*) e->curr->data;
-    e->u = (unsigned char*) e->curr->data;
-    e->i = 0;
 
     return 1;
 }
