@@ -28,6 +28,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_return_maps = make_atom(env, "return_maps");
     st->atom_nil = make_atom(env, "nil");
     st->atom_use_nil = make_atom(env, "use_nil");
+    st->atom_with_trailer = make_atom(env, "with_trailer");
 
     // Markers used in encoding
     st->ref_object = make_atom(env, "$object_ref$");

@@ -53,6 +53,7 @@ typedef struct {
     int             is_partial;
     int             return_maps;
     int             use_nil;
+    int             with_trailer;
 
     char*           p;
     unsigned char*  u;
@@ -81,6 +82,7 @@ dec_new(ErlNifEnv* env)
     d->is_partial = 0;
     d->return_maps = 0;
     d->use_nil = 0;
+    d->with_trailer = 0;
 
     d->p = NULL;
     d->u = NULL;
@@ -712,6 +714,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 #endif
         } else if(enif_compare(val, d->atoms->atom_use_nil) == 0) {
             d->use_nil = 1;
+        } else if(enif_compare(val, d->atoms->atom_with_trailer) == 0) {
+            d->with_trailer = 1;
         } else {
             return enif_make_badarg(env);
         }

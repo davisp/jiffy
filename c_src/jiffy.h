@@ -42,6 +42,7 @@ typedef struct {
     ERL_NIF_TERM    atom_return_maps;
     ERL_NIF_TERM    atom_nil;
     ERL_NIF_TERM    atom_use_nil;
+    ERL_NIF_TERM    atom_with_trailer;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
