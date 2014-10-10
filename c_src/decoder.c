@@ -754,8 +754,14 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     start = d->i;
     while(d->i < bin.size) {
         //fprintf(stderr, "state: %d\r\n", dec_curr(d));
-        if(should_yield(d->i - start, d->bytes_per_iter)) {
-            consume_timeslice(env, d->i - start, d->bytes_per_iter);
+        if(should_yield(d->i - start, d->bytes_per_iter)
+            /* A system could handle roughly 100kb per millisecond on a single core.
+             * So the total amount of work per millisecond is 100kb.
+             * We report the percentage of the time every (bytes_per_iter) bytes
+             * in hope that the system will ask as to yield. We don't yield until
+             * asked by the system according to our feedback (of questionable accuracy).
+             */
+            && consume_timeslice(env, d->i - start, 100000)) {
             return enif_make_tuple5(
                     env,
                     st->atom_iter,
