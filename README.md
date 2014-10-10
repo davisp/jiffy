@@ -42,6 +42,10 @@ The options for decode are:
 * `return_maps` - Tell Jiffy to return objects using the maps data type
   on VMs that support it. This raises an error on VMs that don't support
   maps.
+* `with_trailer` - Tell Jiffy to return the trailing unparsed data (if any) along with
+  the parsed term instead of failing with {error,{_,invalid_traling_data}}. When
+  the trailer is available, the return value is {with_trailer, EJson, Trailer},
+  where Trailer is a sub-binary of the input, for efficiency.
 
 `jiffy:encode/1,2`
 ------------------
