@@ -63,16 +63,6 @@ get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
 }
 
 int
-should_yield(size_t used, size_t limit)
-{
-    if(limit == 0 || used < limit) {
-        return 0;
-    }
-
-    return 1;
-}
-
-int
 consume_timeslice(ErlNifEnv* env, size_t used, size_t limit)
 {
 #if(ERL_NIF_MAJOR_VERSION >= 2 && ERL_NIF_MINOR_VERSION >= 4)
