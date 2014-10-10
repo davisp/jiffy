@@ -6,6 +6,11 @@
 -include_lib("eunit/include/eunit.hrl").
 
 trailer_test_() ->
+   Opts = [with_trailer],
    {"trailer", [
-        ?_assertEqual(true, jiffy:decode(<<"true">>, [with_trailer]))
+        ?_assertEqual(true, jiffy:decode(<<"true">>, Opts)),
+        ?_assertMatch({with_trailer, true, <<";">>}, jiffy:decode(<<"true;">>, Opts)),
+        ?_assertMatch({with_trailer, true, <<"[]">>}, jiffy:decode(<<"true[]">>, Opts)),
+        ?_assertMatch({with_trailer, [], <<"{}">>}, jiffy:decode(<<"[]{}">>, Opts)),
+        ?_assertMatch({with_trailer, 1, <<"2 3">>}, jiffy:decode(<<"1 2 3">>, Opts))
     ]}.

@@ -730,6 +730,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     Decoder* d;
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
 
+    ERL_NIF_TERM bin_term = argv[0];
     ErlNifBinary bin;
 
     ERL_NIF_TERM objs;
@@ -740,7 +741,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     if(argc != 5) {
         return enif_make_badarg(env);
-    } else if(!enif_inspect_binary(env, argv[0], &bin)) {
+    } else if(!enif_inspect_binary(env, bin_term, &bin)) {
         return enif_make_badarg(env);
     } else if(!enif_get_resource(env, argv[1], st->res_dec, (void**) &d)) {
         return enif_make_badarg(env);
@@ -1038,8 +1039,16 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         d->i++;
                         break;
                     default:
-                        ret = dec_error(d, "invalid_trailing_data");
-                        goto done;
+                        if(d->with_trailer) {
+                            ERL_NIF_TERM trailer = enif_make_sub_binary(env,
+                                bin_term, d->i, bin.size - d->i);
+                            val = enif_make_tuple3(env, d->atoms->atom_with_trailer,
+                                    val, trailer);
+                            goto soft_done;
+                        } else {
+                            ret = dec_error(d, "invalid_trailing_data");
+                            goto done;
+                        }
                 }
                 break;
 
@@ -1048,6 +1057,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
         }
     }
+
+soft_done:
 
     if(dec_curr(d) != st_done) {
         ret = dec_error(d, "truncated_json");
