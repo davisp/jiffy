@@ -19,22 +19,12 @@ decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
         {partial, EJson} ->
             finish_decode(EJson);
         {iter, Decoder, Val, Objs, Curr} ->
-            trailer_or_error(decode_loop(Data, Decoder, Val, Objs, Curr), Opts, Data);
+            decode_loop(Data, Decoder, Val, Objs, Curr);
         EJson ->
             EJson
     end;
 decode(Data, Opts) when is_list(Data) ->
     decode(iolist_to_binary(Data), Opts).
-
-% Only return trailing data if explicitly requested in the options.
-trailer_or_error({with_trailer, _EJson, TrailerData} = WithTrailer, Opts, Data) ->
-    case lists:member(with_trailer, Opts) of
-        true -> WithTrailer;
-        false ->
-            AtByte = iolist_size(Data) - iolist_size(TrailerData) + 1,
-            throw({error,{AtByte,invalid_trailing_data}})
-    end;
-trailer_or_error(EJson, _Opts, _Data) -> EJson.
 
 
 encode(Data) ->
