@@ -3,21 +3,15 @@
 
 -module(jiffy_11_proper_tests).
 
--ifdef(JIFFY_DEV).
 
--include_lib("proper/include/proper.hrl").
+-include_lib("triq/include/triq.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("jiffy_util.hrl").
 
-opts() ->
-    [
-        {max_size, 15},
-        {numtests, 1000}
-    ].
 
 run(Name) ->
     {msg("~s", [Name]), [
-        {timeout, 300, ?_assert(proper:quickcheck(?MODULE:Name(), opts()))}
+        {timeout, 300, ?_assert(triq:check(?MODULE:Name(), 10))}
     ]}.
 
 proper_encode_decode_test_() ->
@@ -84,7 +78,7 @@ json_boolean() ->
 
 
 json_number() ->
-    oneof([integer(), float()]).
+    oneof([int(), real()]).
 
 
 json_string() ->
@@ -96,7 +90,7 @@ json_list(S) when S =< 0 ->
 json_list(S) ->
     ?LETSHRINK(
         [ListSize],
-        [integer(0, S)],
+        [int(0, S)],
         vector(ListSize, json_text(S - ListSize))
     ).
 
@@ -106,7 +100,7 @@ json_object(S) when S =< 0 ->
 json_object(S) ->
     ?LETSHRINK(
         [ObjectSize],
-        [integer(0, S)],
+        [int(0, S)],
         {vector(ObjectSize, {json_string(), json_text(S - ObjectSize)})}
     ).
 
@@ -121,7 +115,7 @@ json_value() ->
 
 
 json_text(S) when S > 0 ->
-    ?LAZY(oneof([
+    ?DELAY(oneof([
         json_list(S),
         json_object(S)
     ]));
@@ -151,7 +145,7 @@ escaped_utf8_bin() ->
 
 
 escaped_char() ->
-    ?LET(C, char(),
+    ?LET(C, unicode_char(),
         case C of
             $" -> "\\\"";
             C when C == 65534 -> 65533;
@@ -160,5 +154,3 @@ escaped_char() ->
             C -> C
         end
     ).
-
--endif.
