@@ -91,7 +91,7 @@ the `return_maps` option to `jiffy:decode/2`.
 Improvements over EEP0018
 -------------------------
 
-Jiffy should be in all ways an improvemnt over EEP0018. It no longer
+Jiffy should be in all ways an improvement over EEP0018. It no longer
 imposes limits on the nesting depth. It is capable of encoding and
 decoding large numbers and it does quite a bit more validation of UTF-8 in strings.
 
