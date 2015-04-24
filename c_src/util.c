@@ -63,6 +63,34 @@ get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
 }
 
 int
+get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term)
+{
+    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    const ERL_NIF_TERM* tuple;
+    int arity;
+
+    if(!enif_get_tuple(env, val, &arity, &tuple)) {
+      return 0;
+    }
+
+    if(arity != 2) {
+      return 0;
+    }
+
+    if(enif_compare(tuple[0], st->atom_null_term) != 0) {
+      return 0;
+    }
+
+    if(!enif_is_atom(env, tuple[1])) {
+      return 0;
+    }
+
+    *null_term = tuple[1];
+
+    return 1;
+}
+
+int
 should_yield(size_t used, size_t limit)
 {
     if(limit == 0 || used < limit) {

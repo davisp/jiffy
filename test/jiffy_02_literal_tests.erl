@@ -31,3 +31,14 @@ nil_test_() ->
         {"Decode", ?_assertEqual(nil, jiffy:decode(<<"null">>, [use_nil]))},
         {"Encode", ?_assertEqual(<<"null">>, jiffy:encode(nil, [use_nil]))}
     ]}.
+
+null_term_test_() ->
+    T = [
+        {undefined, [{null_term, undefined}]},
+        {whatever, [{null_term, whatever}]},
+        {undefined, [use_nil, {null_term, undefined}]},
+        {nil, [{null_term, undefined}, use_nil]},
+        {whatever, [{null_term, undefined}, {null_term, whatever}]}
+    ],
+    {"null_term",
+        [?_assertEqual(R, jiffy:decode(<<"null">>, O)) || {R, O} <- T]}.
