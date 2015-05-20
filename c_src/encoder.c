@@ -34,6 +34,7 @@ typedef struct {
     int             uescape;
     int             pretty;
     int             use_nil;
+    int             escape_forward_slashes;
 
     int             shiftcnt;
     int             count;
@@ -77,6 +78,7 @@ enc_new(ErlNifEnv* env)
     e->uescape = 0;
     e->pretty = 0;
     e->use_nil = 0;
+    e->escape_forward_slashes = 0;
     e->shiftcnt = 0;
     e->count = 0;
 
@@ -281,6 +283,12 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
                 esc_extra += 1;
                 i++;
                 continue;
+            case '/':
+                if(e->escape_forward_slashes) {
+                    esc_extra += 1;
+                    i++;
+                    continue;
+                }
             default:
                 if(data[i] < 0x20) {
                     esc_extra += 5;
@@ -348,6 +356,13 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
                 e->p[e->i++] = 't';
                 i++;
                 continue;
+            case '/':
+                if(e->escape_forward_slashes) {
+                    e->p[e->i++] = '\\';
+                    e->u[e->i++] = data[i];
+                    i++;
+                    continue;
+                }
             default:
                 if(data[i] < 0x20) {
                     ulen = unicode_uescape(data[i], &(e->p[e->i]));
@@ -591,6 +606,8 @@ encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             e->uescape = 1;
         } else if(enif_compare(val, e->atoms->atom_pretty) == 0) {
             e->pretty = 1;
+        } else if(enif_compare(val, e->atoms->atom_escape_forward_slashes) == 0) {
+            e->escape_forward_slashes = 1;
         } else if(enif_compare(val, e->atoms->atom_use_nil) == 0) {
             e->use_nil = 1;
         } else if(enif_compare(val, e->atoms->atom_force_utf8) == 0) {
