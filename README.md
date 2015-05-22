@@ -82,7 +82,7 @@ Data Format
     {[]}                       -> {}             -> {[]}
     {[{foo, bar}]}             -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
     {[{<<"foo">>, <<"bar">>}]} -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
-    #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{<<"foo">> -> <<"bar">>}
+    #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{<<"foo">> => <<"bar">>}
 
 N.B. The last entry in this table is only valid for VM's that support
 the `maps` data type (i.e., 17.0 and newer) and client code must pass
