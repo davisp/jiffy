@@ -1,3 +1,5 @@
+_build
+.rebar3
 .jiffy.dev
 *.app
 *.beam
