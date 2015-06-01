@@ -8,9 +8,21 @@
 
 #define DEFAULT_BYTES_PER_ITER 2048
 
+#ifndef UNUSED
+#define UNUSED  __attribute__((unused))
+#endif
+
 #define MAP_TYPE_PRESENT \
     ((ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION >= 6) \
     || (ERL_NIF_MAJOR_VERSION > 2))
+
+static int UNUSED should_yield(size_t used, size_t limit) {
+    if(limit == 0 || used < limit) {
+        return 0;
+    }
+
+    return 1;
+}
 
 typedef struct {
     ERL_NIF_TERM    atom_ok;
@@ -30,6 +42,7 @@ typedef struct {
     ERL_NIF_TERM    atom_return_maps;
     ERL_NIF_TERM    atom_nil;
     ERL_NIF_TERM    atom_use_nil;
+    ERL_NIF_TERM    atom_with_trailer;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
@@ -44,7 +57,6 @@ ERL_NIF_TERM make_error(jiffy_st* st, ErlNifEnv* env, const char* error);
 ERL_NIF_TERM make_obj_error(jiffy_st* st, ErlNifEnv* env, const char* error,
         ERL_NIF_TERM obj);
 int get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi);
-int should_yield(size_t used, size_t limit);
 int consume_timeslice(ErlNifEnv* env, size_t used, size_t limit);
 
 ERL_NIF_TERM decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);

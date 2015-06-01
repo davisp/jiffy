@@ -53,6 +53,7 @@ typedef struct {
     int             is_partial;
     int             return_maps;
     int             use_nil;
+    int             with_trailer;
 
     char*           p;
     unsigned char*  u;
@@ -81,6 +82,7 @@ dec_new(ErlNifEnv* env)
     d->is_partial = 0;
     d->return_maps = 0;
     d->use_nil = 0;
+    d->with_trailer = 0;
 
     d->p = NULL;
     d->u = NULL;
@@ -712,6 +714,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 #endif
         } else if(enif_compare(val, d->atoms->atom_use_nil) == 0) {
             d->use_nil = 1;
+        } else if(enif_compare(val, d->atoms->atom_with_trailer) == 0) {
+            d->with_trailer = 1;
         } else {
             return enif_make_badarg(env);
         }
@@ -726,6 +730,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     Decoder* d;
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
 
+    ERL_NIF_TERM bin_term = argv[0];
     ErlNifBinary bin;
 
     ERL_NIF_TERM objs;
@@ -736,7 +741,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     if(argc != 5) {
         return enif_make_badarg(env);
-    } else if(!enif_inspect_binary(env, argv[0], &bin)) {
+    } else if(!enif_inspect_binary(env, bin_term, &bin)) {
         return enif_make_badarg(env);
     } else if(!enif_get_resource(env, argv[1], st->res_dec, (void**) &d)) {
         return enif_make_badarg(env);
@@ -754,8 +759,14 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     start = d->i;
     while(d->i < bin.size) {
         //fprintf(stderr, "state: %d\r\n", dec_curr(d));
-        if(should_yield(d->i - start, d->bytes_per_iter)) {
-            consume_timeslice(env, d->i - start, d->bytes_per_iter);
+        if(should_yield(d->i - start, d->bytes_per_iter)
+            /* A system could handle roughly 100kb per millisecond on a single core.
+             * So the total amount of work per millisecond is 100kb.
+             * We report the percentage of the time every (bytes_per_iter) bytes
+             * in hope that the system will ask as to yield. We don't yield until
+             * asked by the system according to our feedback (of questionable accuracy).
+             */
+            && consume_timeslice(env, d->i - start, 100000)) {
             return enif_make_tuple5(
                     env,
                     st->atom_iter,
@@ -1028,8 +1039,16 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         d->i++;
                         break;
                     default:
-                        ret = dec_error(d, "invalid_trailing_data");
-                        goto done;
+                        if(d->with_trailer) {
+                            ERL_NIF_TERM trailer = enif_make_sub_binary(env,
+                                bin_term, d->i, bin.size - d->i);
+                            val = enif_make_tuple3(env, d->atoms->atom_with_trailer,
+                                    val, trailer);
+                            goto soft_done;
+                        } else {
+                            ret = dec_error(d, "invalid_trailing_data");
+                            goto done;
+                        }
                 }
                 break;
 
@@ -1038,6 +1057,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
         }
     }
+
+soft_done:
 
     if(dec_curr(d) != st_done) {
         ret = dec_error(d, "truncated_json");
