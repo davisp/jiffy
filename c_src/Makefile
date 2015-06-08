@@ -44,7 +44,6 @@ $(NIF_SO): $(NIF_OBJS)
 	$(CC) $(NIF_OBJS) $(LDFLAGS) $(LDLIBS) -o $(NIF_SO)
 
 %.o: %.c
-	echo $(NIF_SOURCES)
 	@$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 $(NIF_ENV):
