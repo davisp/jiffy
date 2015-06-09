@@ -14,6 +14,7 @@ UNAME_SYS := $(shell uname -s)
 ifeq ($(UNAME_SYS), Darwin)
 	CC ?= cc
 	CFLAGS ?= -O3 -std=c99 -arch x86_64 -Wall -Wmissing-prototypes
+	CXXFLAGS ?= -O3 -arch x86_64 -Wall
 	LDFLAGS ?= -arch x86_64 -flat_namespace -undefined suppress
 else ifeq ($(UNAME_SYS), FreeBSD)
 	CC ?= cc
@@ -26,6 +27,7 @@ else ifeq ($(UNAME_SYS), Linux)
 endif
 
 CFLAGS += -fPIC -I$(ERTS_INCLUDE_DIR) -I$(ERL_INTERFACE_INCLUDE_DIR)
+CXXFLAGS += -fPIC -I$(ERTS_INCLUDE_DIR) -I$(ERL_INTERFACE_INCLUDE_DIR)
 LDLIBS += -L$(ERL_INTERFACE_LIB_DIR) -lerl_interface -lei
 LDFLAGS += -shared
 
@@ -45,6 +47,9 @@ $(NIF_SO): $(NIF_OBJS)
 
 %.o: %.c
 	@$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+
+%.o: %.cc
+        @$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
 $(NIF_ENV):
 	@$(ERL) -eval "file:write_file(\"$(NIF_ENV)\", \
