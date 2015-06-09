@@ -49,7 +49,7 @@ $(NIF_SO): $(NIF_OBJS)
 	@$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 %.o: %.cc
-        @$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
+    @$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
 $(NIF_ENV):
 	@$(ERL) -eval "file:write_file(\"$(NIF_ENV)\", \
