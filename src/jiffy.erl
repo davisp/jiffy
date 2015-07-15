@@ -5,13 +5,41 @@
 -export([decode/1, decode/2, encode/1, encode/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
+
+%% More information on the JSON standard: http://json.org
+-type json_value() :: null
+                    | true
+                    | false
+                    | json_string()
+                    | json_number()
+                    | json_object()
+                    | json_array().
+
+
+-type json_array()  :: [json_value()].
+-type json_string() :: binary().
+-type json_number() :: integer() | float().
+-type json_object() :: {[{json_string(),json_value()}]}.
+
+-type decode_option() :: return_maps
+                       | {bytes_per_iter, non_neg_integer()}.
+-type decode_options() :: [decode_option()].
+
+-type encode_option() :: unescape
+                       | pretty
+                       | force_utf8
+                       | {bytes_per_iter, non_neg_integer()}.
+-type encode_options() :: [encode_option()].
+
+-export_type([json_value/0]).
+
 -on_load(init/0).
 
-
+-spec decode(iolist() | binary()) -> json_value().
 decode(Data) ->
     decode(Data, []).
 
-
+-spec decode(iolist() | binary(), decode_options()) -> json_value().
 decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
     case nif_decode_init(Data, Opts) of
         {error, _} = Error ->
@@ -26,11 +54,11 @@ decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
 decode(Data, Opts) when is_list(Data) ->
     decode(iolist_to_binary(Data), Opts).
 
-
+-spec encode(json_value()) -> iolist().
 encode(Data) ->
     encode(Data, []).
 
-
+-spec encode(json_value(), encode_options()) -> iolist().
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
     case nif_encode_init(Data, Options) of
