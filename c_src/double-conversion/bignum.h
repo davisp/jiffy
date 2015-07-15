@@ -28,7 +28,7 @@
 #ifndef DOUBLE_CONVERSION_BIGNUM_H_
 #define DOUBLE_CONVERSION_BIGNUM_H_
 
-#include "utils.h"
+#include "double-conversion/utils.h"
 
 namespace double_conversion {
 
@@ -49,7 +49,6 @@ class Bignum {
 
   void AssignPowerUInt16(uint16_t base, int exponent);
 
-  void AddUInt16(uint16_t operand);
   void AddUInt64(uint64_t operand);
   void AddBignum(const Bignum& other);
   // Precondition: this >= other.

@@ -29,7 +29,7 @@
 #include <limits.h>
 #include <math.h>
 
-#include "utils.h"
+#include "double-conversion/utils.h"
 
 #include "cached-powers.h"
 
@@ -152,6 +152,7 @@ void PowersOfTenCache::GetCachedPowerForBinaryExponentRange(
   ASSERT(0 <= index && index < kCachedPowersLength);
   CachedPower cached_power = kCachedPowers[index];
   ASSERT(min_exponent <= cached_power.binary_exponent);
+  (void) max_exponent;  // Mark variable as used.
   ASSERT(cached_power.binary_exponent <= max_exponent);
   *decimal_exponent = cached_power.decimal_exponent;
   *power = DiyFp(cached_power.significand, cached_power.binary_exponent);

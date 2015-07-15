@@ -33,7 +33,8 @@
 
 #include <assert.h>
 #ifndef ASSERT
-#define ASSERT(condition)      (assert(condition))
+#define ASSERT(condition)         \
+    assert(condition);
 #endif
 #ifndef UNIMPLEMENTED
 #define UNIMPLEMENTED() (abort())
@@ -55,11 +56,16 @@
 #if defined(_M_X64) || defined(__x86_64__) || \
     defined(__ARMEL__) || defined(__avr32__) || \
     defined(__hppa__) || defined(__ia64__) || \
-    defined(__mips__) || defined(__powerpc__) || \
+    defined(__mips__) || \
+    defined(__powerpc__) || defined(__ppc__) || defined(__ppc64__) || \
+    defined(_POWER) || defined(_ARCH_PPC) || defined(_ARCH_PPC64) || \
     defined(__sparc__) || defined(__sparc) || defined(__s390__) || \
     defined(__SH4__) || defined(__alpha__) || \
-    defined(_MIPS_ARCH_MIPS32R2)
+    defined(_MIPS_ARCH_MIPS32R2) || \
+    defined(__AARCH64EL__) || defined(__aarch64__)
 #define DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS 1
+#elif defined(__mc68000__)
+#undef DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS
 #elif defined(_M_IX86) || defined(__i386__) || defined(__i386)
 #if defined(_WIN32)
 // Windows uses a 64bit wide floating point stack.
@@ -71,6 +77,11 @@
 #error Target architecture was not detected as supported by Double-Conversion.
 #endif
 
+#if defined(__GNUC__)
+#define DOUBLE_CONVERSION_UNUSED __attribute__((unused))
+#else
+#define DOUBLE_CONVERSION_UNUSED
+#endif
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 
@@ -89,6 +100,8 @@ typedef unsigned __int64 uint64_t;
 #include <stdint.h>
 
 #endif
+
+typedef uint16_t uc16;
 
 // The following macro works on both 32 and 64-bit platforms.
 // Usage: instead of writing 0x1234567890123456
@@ -155,8 +168,8 @@ template <typename T>
 class Vector {
  public:
   Vector() : start_(NULL), length_(0) {}
-  Vector(T* data, int length) : start_(data), length_(length) {
-    ASSERT(length == 0 || (length > 0 && data != NULL));
+  Vector(T* data, int len) : start_(data), length_(len) {
+    ASSERT(len == 0 || (len > 0 && data != NULL));
   }
 
   // Returns a vector using the same backing storage as this one,
@@ -198,8 +211,8 @@ class Vector {
 // buffer bounds on all operations in debug mode.
 class StringBuilder {
  public:
-  StringBuilder(char* buffer, int size)
-      : buffer_(buffer, size), position_(0) { }
+  StringBuilder(char* buffer, int buffer_size)
+      : buffer_(buffer, buffer_size), position_(0) { }
 
   ~StringBuilder() { if (!is_finalized()) Finalize(); }
 
@@ -292,24 +305,12 @@ class StringBuilder {
 // you can use BitCast to cast one pointer type to another.  This confuses gcc
 // enough that it can no longer see that you have cast one pointer type to
 // another thus avoiding the warning.
-//
-// Adding an unused attribute for this static check. Apparently GCC 4.8
-// now throws an error for unused typedefs which triggers -Werror.
-//
-// PJD: 4-24-2013
-//
-
-#if defined(__GNUC__)
-#define UNUSED __attribute__((unused))
-#else
-#define UNUSED
-#endif
-
 template <class Dest, class Source>
 inline Dest BitCast(const Source& source) {
   // Compile time assertion: sizeof(Dest) == sizeof(Source)
   // A compile error here means your Dest and Source have different sizes.
-  UNUSED typedef char VerifySizesAreEqual[sizeof(Dest) == sizeof(Source) ? 1 : -1];
+  DOUBLE_CONVERSION_UNUSED
+      typedef char VerifySizesAreEqual[sizeof(Dest) == sizeof(Source) ? 1 : -1];
 
   Dest dest;
   memmove(&dest, &source, sizeof(dest));
