@@ -6,3 +6,4 @@
 .eunit
 deps
 erln8.config
+TEST-*.xml
