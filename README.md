@@ -47,6 +47,10 @@ The options for decode are:
   instead of `null`.
 * `use_nil` - Returns the atom `nil` instead of `null` when decoding
   JSON. This is a short hand for `{null_term, nil}`.
+* `return_trailer` - If any non-whitespace is found after the first
+  JSON term is decoded the return value of decode/2 becomes
+  `{has_trailer, FirstTerm, RestData::iodata()}`. This is useful to
+  decode multiple terms in a single binary.
 
 `jiffy:encode/1,2`
 ------------------

@@ -23,8 +23,12 @@
 -type json_number() :: integer() | float().
 -type json_object() :: {[{json_string(),json_value()}]}.
 
+-type decode_result() :: json_value()
+                        | {has_trailer, json_value(), binary()}.
+
 -type decode_option() :: return_maps
                         | use_nil
+                        | return_trailer
                         | {null_term, any()}
                         | {bytes_per_iter, non_neg_integer()}.
 
@@ -37,10 +41,10 @@
 -type decode_options() :: [decode_option()].
 -type encode_options() :: [encode_option()].
 
--export_type([json_value/0]).
+-export_type([json_value/0, jiffy_decode_result/0]).
 
 
--spec decode(iolist() | binary()) -> json_value().
+-spec decode(iolist() | binary()) -> jiffy_decode_result().
 decode(Data) ->
     decode(Data, []).
 
