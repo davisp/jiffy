@@ -52,6 +52,7 @@ typedef struct {
     size_t          bytes_per_iter;
     int             is_partial;
     int             return_maps;
+    int             return_trailer;
     ERL_NIF_TERM    null_term;
 
     char*           p;
@@ -80,6 +81,7 @@ dec_new(ErlNifEnv* env)
     d->bytes_per_iter = DEFAULT_BYTES_PER_ITER;
     d->is_partial = 0;
     d->return_maps = 0;
+    d->return_trailer = 0;
     d->null_term = d->atoms->atom_null;
 
     d->p = NULL;
@@ -710,6 +712,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 #else
             return enif_make_badarg(env);
 #endif
+        } else if(enif_compare(val, d->atoms->atom_return_trailer) == 0) {
+            d->return_trailer = 1;
         } else if(enif_compare(val, d->atoms->atom_use_nil) == 0) {
             d->null_term = d->atoms->atom_nil;
         } else if(get_null_term(env, val, &(d->null_term))) {
@@ -733,6 +737,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM objs;
     ERL_NIF_TERM curr;
     ERL_NIF_TERM val = argv[2];
+    ERL_NIF_TERM trailer;
     ERL_NIF_TERM ret;
     size_t start;
 
@@ -1030,8 +1035,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         d->i++;
                         break;
                     default:
-                        ret = dec_error(d, "invalid_trailing_data");
-                        goto done;
+                        goto decode_done;
                 }
                 break;
 
@@ -1039,6 +1043,16 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = dec_error(d, "invalid_internal_state");
                 goto done;
         }
+    }
+
+decode_done:
+
+    if(d->i < bin.size && d->return_trailer) {
+        trailer = enif_make_sub_binary(env, argv[0], d->i, bin.size - d->i);
+        val = enif_make_tuple3(env, d->atoms->atom_has_trailer, val, trailer);
+    } else if(d->i < bin.size) {
+        ret = dec_error(d, "invalid_trailing_data");
+        goto done;
     }
 
     if(dec_curr(d) != st_done) {

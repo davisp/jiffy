@@ -24,6 +24,7 @@ proper_encode_decode_test_() ->
     [
         run(prop_enc_dec),
         run(prop_enc_dec_pretty),
+        run(prop_dec_trailer),
         run(prop_enc_no_crash),
         run(prop_dec_no_crash_bin),
         run(prop_dec_no_crash_any)
@@ -34,6 +35,26 @@ prop_enc_dec() ->
         begin
             %io:format(standard_error, "Data: ~p~n", [Data]),
             Data == jiffy:decode(jiffy:encode(Data))
+        end
+    ).
+
+prop_dec_trailer() ->
+    ?FORALL({T1, T2}, {json(), json()},
+        begin
+            B1 = jiffy:encode(T1),
+            B2 = jiffy:encode(T2),
+            Combiners = [
+                <<" ">>,
+                <<"\r\t">>,
+                <<"\n   \t">>,
+                <<"                     ">>
+            ],
+            lists:foreach(fun(Comb) ->
+                Bin = <<B1/binary, Comb/binary, B2/binary>>,
+                {has_trailer, T1, Rest} = jiffy:decode(Bin, [return_trailer]),
+                T2 = jiffy:decode(Rest)
+            end, Combiners),
+            true
         end
     ).
 
