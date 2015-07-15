@@ -30,13 +30,15 @@
                         | use_nil
                         | return_trailer
                         | {null_term, any()}
-                        | {bytes_per_iter, non_neg_integer()}.
+                        | {bytes_per_iter, non_neg_integer()}
+                        | {bytes_per_red, non_neg_integer()}.
 
 -type encode_option() :: uescape
                         | pretty
                         | force_utf8
                         | escape_forward_slashes
-                        | {bytes_per_iter, non_neg_integer()}.
+                        | {bytes_per_iter, non_neg_integer()},
+                        | {bytes_per_red, non_neg_integer()}.
 
 -type decode_options() :: [decode_option()].
 -type encode_options() :: [encode_option()].

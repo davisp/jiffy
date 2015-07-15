@@ -36,9 +36,6 @@ Errors are raised as exceptions.
 
 The options for decode are:
 
-* `{bytes_per_iter, N}` where N &gt;= 0 - This controls the number of
-  bytes that Jiffy will process before yielding back to the VM. The
-  mechanics of this yield are completely hidden from the end user.
 * `return_maps` - Tell Jiffy to return objects using the maps data type
   on VMs that support it. This raises an error on VMs that don't support
   maps.
@@ -51,6 +48,12 @@ The options for decode are:
   JSON term is decoded the return value of decode/2 becomes
   `{has_trailer, FirstTerm, RestData::iodata()}`. This is useful to
   decode multiple terms in a single binary.
+* `{bytes_per_red, N}` where N &gt;= 0 - This controls the number of
+  bytes that Jiffy will process as an equivalent to a reduction. Each
+  20 reductions we consume 1% of our allocated time slice for the current
+  process. When the Erlang VM indicates we need to return from the NIF.
+* `{bytes_per_iter, N}` where N &gt;= 0 - Backwards compatible option
+  that is converted into the `bytes_per_red` value.
 
 `jiffy:encode/1,2`
 ------------------
@@ -68,11 +71,10 @@ The options for encode are:
 * `force_utf8` - Force strings to encode as UTF-8 by fixing broken
   surrogate pairs and/or using the replacement character to remove
   broken UTF-8 sequences in data.
-* `{bytes_per_iter, N}` where N &gt;= 0 - This controls the number of
-  bytes that Jiffy will generate before yielding back to the VM. The
-  mechanics of this yield are completely hidden from the end user.
 * `escape_forward_slashes` - Escapes the `/` character which can be
   useful when encoding URLs in some cases.
+* `{bytes_per_red, N}` - Refer to the decode options
+* `{bytes_per_iter, N}` - Refer to the decode options
 
 Data Format
 -----------

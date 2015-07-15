@@ -6,7 +6,8 @@
 
 #include "erl_nif.h"
 
-#define DEFAULT_BYTES_PER_ITER 2048
+#define DEFAULT_BYTES_PER_REDUCTION 20
+#define DEFAULT_ERLANG_REDUCTION_COUNT 2000
 
 #define MAP_TYPE_PRESENT \
     ((ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION >= 6) \
@@ -48,9 +49,9 @@ ERL_NIF_TERM make_error(jiffy_st* st, ErlNifEnv* env, const char* error);
 ERL_NIF_TERM make_obj_error(jiffy_st* st, ErlNifEnv* env, const char* error,
         ERL_NIF_TERM obj);
 int get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi);
+int get_bytes_per_red(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpr);
 int get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term);
-int should_yield(size_t used, size_t limit);
-int consume_timeslice(ErlNifEnv* env, size_t used, size_t limit);
+int should_yield(ErlNifEnv* env, size_t* used, size_t bytes_per_red);
 
 ERL_NIF_TERM decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
