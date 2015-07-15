@@ -42,6 +42,11 @@ The options for decode are:
 * `return_maps` - Tell Jiffy to return objects using the maps data type
   on VMs that support it. This raises an error on VMs that don't support
   maps.
+* `{null_term, Term}` - Returns the specified `Term` instead of `null`
+  when decoding JSON. This is for people that wish to use `undefined`
+  instead of `null`.
+* `use_nil` - Returns the atom `nil` instead of `null` when decoding
+  JSON. This is a short hand for `{null_term, nil}`.
 
 `jiffy:encode/1,2`
 ------------------
@@ -62,6 +67,8 @@ The options for encode are:
 * `{bytes_per_iter, N}` where N &gt;= 0 - This controls the number of
   bytes that Jiffy will generate before yielding back to the VM. The
   mechanics of this yield are completely hidden from the end user.
+* `escape_forward_slashes` - Escapes the `/` character which can be
+  useful when encoding URLs in some cases.
 
 Data Format
 -----------
