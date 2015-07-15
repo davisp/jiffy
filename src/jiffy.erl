@@ -23,7 +23,7 @@
 -type json_number() :: integer() | float().
 -type json_object() :: {[{json_string(),json_value()}]}.
 
--type decode_result() :: json_value()
+-type jiffy_decode_result() :: json_value()
                         | {has_trailer, json_value(), binary()}.
 
 -type decode_option() :: return_maps
@@ -37,7 +37,7 @@
                         | pretty
                         | force_utf8
                         | escape_forward_slashes
-                        | {bytes_per_iter, non_neg_integer()},
+                        | {bytes_per_iter, non_neg_integer()}
                         | {bytes_per_red, non_neg_integer()}.
 
 -type decode_options() :: [decode_option()].
