@@ -52,7 +52,7 @@ typedef struct {
     size_t          bytes_per_iter;
     int             is_partial;
     int             return_maps;
-    int             use_nil;
+    ERL_NIF_TERM    null_term;
 
     char*           p;
     unsigned char*  u;
@@ -80,7 +80,7 @@ dec_new(ErlNifEnv* env)
     d->bytes_per_iter = DEFAULT_BYTES_PER_ITER;
     d->is_partial = 0;
     d->return_maps = 0;
-    d->use_nil = 0;
+    d->null_term = d->atoms->atom_null;
 
     d->p = NULL;
     d->u = NULL;
@@ -711,7 +711,9 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             return enif_make_badarg(env);
 #endif
         } else if(enif_compare(val, d->atoms->atom_use_nil) == 0) {
-            d->use_nil = 1;
+            d->null_term = d->atoms->atom_nil;
+        } else if(get_null_term(env, val, &(d->null_term))) {
+            continue;
         } else {
             return enif_make_badarg(env);
         }
@@ -783,7 +785,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             ret = dec_error(d, "invalid_literal");
                             goto done;
                         }
-                        val = d->use_nil ? d->atoms->atom_nil : d->atoms->atom_null;
+                        val = d->null_term;
                         dec_pop(d, st_value);
                         d->i += 4;
                         break;

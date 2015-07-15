@@ -23,6 +23,8 @@ string_error_test_() ->
 string_utf8_test_() ->
     [gen(utf8, Case) || Case <- cases(utf8)].
 
+string_escaped_slashes_test_() ->
+    [gen(escaped_slashes, Case) || Case <- cases(escaped_slashes)].
 
 gen(ok, {J, E}) ->
     gen(ok, {J, E, J});
@@ -50,8 +52,13 @@ gen(utf8, {Case, Fixed}) ->
         ?_assertThrow({error, {invalid_string, _}}, jiffy:encode(Case)),
         ?_assertEqual(Fixed2, jiffy:encode(Case, [force_utf8])),
         ?_assertThrow({error, {_, invalid_string}}, jiffy:decode(Case2))
-    ]}.
+    ]};
 
+gen(escaped_slashes, {J, E}) ->
+    {msg("escaped_slashes - ~s", [J]), [
+        {"Decode", ?_assertEqual(E, dec(J))},
+        {"Encode", ?_assertEqual(J, enc(E, [escape_forward_slashes]))}
+    ]}.
 
 cases(ok) ->
     [
@@ -143,4 +150,9 @@ cases(utf8) ->
         {<<16#F8, 16#84, 16#80, 16#80, 16#80>>, <<16#EF, 16#BF, 16#BD>>},
         {<<16#FC, 16#80, 16#80, 16#80, 16#80, 16#80>>, <<16#EF, 16#BF, 16#BD>>},
         {<<16#FC, 16#82, 16#80, 16#80, 16#80, 16#80>>, <<16#EF, 16#BF, 16#BD>>}
+    ];
+
+cases(escaped_slashes) ->
+    [
+        {<<"\"\\/\"">>, <<"/">>}
     ].
