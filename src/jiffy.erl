@@ -19,7 +19,7 @@
                     | json_array().
 
 -type json_array()  :: [json_value()].
--type json_string() :: binary().
+-type json_string() :: atom() | binary().
 -type json_number() :: integer() | float().
 -type json_object() :: {[{json_string(),json_value()}]}.
 
