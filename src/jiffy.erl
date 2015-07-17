@@ -21,10 +21,16 @@
 -type json_array()  :: [json_value()].
 -type json_string() :: atom() | binary().
 -type json_number() :: integer() | float().
+
+-ifdef(JIFFY_NO_MAPS).
+
 -type json_object() :: {[{json_string(),json_value()}]}.
 
--ifndef(JIFFY_NO_MAPS).
--type #{json_string() => json_value()}.
+-else.
+
+-type json_object() :: {[{json_string(),json_value()}]}
+                        | #{json_string() => json_value()}.
+
 -endif.
 
 -type jiffy_decode_result() :: json_value()
