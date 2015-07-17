@@ -23,6 +23,10 @@
 -type json_number() :: integer() | float().
 -type json_object() :: {[{json_string(),json_value()}]}.
 
+-ifndef(JIFFY_NO_MAPS).
+-type #{json_string() => json_value()}.
+-endif.
+
 -type jiffy_decode_result() :: json_value()
                         | {has_trailer, json_value(), binary()}.
 
