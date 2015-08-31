@@ -16,7 +16,7 @@ Proper = [
 ConfigPath = filename:dirname(SCRIPT),
 DevMarker = filename:join([ConfigPath, ".jiffy.dev"]),
 
-case filelib:is_file(DevMarker) orelse os:getenv("TRAVIS") == "true" of
+case filelib:is_file(DevMarker) of
     true ->
         % Don't override existing dependencies
         Config0 = case lists:keyfind(deps, 1, CONFIG) of

@@ -1,6 +1,7 @@
 language: erlang
 notifications:
   email: paul.joseph.davis@gmail.com
+script: make check
 otp_release:
    - 17.5
    - 17.4
