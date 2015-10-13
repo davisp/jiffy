@@ -65,6 +65,20 @@ typedef struct {
     int             st_top;
 } Decoder;
 
+Decoder* dec_new(ErlNifEnv* env);
+void dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin);
+ERL_NIF_TERM dec_error(Decoder* d, const char* atom);
+char dec_curr(Decoder* d);
+int dec_top(Decoder* d);
+void dec_push(Decoder* d, char val);
+void dec_pop(Decoder* d, char val);
+int dec_string(Decoder* d, ERL_NIF_TERM* value);
+int dec_number(Decoder* d, ERL_NIF_TERM* value);
+ERL_NIF_TERM make_empty_object(ErlNifEnv* env, int ret_map);
+int make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out, int ret_map);
+ERL_NIF_TERM make_array(ErlNifEnv* env, ERL_NIF_TERM list);
+
+
 Decoder*
 dec_new(ErlNifEnv* env)
 {
