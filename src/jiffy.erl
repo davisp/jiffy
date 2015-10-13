@@ -77,12 +77,12 @@ decode(Data, Opts) when is_list(Data) ->
     decode(iolist_to_binary(Data), Opts).
 
 
--spec encode(json_value()) -> iolist().
+-spec encode(json_value()) -> iodata().
 encode(Data) ->
     encode(Data, []).
 
 
--spec encode(json_value(), encode_options()) -> iolist().
+-spec encode(json_value(), encode_options()) -> iodata().
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
     case nif_encode_init(Data, Options) of
