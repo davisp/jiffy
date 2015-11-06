@@ -1,0 +1,44 @@
+IsRebar3 = case application:get_key(rebar, vsn) of
+               {ok, VSN} ->
+                   [VSN1 | _] = string:tokens(VSN, "-"),
+                   [Maj, Min, Patch] = string:tokens(VSN1, "."),
+                   (list_to_integer(Maj) >= 3);
+               undefined ->
+                   lists:keymember(mix, 1, application:loaded_applications())
+           end,
+
+case IsRebar3 of
+    true ->
+        CONFIG;
+    false ->
+                io:format("la~n", []),
+
+        CONFIG1 = [{eunit_opts, [verbose]},  {plugins, [rebar_gdb_plugin]} | CONFIG],
+
+        ErlOpts = [{d, 'JIFFY_DEV'}],
+        Proper = [{proper, ".*", {git, "git://github.com/manopapad/proper.git", "master"}}],
+
+        ConfigPath = filename:dirname(SCRIPT),
+        DevMarker = filename:join([ConfigPath, ".jiffy.dev"]),
+
+        case filelib:is_file(DevMarker) of
+            true ->
+                % Don't override existing dependencies
+                CONFIG2 = case lists:keyfind(deps, 1, CONFIG1) of
+                    false ->
+                        CONFIG1 ++ [{deps, Proper}];
+                    {deps, DepsList} ->
+                        lists:keyreplace(deps, 1, CONFIG1, {deps, DepsList ++ Proper})
+                    end,
+                
+                case lists:keyfind(erl_opts, 1, CONFIG2) of
+                    false ->
+                        CONFIG2 ++ [{erl_opts, ErlOpts}];
+                    {erl_opts, Opts} ->
+                        NewOpts = {erl_opts, Opts ++ ErlOpts},
+                        lists:keyreplace(erl_opts, 1, CONFIG2, NewOpts)
+                end;
+            false ->
+                CONFIG1
+        end
+end.
