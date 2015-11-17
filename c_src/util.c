@@ -54,7 +54,7 @@ get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
         return 0;
     }
 
-    if(!enif_get_uint(env, tuple[1], &bytes)) {
+    if(!enif_get_uint(env, tuple[1], &bytes) || !bytes) {
         return 0;
     }
 
@@ -80,11 +80,11 @@ get_bytes_per_red(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
         return 0;
     }
 
-    if(enif_compare(tuple[0], st->atom_bytes_per_iter) != 0) {
+    if(enif_compare(tuple[0], st->atom_bytes_per_red) != 0) {
         return 0;
     }
 
-    if(!enif_get_uint(env, tuple[1], &bytes)) {
+    if(!enif_get_uint(env, tuple[1], &bytes) || !bytes) {
         return 0;
     }
 
