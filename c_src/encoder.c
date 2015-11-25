@@ -559,12 +559,15 @@ enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
 
     do {
         if(!enif_map_iterator_get_pair(env, &iter, &key, &val)) {
+            enif_map_iterator_destroy(env, &iter);
             fprintf(stderr, "bad get pair\r\n");
             return 0;
         }
         tuple = enif_make_tuple2(env, key, val);
         list = enif_make_list_cell(env, tuple, list);
     } while(enif_map_iterator_next(env, &iter));
+
+    enif_map_iterator_destroy(env, &iter);
 
     *out = enif_make_tuple1(env, list);
     return 1;
