@@ -1,37 +1,44 @@
-% This file is part of Jiffy released under the MIT license.
-% See the LICENSE file for more information.
+IsRebar3 = case application:get_key(rebar, vsn) of
+               {ok, VSN} ->
+                   [VSN1 | _] = string:tokens(VSN, "-"),
+                   [Maj, Min, Patch] = string:tokens(VSN1, "."),
+                   (list_to_integer(Maj) >= 3);
+               undefined ->
+                   lists:keymember(mix, 1, application:loaded_applications())
+           end,
 
-% Only include PropEr as a dependency when the JIFFY_DEV
-% environment variable is defined. This allows downstream
-% applications to avoid requiring PropEr.
-%
-% This script is based on the example provided with Rebar.
-
-ErlOpts = [{d, 'JIFFY_DEV'}],
-
-Proper = [
-    {proper, ".*", {git, "git://github.com/manopapad/proper.git", "master"}}
-],
-
-ConfigPath = filename:dirname(SCRIPT),
-DevMarker = filename:join([ConfigPath, ".jiffy.dev"]),
-
-case filelib:is_file(DevMarker) of
+case IsRebar3 of
     true ->
-        % Don't override existing dependencies
-        Config0 = case lists:keyfind(deps, 1, CONFIG) of
-            false ->
-                CONFIG ++ [{deps, Proper}];
-            {deps, DepsList} ->
-                lists:keyreplace(deps, 1, CONFIG, {deps, DepsList ++ Proper})
-        end,
-        Config1 = case lists:keyfind(erl_opts, 1, Config0) of
-            false ->
-                Config0 ++ [{erl_opts, ErlOpts}];
-            {erl_opts, Opts} ->
-                NewOpts = {erl_opts, Opts ++ ErlOpts},
-                lists:keyreplace(erl_opts, 1, Config0, NewOpts)
-        end;
+        CONFIG;
     false ->
-        CONFIG
+                io:format("la~n", []),
+
+        CONFIG1 = [{eunit_opts, [verbose]},  {plugins, [rebar_gdb_plugin]} | CONFIG],
+
+        ErlOpts = [{d, 'JIFFY_DEV'}],
+        Proper = [{proper, ".*", {git, "git://github.com/manopapad/proper.git", "master"}}],
+
+        ConfigPath = filename:dirname(SCRIPT),
+        DevMarker = filename:join([ConfigPath, ".jiffy.dev"]),
+
+        case filelib:is_file(DevMarker) of
+            true ->
+                % Don't override existing dependencies
+                CONFIG2 = case lists:keyfind(deps, 1, CONFIG1) of
+                    false ->
+                        CONFIG1 ++ [{deps, Proper}];
+                    {deps, DepsList} ->
+                        lists:keyreplace(deps, 1, CONFIG1, {deps, DepsList ++ Proper})
+                    end,
+                
+                case lists:keyfind(erl_opts, 1, CONFIG2) of
+                    false ->
+                        CONFIG2 ++ [{erl_opts, ErlOpts}];
+                    {erl_opts, Opts} ->
+                        NewOpts = {erl_opts, Opts ++ ErlOpts},
+                        lists:keyreplace(erl_opts, 1, CONFIG2, NewOpts)
+                end;
+            false ->
+                CONFIG1
+        end
 end.

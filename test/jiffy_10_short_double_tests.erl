@@ -8,7 +8,12 @@
 -include("jiffy_util.hrl").
 
 
-filename() -> "../test/cases/short-doubles.txt".
+filename() ->
+    FName = "test/cases/short-doubles.txt",
+    case filelib:is_file(FName) of
+        true -> FName;
+        false -> "../" ++ FName
+    end.
 
 
 short_double_test_() ->

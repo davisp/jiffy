@@ -67,6 +67,16 @@ static char* shifts[NUM_SHIFTS] = {
 };
 
 
+Encoder* enc_new(ErlNifEnv* env);
+int enc_init(Encoder* e, ErlNifEnv* env);
+ERL_NIF_TERM enc_error(Encoder* e, const char* msg);
+ERL_NIF_TERM enc_obj_error(Encoder* e, const char* msg, ERL_NIF_TERM obj);
+int enc_result(Encoder* e, ERL_NIF_TERM* value);
+int enc_done(Encoder* e, ERL_NIF_TERM* value);
+#if MAP_TYPE_PRESENT
+int enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out);
+#endif
+
 Encoder*
 enc_new(ErlNifEnv* env)
 {
