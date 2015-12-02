@@ -759,10 +759,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     objs = argv[3];
     curr = argv[4];
 
-    //fprintf(stderr, "Parsing:\r\n");
     while(d->i < bin.size) {
-        //fprintf(stderr, "state: %d\r\n", dec_curr(d));
-
         if(should_yield(env, &bytes_read, d->bytes_per_red)) {
             return enif_make_tuple5(
                     env,
