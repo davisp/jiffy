@@ -54,7 +54,7 @@ get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
         return 0;
     }
 
-    if(!enif_get_uint(env, tuple[1], &bytes) || !bytes) {
+    if(!enif_get_uint(env, tuple[1], &bytes)) {
         return 0;
     }
 
@@ -84,7 +84,7 @@ get_bytes_per_red(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
         return 0;
     }
 
-    if(!enif_get_uint(env, tuple[1], &bytes) || !bytes) {
+    if(!enif_get_uint(env, tuple[1], &bytes)) {
         return 0;
     }
 
@@ -124,6 +124,10 @@ get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term)
 int
 should_yield(ErlNifEnv* env, size_t* used, size_t bytes_per_red)
 {
+    if (!bytes_per_red) {
+        return 0;
+    }
+
 #if(ERL_NIF_MAJOR_VERSION >= 2 && ERL_NIF_MINOR_VERSION >= 4)
 
     if(((*used) / bytes_per_red) >= 20) {
