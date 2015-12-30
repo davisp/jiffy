@@ -41,6 +41,7 @@
                         | return_trailer
                         | dedupe_keys
                         | copy_strings
+                        | attempt_atom
                         | {null_term, any()}
                         | {bytes_per_iter, non_neg_integer()}
                         | {bytes_per_red, non_neg_integer()}.
