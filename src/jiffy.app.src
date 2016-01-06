@@ -2,5 +2,9 @@
     {description, "JSON Decoder/Encoder."},
     {vsn, git},
     {registered, []},
-    {applications, [kernel, stdlib]}
+    {applications, [kernel, stdlib]},
+    {registered, []},
+    {maintainers, ["davisp"]},
+    {licenses, ["ISC"]},
+    {links, [{"Github", "https://github.com/davisp/jiffy"}]}
 ]}.
