@@ -8,7 +8,8 @@
 -include("jiffy_util.hrl").
 
 
-filename() -> "../test/cases/short-doubles.txt".
+filename() ->
+    cases_path("short-doubles.txt").
 
 
 short_double_test_() ->

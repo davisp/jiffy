@@ -25,3 +25,16 @@ enc(V) ->
 
 enc(V, Opts) ->
     iolist_to_binary(jiffy:encode(V, Opts)).
+
+
+%% rebar runs eunit with PWD as .eunit/
+%% rebar3 runs eunit with PWD as ./
+%% this adapts to the differences
+cases_path(Suffix) ->
+    {ok, Cwd} = file:get_cwd(),
+    Prefix = case filename:basename(Cwd) of
+        ".eunit" -> "..";
+        _ -> "."
+    end,
+    Path = "test/cases",
+    filename:join([Prefix, Path, Suffix]).
