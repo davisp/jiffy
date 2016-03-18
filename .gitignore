@@ -2,8 +2,10 @@
 .jiffy.dev
 *.app
 *.beam
+*.d
 *.o
 *.so
+_build
 deps
 erln8.config
 hexer.config

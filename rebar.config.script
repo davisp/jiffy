@@ -7,31 +7,56 @@
 %
 % This script is based on the example provided with Rebar.
 
-ErlOpts = [{d, 'JIFFY_DEV'}],
+IsRebar3 = erlang:function_exported(rebar3, main, 1),
 
-Proper = [
-    {proper, ".*", {git, "git://github.com/manopapad/proper.git", "master"}}
+PropErUrl = "git://github.com/manopapad/proper.git",
+PortCompilerUrl = "git@github.com:blt/port_compiler.git",
+
+
+IsDevEnv = begin
+    ConfigPath = filename:dirname(SCRIPT),
+    DevMarker = filename:join([ConfigPath, ".jiffy.dev"]),
+    filelib:is_file(DevMarker)
+end.
+
+Deps = if not IsDevEnv -> []; true ->
+    [{proper, ".*", {git, PropErUrl, {branch, "master"}}}]
+end,
+
+ErlOpts = if not IsDevEnv -> []; true ->
+    [{d, 'JIFFY_DEV'}]
+end,
+
+Plugins = case IsRebar3 of
+    true -> [{pc, {git, PortCompilerUrl, {branch, "master"}}}];
+    false -> [rebar_gdb_plugin]
+end,
+
+ProviderHooks = if not IsRebar3 -> []; true ->
+    [{pre, [
+        {compile, {pc, compile}},
+        {clean, {pc, clean}}
+    ]}]
+end,
+
+OptsToAdd = [
+    {deps, Deps},
+    {erl_opts, ErlOpts},
+    {plugins, Plugins},
+    {provider_hooks, ProviderHooks}
 ],
 
-ConfigPath = filename:dirname(SCRIPT),
-DevMarker = filename:join([ConfigPath, ".jiffy.dev"]),
+AddOpt = fun(Name, Value, Config) when is_list(Value) ->
+    case lists:keyfind(Name, 1, Config) of
+        {Name, CurrVal} when is_list(CurrVal) ->
+            lists:keyreplace(Name, 1, Config, {Name, CurrVal ++ Value});
+        false ->
+            Config ++ [{Name, Value}];
+        _ ->
+            Config
+    end
+end,
 
-case filelib:is_file(DevMarker) of
-    true ->
-        % Don't override existing dependencies
-        Config0 = case lists:keyfind(deps, 1, CONFIG) of
-            false ->
-                CONFIG ++ [{deps, Proper}];
-            {deps, DepsList} ->
-                lists:keyreplace(deps, 1, CONFIG, {deps, DepsList ++ Proper})
-        end,
-        Config1 = case lists:keyfind(erl_opts, 1, Config0) of
-            false ->
-                Config0 ++ [{erl_opts, ErlOpts}];
-            {erl_opts, Opts} ->
-                NewOpts = {erl_opts, Opts ++ ErlOpts},
-                lists:keyreplace(erl_opts, 1, Config0, NewOpts)
-        end;
-    false ->
-        CONFIG
-end.
+lists:foldl(fun({Name, Value}, CfgAcc) ->
+    AddOpt(Name, Value, CfgAcc)
+end, CONFIG, OptsToAdd).

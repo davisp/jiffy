@@ -8,7 +8,14 @@
 -include("jiffy_util.hrl").
 
 
-filename() -> "../test/cases/short-doubles.txt".
+filename() ->
+    {ok, Cwd} = file:get_cwd(),
+    case filename:basename(Cwd) of
+        ".eunit" ->
+            "../test/cases/short-doubles.txt";
+        _ ->
+            "test/cases/short-doubles.txt"
+    end.
 
 
 short_double_test_() ->
