@@ -61,7 +61,7 @@ decode(Data) ->
     decode(Data, []).
 
 
--spec decode(iolist() | binary(), decode_options()) -> json_value().
+-spec decode(iolist() | binary(), decode_options()) -> jiffy_decode_result().
 decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
     case nif_decode_init(Data, Opts) of
         {error, _} = Error ->
