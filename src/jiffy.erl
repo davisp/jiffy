@@ -46,6 +46,7 @@
 -type encode_option() :: uescape
                         | pretty
                         | force_utf8
+                        | use_nil
                         | escape_forward_slashes
                         | {bytes_per_iter, non_neg_integer()}
                         | {bytes_per_red, non_neg_integer()}.
