@@ -30,7 +30,7 @@ gen(ok, {J1, E, J2}) ->
 
 gen(error, J) ->
     {msg("Error: ~s", [J]), [
-        ?_assertThrow({error, _}, dec(J))
+        ?_assertError(_, dec(J))
     ]};
 
 gen(floats, F) ->

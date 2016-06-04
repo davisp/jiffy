@@ -13,8 +13,8 @@ yajl_test_() ->
     [gen(Case) || Case <- Cases].
 
 
-gen({Name, Json, {error, _}=Erl}) ->
-    {Name, ?_assertThrow(Erl, jiffy:decode(Json))};
+gen({Name, Json, {error, Erl}}) ->
+    {Name, ?_assertError(Erl, jiffy:decode(Json))};
 gen({Name, Json, Erl}) ->
     {Name, ?_assertEqual(Erl, jiffy:decode(Json))}.
 
