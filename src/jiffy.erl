@@ -64,8 +64,8 @@ decode(Data) ->
 -spec decode(iolist() | binary(), decode_options()) -> jiffy_decode_result().
 decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
     case nif_decode_init(Data, Opts) of
-        {error, _} = Error ->
-            throw(Error);
+        {error, Error} ->
+            error(Error);
         {partial, EJson} ->
             finish_decode(EJson);
         {iter, Decoder, Val, Objs, Curr} ->
@@ -92,8 +92,8 @@ encode(Data, Options) ->
         {error, {invalid_object_member_key, _}} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
             encode(FixedData, Options -- [force_utf8]);
-        {error, _} = Error ->
-            throw(Error);
+        {error, Error} ->
+            error(Error);
         {partial, IOData} ->
             finish_encode(IOData, []);
         {iter, Encoder, Stack, IOBuf} ->
@@ -158,9 +158,9 @@ finish_encode([Val | Rest], Acc) when is_integer(Val) ->
     Bin = list_to_binary(integer_to_list(Val)),
     finish_encode(Rest, [Bin | Acc]);
 finish_encode([InvalidEjson | _], _) ->
-    throw({error, {invalid_ejson, InvalidEjson}});
+    error({invalid_ejson, InvalidEjson});
 finish_encode(_, _) ->
-    throw({error, invalid_ejson}).
+    error(invalid_ejson).
 
 
 init() ->
@@ -177,8 +177,8 @@ init() ->
 
 decode_loop(Data, Decoder, Val, Objs, Curr) ->
     case nif_decode_iter(Data, Decoder, Val, Objs, Curr) of
-        {error, _} = Error ->
-            throw(Error);
+        {error, Error} ->
+            error(Error);
         {partial, EJson} ->
             finish_decode(EJson);
         {iter, NewDecoder, NewVal, NewObjs, NewCurr} ->
@@ -197,8 +197,8 @@ encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
         {error, {invalid_object_member_key, _}} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
             encode(FixedData, Options -- [force_utf8]);
-        {error, _} = Error ->
-            throw(Error);
+        {error, Error} ->
+            error(Error);
         {partial, IOData} ->
             finish_encode(IOData, []);
         {iter, NewEncoder, NewStack, NewIOBuf} ->

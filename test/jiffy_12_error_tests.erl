@@ -84,4 +84,4 @@ enc_invalid_object_member_key_test_() ->
 
 
 enc_error(Type, Obj, Case) ->
-    ?_assertEqual({error, {Type, Obj}}, (catch jiffy:encode(Case))).
+    ?_assertMatch({'EXIT', {{Type, Obj}, _}}, (catch jiffy:encode(Case))).
