@@ -61,7 +61,7 @@ decode(Data) ->
     decode(Data, []).
 
 
--spec decode(iolist() | binary(), decode_options()) -> json_value().
+-spec decode(iolist() | binary(), decode_options()) -> jiffy_decode_result().
 decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
     case nif_decode_init(Data, Opts) of
         {error, _} = Error ->
@@ -87,6 +87,9 @@ encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
     case nif_encode_init(Data, Options) of
         {error, {invalid_string, _}} when ForceUTF8 == true ->
+            FixedData = jiffy_utf8:fix(Data),
+            encode(FixedData, Options -- [force_utf8]);
+        {error, {invalid_object_member_key, _}} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
             encode(FixedData, Options -- [force_utf8]);
         {error, _} = Error ->
@@ -189,6 +192,9 @@ encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
     ForceUTF8 = lists:member(force_utf8, Options),
     case nif_encode_iter(Encoder, Stack, IOBuf) of
         {error, {invalid_string, _}} when ForceUTF8 == true ->
+            FixedData = jiffy_utf8:fix(Data),
+            encode(FixedData, Options -- [force_utf8]);
+        {error, {invalid_object_member_key, _}} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
             encode(FixedData, Options -- [force_utf8]);
         {error, _} = Error ->
