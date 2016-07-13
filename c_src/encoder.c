@@ -408,7 +408,7 @@ enc_long(Encoder* e, ErlNifSInt64 val)
     }
 
 #if (defined(__WIN32__) || defined(_WIN32) || defined(_WIN32_))
-    snprintf(&(e->p[e->i]), 32, "%ld", val);
+    snprintf(&(e->p[e->i]), 32, "%lld", val);
 #elif SIZEOF_LONG == 8
     snprintf(&(e->p[e->i]), 32, "%ld", val);
 #else
