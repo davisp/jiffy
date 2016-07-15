@@ -8,3 +8,5 @@ deps
 erln8.config
 hexer.config
 TEST-*.xml
+*.d
+_build

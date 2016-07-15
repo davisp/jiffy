@@ -25,3 +25,15 @@ enc(V) ->
 
 enc(V, Opts) ->
     iolist_to_binary(jiffy:encode(V, Opts)).
+
+%% rebar runs eunit with PWD as .eunit/
+%% rebar3 runs eunit with PWD as ./
+%% this adapts to the differences
+cases_path() ->
+    Path = "test/cases",
+    AltPath = "../" ++ Path,
+    case filelib:is_dir( Path ) of
+        true -> Path;
+        false -> AltPath
+    end.
+    
