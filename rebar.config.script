@@ -19,7 +19,10 @@ IsDevEnv = begin
 end.
 
 Deps = if not IsDevEnv -> []; true ->
-    [{proper, ".*", {git, PropErUrl, {branch, "master"}}}]
+    case IsRebar3 of
+        true -> [proper];
+        false -> [{proper, ".*", {git, PropErUrl, {branch, "master"}}}]
+    end
 end,
 
 ErlOpts = if not IsDevEnv -> []; true ->
