@@ -10,7 +10,6 @@
 IsRebar3 = erlang:function_exported(rebar3, main, 1),
 
 PropErUrl = "git://github.com/manopapad/proper.git",
-PortCompilerUrl = "git@github.com:blt/port_compiler.git",
 
 
 IsDevEnv = begin
@@ -20,7 +19,10 @@ IsDevEnv = begin
 end.
 
 Deps = if not IsDevEnv -> []; true ->
-    [{proper, ".*", {git, PropErUrl, {branch, "master"}}}]
+    case IsRebar3 of
+        true -> [proper];
+        false -> [{proper, ".*", {git, PropErUrl, {branch, "master"}}}]
+    end
 end,
 
 ErlOpts = if not IsDevEnv -> []; true ->
@@ -28,7 +30,7 @@ ErlOpts = if not IsDevEnv -> []; true ->
 end,
 
 Plugins = case IsRebar3 of
-    true -> [{pc, {git, PortCompilerUrl, {branch, "master"}}}];
+    true -> [pc];
     false -> [rebar_gdb_plugin]
 end,
 
