@@ -628,16 +628,28 @@ enc_object_element(Encoder* e, int first, ERL_NIF_TERM curr, ERL_NIF_TERM* stack
     if(!first && !enc_comma(e)) {
         return enc_error(e, "internal_error");
     }
-    if(!enc_string(e, tuple[0])) {
-        return enc_obj_error(e, "invalid_object_member_key", tuple[0]);
+    if(enif_compare(tuple[0], e->atoms->atom_partial_object) == 0) {
+        if(!enif_is_binary(env, tuple[1])) {
+            return enc_obj_error(e, "invalid_json_string", curr);
+        }
+        if(!enc_json(e, tuple[1])) {
+            return enc_error(e, "internal_error");
+        }
+        stack = enif_make_list_cell(env, curr, stack);
+        stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
+        *stackp = stack;
+    } else {
+        if(!enc_string(e, tuple[0])) {
+            return enc_obj_error(e, "invalid_object_member_key", tuple[0]);
+        }
+        if(!enc_colon(e)) {
+            return enc_error(e, "internal_error");
+        }
+        stack = enif_make_list_cell(env, curr, stack);
+        stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
+        stack = enif_make_list_cell(env, tuple[1], stack);
+        *stackp = stack;
     }
-    if(!enc_colon(e)) {
-        return enc_error(e, "internal_error");
-    }
-    stack = enif_make_list_cell(env, curr, stack);
-    stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
-    stack = enif_make_list_cell(env, tuple[1], stack);
-    *stackp = stack;
     return 0;
 }
 
@@ -843,7 +855,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_object_element(e, 1, tuple[0], &stack);
                 if (ret) { goto done; }
             } else if(arity == 2) {
-                if(enif_compare(tuple[0], e->atoms->atom_json) != 0) {
+                if((enif_compare(tuple[0], e->atoms->atom_json) != 0) &&
+                   (enif_compare(tuple[0], e->atoms->atom_partial_array) != 0)) {
                     ret = enc_obj_error(e, "invalid_ejson", curr);
                     goto done;
                 }

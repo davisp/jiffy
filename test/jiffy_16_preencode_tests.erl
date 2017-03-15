@@ -19,6 +19,11 @@ gen(ok, {E1, J, E2}) ->
         {"Decode", ?_assertEqual(E2, dec(J))}
     ]};
 
+gen(ok, {E, J}) ->
+    {msg("~p", [E]), [
+        {"Encode", ?_assertEqual(J, enc(E))}
+    ]};
+
 gen(error, E) ->
     {msg("Error: ~p", [E]), [
         ?_assertThrow({error, _}, enc(E))
@@ -45,7 +50,24 @@ cases(ok) ->
         , { [ {json, JSON}, {json, JSON} ], <<"[[1,\"a\"],[1,\"a\"]]">>, [ EJSON, EJSON ]}
         , { {[ {<<"a">>, {json, JSON}} ]}, <<"{\"a\":[1,\"a\"]}">>, {[ {<<"a">>, EJSON} ]}}
         ],
-    TopTests ++ BuriedTests;
+
+    PartialArray = jiffy:partial_encode([ 2, 3 ], []),
+    PartialArrayTests =
+        [ {[ PartialArray ], <<"[2,3]">>}
+        , {[ 1, PartialArray ], <<"[1,2,3]">>}
+        , {[ PartialArray, 4 ], <<"[2,3,4]">>}
+        , {[ 1, PartialArray, 4 ], <<"[1,2,3,4]">>}
+        ],
+
+    PartialObject = jiffy:partial_encode({[ {<<"ii">>, <<"two">>}, {<<"iii">>, 3} ]}, []),
+    PartialObjectTests =
+        [ {{[ PartialObject ]}, <<"{\"ii\":\"two\",\"iii\":3}">>}
+        , {{[ {<<"i">>, 1}, PartialObject ]}, <<"{\"i\":1,\"ii\":\"two\",\"iii\":3}">>}
+        , {{[ PartialObject, {<<"iv">>, 4} ]}, <<"{\"ii\":\"two\",\"iii\":3,\"iv\":4}">>}
+        , {{[ {<<"i">>, 1}, PartialObject, {<<"iv">>, 4} ]}, <<"{\"i\":1,\"ii\":\"two\",\"iii\":3,\"iv\":4}">>}
+        ],
+
+    TopTests ++ BuriedTests ++ PartialArrayTests ++ PartialObjectTests;
 
 cases(error) ->
     [ {json, true}
