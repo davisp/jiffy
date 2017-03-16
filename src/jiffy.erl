@@ -16,7 +16,8 @@
                     | json_string()
                     | json_number()
                     | json_object()
-                    | json_array().
+                    | json_array()
+                    | json_preencoded().
 
 -type json_array()  :: [json_value()].
 -type json_string() :: atom() | binary().
@@ -32,6 +33,8 @@
                         | #{json_string() => json_value()}.
 
 -endif.
+
+-type json_preencoded() :: {json, Json::iodata()}.
 
 -type jiffy_decode_result() :: json_value()
                         | {has_trailer, json_value(), binary()}.
