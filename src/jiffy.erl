@@ -2,7 +2,7 @@
 % See the LICENSE file for more information.
 
 -module(jiffy).
--export([decode/1, decode/2, encode/1, encode/2]).
+-export([decode/1, decode/2, encode/1, encode/2, partial_encode/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
 -compile([no_native]).
@@ -19,17 +19,20 @@
                     | json_array()
                     | json_preencoded().
 
--type json_array()  :: [json_value()].
+-type json_array()  :: [json_value()|json_partial_array()].
 -type json_string() :: atom() | binary().
 -type json_number() :: integer() | float().
 
+-type json_partial_array() :: {'$partial_array$', iodata()}.
+-type json_partial_object() :: {'$partial_object$', iodata()}.
+
 -ifdef(JIFFY_NO_MAPS).
 
--type json_object() :: {[{json_string(),json_value()}]}.
+-type json_object() :: {[({json_string(),json_value()})|json_partial_object()]}.
 
 -else.
 
--type json_object() :: {[{json_string(),json_value()}]}
+-type json_object() :: {[({json_string(),json_value()})|json_partial_object()]}
                         | #{json_string() => json_value()}.
 
 -endif.
@@ -107,6 +110,16 @@ encode(Data, Options) ->
         IOData ->
             IOData
     end.
+
+
+-spec partial_encode(json_array(), encode_options()) -> json_partial_array();
+                    (json_object(), encode_options()) -> json_partial_object().
+partial_encode(Data, Options) when is_list(Data) ->
+    Json = iolist_to_binary(encode(Data, Options)),
+    {'$partial_array$', binary_part(Json, 1, byte_size(Json) - 2)};
+partial_encode(Data, Options) when is_tuple(Data) ->
+    Json = iolist_to_binary(encode(Data, Options)),
+    {'$partial_object$', binary_part(Json, 1, byte_size(Json) - 2)}.
 
 
 finish_decode({bignum, Value}) ->

@@ -580,6 +580,7 @@ enc_object_element(Encoder* e, int first, ERL_NIF_TERM curr, ERL_NIF_TERM* stack
     if(first && !enc_start_object(e)) {
         return enc_error(e, "internal_error");
     }
+next_object_elt:
     if(enif_is_empty_list(env, curr)) {
         if(!enc_end_object(e)) {
             return enc_error(e, "internal_error");
@@ -594,6 +595,22 @@ enc_object_element(Encoder* e, int first, ERL_NIF_TERM curr, ERL_NIF_TERM* stack
     }
     if(arity != 2) {
         return enc_obj_error(e, "invalid_object_member_arity", item);
+    }
+    if(enif_compare(tuple[0], e->atoms->atom_partial_object) == 0) {
+        ErlNifBinary bin;
+        if(!enif_inspect_binary(env, tuple[1], &bin)) {
+            return enc_error(e, "internal_error");
+        }
+        if(bin.size > 0) {
+            if(!first && !enc_comma(e)) {
+                return enc_error(e, "internal_error");
+            }
+            if(!enc_unknown(e, tuple[1])) {
+                return enc_error(e, "internal_error");
+            }
+            first = 0;
+        }
+        goto next_object_elt;
     }
     if(!first && !enc_comma(e)) {
         return enc_error(e, "internal_error");
@@ -617,10 +634,14 @@ enc_array_element(Encoder* e, int first, ERL_NIF_TERM curr, ERL_NIF_TERM* stackp
     ErlNifEnv* env = e->env;
     ERL_NIF_TERM stack = *stackp;
     ERL_NIF_TERM item;
+    const ERL_NIF_TERM* tuple;
+    int arity;
+    ErlNifBinary bin;
 
     if(first && !enc_start_array(e)) {
         return enc_error(e, "internal_error");
     }
+next_array_elt:
     if(enif_is_empty_list(env, curr)) {
         if(!enc_end_array(e)) {
             return enc_error(e, "internal_error");
@@ -629,6 +650,21 @@ enc_array_element(Encoder* e, int first, ERL_NIF_TERM curr, ERL_NIF_TERM* stackp
     }
     if(!enif_get_list_cell(env, curr, &item, &curr)) {
         return enc_error(e, "internal_error");
+    }
+    if(enif_get_tuple(env, item, &arity, &tuple) &&
+       (arity == 2) &&
+       (enif_compare(tuple[0], e->atoms->atom_partial_array) == 0) &&
+       enif_inspect_binary(env, tuple[1], &bin)) {
+        if (bin.size > 0) {
+            if(!first && !enc_comma(e)) {
+                return enc_error(e, "internal_error");
+            }
+            if(!enc_unknown(e, tuple[1])) {
+                return enc_error(e, "internal_error");
+            }
+            first = 0;
+        }
+        goto next_array_elt;
     }
     if(!first && !enc_comma(e)) {
         return enc_error(e, "internal_error");
