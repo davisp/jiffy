@@ -106,8 +106,8 @@ defmodule Jiffy do
 
   # Examples
 
-      iex> Jiffy.decode!([1, 2, 3])
-      "[1,2,3]"
+      iex> Jiffy.decode!("[1,2,3]")
+      [1, 2, 3]
   """
   @spec decode!(String.t, opts :: :jiffy.decode_option()) :: any() | no_return()
   def decode!(data, opts \\ []) do
