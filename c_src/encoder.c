@@ -492,16 +492,6 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
     return enc_quoted(e, bin.data, bin.size, 0);
 }
 
-static inline int
-enc_object_key(ErlNifEnv *env, Encoder* e, ERL_NIF_TERM val)
-{
-    if(enif_is_atom(env, val)) {
-        return enc_atom(e, val);
-    }
-
-    return enc_string(e, val);
-}
-
 // From https://www.slideshare.net/andreialexandrescu1/three-optimization-tips-for-c-15708507
 
 #define P01 10
@@ -618,6 +608,25 @@ enc_char(Encoder* e, char c)
 
     e->p[e->i++] = c;
     return 1;
+}
+
+static inline int
+enc_object_key(ErlNifEnv *env, Encoder* e, ERL_NIF_TERM val)
+{
+    ErlNifSInt64 ival;
+    double dval;
+
+    if(enif_is_atom(env, val)) {
+        return enc_atom(e, val);
+    }
+    if(enif_get_int64(env, val, &ival)) {
+        return enc_char(e, '"') && enc_long(e, ival) && enc_char(e, '"');
+    }
+    if(enif_get_double(env, val, &dval)) {
+        return enc_char(e, '"') && enc_double(e, dval) && enc_char(e, '"');
+    }
+
+    return enc_string(e, val);
 }
 
 static int
