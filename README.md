@@ -106,10 +106,14 @@ Data Format
     [true, 1.0]                -> [true, 1.0]    -> [true, 1.0]
     {[]}                       -> {}             -> {[]}
     {[{foo, bar}]}             -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
+    {[{123, bar}]}             -> {"123": "bar"} -> {[{<<"123">>, <<"bar">>}]}
+    {[{1.5, bar}]}             -> {"1.5": "bar"} -> {[{<<"1.5">>, <<"bar">>}]}
     {[{<<"foo">>, <<"bar">>}]} -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
     #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{<<"foo">> => <<"bar">>}
+    #{123 => <<"bar">>}        -> {"123": "bar"} -> #{<<"123">> => <<"bar">>}
+    #{1.5 => <<"bar">>}        -> {"1.5": "bar"} -> #{<<"1.5">> => <<"bar">>}
 
-N.B. The last entry in this table is only valid for VM's that support
+N.B. The last three entries in this table are only valid for VM's that support
 the `maps` data type (i.e., 17.0 and newer) and client code must pass
 the `return_maps` option to `jiffy:decode/2`.
 
