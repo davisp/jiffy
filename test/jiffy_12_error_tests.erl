@@ -71,13 +71,10 @@ enc_invalid_object_member_key_test_() ->
     E1 = {1, true},
     {"invalid_object_member_key", [
         {"Bad string", enc_error(Type, <<143>>, {[{<<143>>, true}]})},
-        {"Basic", enc_error(Type, 1, {[{1, true}]})},
         {"Basic", enc_error(Type, [1], {[{[1], true}]})},
         {"Basic", enc_error(Type, {[{foo,bar}]}, {[{{[{foo,bar}]}, true}]})},
         {"Second", enc_error(Type, 1, {[{bar, baz}, E1]})},
-        {"Nested", enc_error(Type, 1, {[{bar,{[E1]}}]})},
         {"Nested", enc_error(Type, 1, {[{bar,{[{baz, 1}, E1]}}]})},
-        {"In List", enc_error(Type, 1, [{[E1]}])},
         {"In List", enc_error(Type, 1, [{[{bang, true}, E1]}])}
     ]}.
 

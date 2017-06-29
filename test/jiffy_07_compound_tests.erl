@@ -9,7 +9,8 @@
 
 
 compound_success_test_() ->
-    [gen(ok, Case) || Case <- cases(ok)].
+    [gen(ok, Case) || Case <- cases(ok)] ++ 
+    [gen(special_encoding, Case) || Case <- cases(special_encoding)].
 
 
 compound_failure_test_() ->
@@ -22,6 +23,11 @@ gen(ok, {J1, E, J2}) ->
     {msg("~s", [J1]), [
         {"Decode", ?_assertEqual(E, dec(J1))},
         {"Encode", ?_assertEqual(J2, enc(E))}
+    ]};
+
+gen(special_encoding, {J, E}) ->
+    {msg("~s", [J]), [
+        {"Encode", ?_assertEqual(J, enc(E))}
     ]};
 
 gen(error, J) ->
@@ -51,6 +57,11 @@ cases(ok) ->
                 null
             ]
         }
+    ];
+
+cases(special_encoding) ->
+    [
+        {<<"{\"123\":\"foo\"}">>, {[{123, <<"foo">>}]}}
     ];
 
 cases(error) ->
