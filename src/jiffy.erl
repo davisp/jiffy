@@ -39,6 +39,7 @@
 -type decode_option() :: return_maps
                         | use_nil
                         | return_trailer
+                        | attempt_atom
                         | {null_term, any()}
                         | {bytes_per_iter, non_neg_integer()}
                         | {bytes_per_red, non_neg_integer()}.
