@@ -374,7 +374,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
     int has_frac = 0;
     int has_exp = 0;
     double dval;
-    long lval;
+    long long lval;
 
     while(d->i < d->len) {
         switch(state) {
@@ -589,7 +589,7 @@ parse:
                 return 1;
             }
         } else {
-            lval = strtol(nbuf, NULL, 10);
+            lval = strtoll(nbuf, NULL, 10);
             if(errno != ERANGE) {
                 *value = enif_make_int64(d->env, lval);
                 return 1;
