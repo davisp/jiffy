@@ -53,6 +53,7 @@ typedef struct {
     int             is_partial;
     int             return_maps;
     int             return_trailer;
+    int             dedupe_keys;
     ERL_NIF_TERM    null_term;
 
     char*           p;
@@ -82,6 +83,7 @@ dec_new(ErlNifEnv* env)
     d->is_partial = 0;
     d->return_maps = 0;
     d->return_trailer = 0;
+    d->dedupe_keys = 0;
     d->null_term = d->atoms->atom_null;
 
     d->p = NULL;
@@ -623,42 +625,6 @@ make_empty_object(ErlNifEnv* env, int ret_map)
     return enif_make_tuple1(env, enif_make_list(env, 0));
 }
 
-int
-make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out, int ret_map)
-{
-    ERL_NIF_TERM ret;
-    ERL_NIF_TERM key;
-    ERL_NIF_TERM val;
-
-#if MAP_TYPE_PRESENT
-    if(ret_map) {
-        ret = enif_make_new_map(env);
-        while(enif_get_list_cell(env, pairs, &val, &pairs)) {
-            if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
-                assert(0 == 1 && "Unbalanced object pairs.");
-            }
-            if(!enif_make_map_put(env, ret, key, val, &ret)) {
-                return 0;
-            }
-        }
-        *out = ret;
-        return 1;
-    }
-#endif
-
-    ret = enif_make_list(env, 0);
-    while(enif_get_list_cell(env, pairs, &val, &pairs)) {
-        if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
-            assert(0 == 1 && "Unbalanced object pairs.");
-        }
-        val = enif_make_tuple2(env, key, val);
-        ret = enif_make_list_cell(env, val, ret);
-    }
-    *out = enif_make_tuple1(env, ret);
-
-    return 1;
-}
-
 ERL_NIF_TERM
 make_array(ErlNifEnv* env, ERL_NIF_TERM list)
 {
@@ -716,6 +682,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 #endif
         } else if(enif_compare(val, d->atoms->atom_return_trailer) == 0) {
             d->return_trailer = 1;
+        } else if(enif_compare(val, d->atoms->atom_dedupe_keys) == 0) {
+            d->dedupe_keys = 1;
         } else if(enif_compare(val, d->atoms->atom_use_nil) == 0) {
             d->null_term = d->atoms->atom_nil;
         } else if(get_null_term(env, val, &(d->null_term))) {
@@ -984,7 +952,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         }
                         dec_pop(d, st_object);
                         dec_pop(d, st_value);
-                        if(!make_object(env, curr, &val, d->return_maps)) {
+                        if(!make_object(env, curr, &val,
+                                d->return_maps, d->dedupe_keys)) {
                             ret = dec_error(d, "internal_object_error");
                             goto done;
                         }

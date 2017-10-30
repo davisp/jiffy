@@ -35,6 +35,7 @@ typedef struct {
     ERL_NIF_TERM    atom_use_nil;
     ERL_NIF_TERM    atom_null_term;
     ERL_NIF_TERM    atom_escape_forward_slashes;
+    ERL_NIF_TERM    atom_dedupe_keys;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
@@ -60,6 +61,9 @@ ERL_NIF_TERM encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 
 void dec_destroy(ErlNifEnv* env, void* obj);
 void enc_destroy(ErlNifEnv* env, void* obj);
+
+int make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
+        int ret_map, int dedupe_keys);
 
 int int_from_hex(const unsigned char* p);
 int int_to_hex(int val, char* p);
