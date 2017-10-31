@@ -1,6 +1,6 @@
 {application, jiffy, [
     {description, "JSON Decoder/Encoder."},
-    {vsn, "0.14.11"},
+    {vsn, "0.14.12"},
     {registered, []},
     {applications, [kernel, stdlib]},
     {maintainers, ["Paul J. Davis"]},
