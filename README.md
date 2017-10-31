@@ -48,6 +48,10 @@ The options for decode are:
   JSON term is decoded the return value of decode/2 becomes
   `{has_trailer, FirstTerm, RestData::iodata()}`. This is useful to
   decode multiple terms in a single binary.
+* `dedupe_keys` - If a key is repeated in a JSON object this flag
+  will ensure that the parsed object only contains a single entry
+  containing the last value seen. This mirrors the parsing beahvior
+  of virtually every other JSON parser.
 * `{bytes_per_red, N}` where N &gt;= 0 - This controls the number of
   bytes that Jiffy will process as an equivalent to a reduction. Each
   20 reductions we consume 1% of our allocated time slice for the current
