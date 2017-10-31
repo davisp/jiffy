@@ -33,6 +33,16 @@ dedupe_keys_test_() ->
             {[{<<"foo">>, 1}, {<<"foo">>, 2}, {<<"foo">>, 3}]},
             {[{<<"foo">>, 3}]}
         },
+        % Sub-objects are covered
+        {
+            {[{<<"foo">>, {[{<<"bar">>, 1}, {<<"bar">>, 2}]}}]},
+            {[{<<"foo">>, {[{<<"bar">>, 2}]}}]}
+        },
+        % Objets in arrays are handled
+        {
+            [{[{<<"foo">>, 1}, {<<"foo">>, 2}]}],
+            [{[{<<"foo">>, 2}]}]
+        },
         % Embedded NULL bytes are handled
         {
             {[{<<"foo\\u0000bar">>, 1}, {<<"foo\\u0000baz">>, 2}]},
