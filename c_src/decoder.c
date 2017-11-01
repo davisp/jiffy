@@ -54,6 +54,7 @@ typedef struct {
     int             return_maps;
     int             return_trailer;
     int             dedupe_keys;
+    int             copy_strings;
     ERL_NIF_TERM    null_term;
 
     char*           p;
@@ -84,6 +85,7 @@ dec_new(ErlNifEnv* env)
     d->return_maps = 0;
     d->return_trailer = 0;
     d->dedupe_keys = 0;
+    d->copy_strings = 0;
     d->null_term = d->atoms->atom_null;
 
     d->p = NULL;
@@ -291,8 +293,13 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     return 0;
 
 parse:
-    if(!has_escape) {
+    if(!has_escape && !d->copy_strings) {
         *value = enif_make_sub_binary(d->env, d->arg, st, (d->i - st - 1));
+        return 1;
+    } else if(!has_escape) {
+        ulen = d->i - 1 - st;
+        chrbuf = (char*) enif_make_new_binary(d->env, ulen, value),
+        memcpy(chrbuf, &(d->p[st]), ulen);
         return 1;
     }
 
@@ -684,6 +691,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             d->return_trailer = 1;
         } else if(enif_compare(val, d->atoms->atom_dedupe_keys) == 0) {
             d->dedupe_keys = 1;
+        } else if(enif_compare(val, d->atoms->atom_copy_strings) == 0) {
+            d->copy_strings = 1;
         } else if(enif_compare(val, d->atoms->atom_use_nil) == 0) {
             d->null_term = d->atoms->atom_nil;
         } else if(get_null_term(env, val, &(d->null_term))) {
