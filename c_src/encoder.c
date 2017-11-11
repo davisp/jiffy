@@ -827,8 +827,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     ret = enc_error(e, "internal_error");
                     goto done;
                 }
-            }
-            else {
+            } else {
                 if(!enc_string(e, tuple[0])) {
                     ret = enc_obj_error(e, "invalid_object_member_key", tuple[0]);
                     goto done;
