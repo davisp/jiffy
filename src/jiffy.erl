@@ -34,11 +34,13 @@
 -endif.
 
 -type jiffy_decode_result() :: json_value()
-                        | {has_trailer, json_value(), binary()}.
+                        | {has_trailer, json_value(), binary()}
+                        | {truncated, non_neg_integer()}.
 
 -type decode_option() :: return_maps
                         | use_nil
                         | return_trailer
+                        | return_truncated
                         | dedupe_keys
                         | {null_term, any()}
                         | {bytes_per_iter, non_neg_integer()}
