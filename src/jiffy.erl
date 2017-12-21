@@ -58,12 +58,12 @@
 -export_type([json_value/0, jiffy_decode_result/0]).
 
 
--spec decode(iolist() | binary()) -> jiffy_decode_result().
+-spec decode(iolist() | binary()) -> jiffy_decode_result() | no_return().
 decode(Data) ->
     decode(Data, []).
 
 
--spec decode(iolist() | binary(), decode_options()) -> jiffy_decode_result().
+-spec decode(iolist() | binary(), decode_options()) -> jiffy_decode_result() | no_return().
 decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
     case nif_decode_init(Data, Opts) of
         {error, _} = Error ->
@@ -79,12 +79,12 @@ decode(Data, Opts) when is_list(Data) ->
     decode(iolist_to_binary(Data), Opts).
 
 
--spec encode(json_value()) -> iodata().
+-spec encode(json_value()) -> iodata() | no_return().
 encode(Data) ->
     encode(Data, []).
 
 
--spec encode(json_value(), encode_options()) -> iodata().
+-spec encode(json_value(), encode_options()) -> iodata() | no_return().
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
     case nif_encode_init(Data, Options) of
