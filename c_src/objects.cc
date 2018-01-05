@@ -25,6 +25,8 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     ERL_NIF_TERM key;
     ERL_NIF_TERM val;
 
+    std::set<std::string> seen;
+
 #if MAP_TYPE_PRESENT
     if(ret_map) {
         ret = enif_make_new_map(env);
@@ -32,8 +34,16 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
             if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
                 assert(0 == 1 && "Unbalanced object pairs.");
             }
-            if(!enif_make_map_put(env, ret, key, val, &ret)) {
+            ErlNifBinary bin;
+            if(!enif_inspect_binary(env, key, &bin)) {
                 return 0;
+            }
+            std::string skey((char*) bin.data, bin.size);
+            if(seen.count(skey) == 0) {
+                seen.insert(skey);
+                if(!enif_make_map_put(env, ret, key, val, &ret)) {
+                    return 0;
+                }
             }
         }
         *out = ret;
@@ -41,7 +51,6 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     }
 #endif
 
-    std::set<std::string> seen;
     ret = enif_make_list(env, 0);
     while(enif_get_list_cell(env, pairs, &val, &pairs)) {
         if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
