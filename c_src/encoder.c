@@ -759,6 +759,9 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "false");
                 goto done;
             }
+        } else if(enif_compare(curr, e->atoms->atom_undefined) == 0) {
+            ret = enc_obj_error(e, "invalid_ejson", curr);
+            goto done;
         } else if(enif_is_binary(env, curr)) {
             if(!enc_string(e, curr)) {
                 ret = enc_obj_error(e, "invalid_string", curr);
