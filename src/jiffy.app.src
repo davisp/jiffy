@@ -2,7 +2,7 @@
     {description, "JSON Decoder/Encoder."},
     {vsn, "0.15.1"},
     {registered, []},
-    {applications, [kernel, stdlib]},
+    {applications, [kernel, stdlib, xmerl]},
     {maintainers, ["Paul J. Davis"]},
     {licenses, ["MIT", "BSD"]},
     {links, [{"GitHub", "https://github.com/davisp/jiffy"}]},
