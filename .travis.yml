@@ -3,6 +3,7 @@ notifications:
   email: paul.joseph.davis@gmail.com
 script: make check
 otp_release:
+   - 21.0
    - 20.0
    - 19.3
    - 19.2
