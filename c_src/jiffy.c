@@ -24,9 +24,11 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_pretty = make_atom(env, "pretty");
     st->atom_force_utf8 = make_atom(env, "force_utf8");
     st->atom_iter = make_atom(env, "iter");
+    st->atom_truncated = make_atom(env, "truncated");
     st->atom_bytes_per_iter = make_atom(env, "bytes_per_iter");
     st->atom_return_maps = make_atom(env, "return_maps");
     st->atom_return_trailer = make_atom(env, "return_trailer");
+    st->atom_return_truncated = make_atom(env, "return_truncated");
     st->atom_has_trailer = make_atom(env, "has_trailer");
     st->atom_nil = make_atom(env, "nil");
     st->atom_use_nil = make_atom(env, "use_nil");

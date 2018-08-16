@@ -52,6 +52,7 @@ typedef struct {
     size_t          bytes_per_red;
     int             is_partial;
     int             return_maps;
+    int             return_truncated;
     int             return_trailer;
     int             dedupe_keys;
     int             copy_strings;
@@ -84,6 +85,7 @@ dec_new(ErlNifEnv* env)
     d->is_partial = 0;
     d->return_maps = 0;
     d->return_trailer = 0;
+    d->return_truncated = 0;
     d->dedupe_keys = 0;
     d->copy_strings = 0;
     d->null_term = d->atoms->atom_null;
@@ -689,6 +691,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 #endif
         } else if(enif_compare(val, d->atoms->atom_return_trailer) == 0) {
             d->return_trailer = 1;
+        } else if(enif_compare(val, d->atoms->atom_return_truncated) == 0) {
+            d->return_truncated = 1;
         } else if(enif_compare(val, d->atoms->atom_dedupe_keys) == 0) {
             d->dedupe_keys = 1;
         } else if(enif_compare(val, d->atoms->atom_copy_strings) == 0) {
@@ -1035,7 +1039,12 @@ decode_done:
     }
 
     if(dec_curr(d) != st_done) {
-        ret = dec_error(d, "truncated_json");
+        if (d->return_truncated) {
+            ret = enif_make_tuple2(env, d->atoms->atom_truncated,
+                                   enif_make_int(d->env, d->i+1));
+        } else {
+            ret = dec_error(d, "truncated_json");
+        }
     } else if(d->is_partial) {
         ret = enif_make_tuple2(env, d->atoms->atom_partial, val);
     } else {

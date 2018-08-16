@@ -48,6 +48,9 @@ The options for decode are:
   JSON term is decoded the return value of decode/2 becomes
   `{has_trailer, FirstTerm, RestData::iodata()}`. This is useful to
   decode multiple terms in a single binary.
+* `return_truncated`  - If the JSON passed to the decoder is incomplete
+  return `{truncated, Pos}`, where `Pos`, is the length of JSON read
+  before hitting the end of the interpretable term.
 * `dedupe_keys` - If a key is repeated in a JSON object this flag
   will ensure that the parsed object only contains a single entry
   containing the last value seen. This mirrors the parsing beahvior

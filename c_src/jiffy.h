@@ -27,9 +27,11 @@ typedef struct {
     ERL_NIF_TERM    atom_pretty;
     ERL_NIF_TERM    atom_force_utf8;
     ERL_NIF_TERM    atom_iter;
+    ERL_NIF_TERM    atom_truncated;
     ERL_NIF_TERM    atom_bytes_per_iter;
     ERL_NIF_TERM    atom_return_maps;
     ERL_NIF_TERM    atom_return_trailer;
+    ERL_NIF_TERM    atom_return_truncated;
     ERL_NIF_TERM    atom_has_trailer;
     ERL_NIF_TERM    atom_nil;
     ERL_NIF_TERM    atom_use_nil;
