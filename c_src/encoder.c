@@ -612,6 +612,35 @@ enc_object_element(Encoder* e, int first, ERL_NIF_TERM curr, ERL_NIF_TERM* stack
 }
 
 ERL_NIF_TERM
+enc_array_element(Encoder* e, int first, ERL_NIF_TERM curr, ERL_NIF_TERM* stackp)
+{
+    ErlNifEnv* env = e->env;
+    ERL_NIF_TERM stack = *stackp;
+    ERL_NIF_TERM item;
+
+    if(first && !enc_start_array(e)) {
+        return enc_error(e, "internal_error");
+    }
+    if(enif_is_empty_list(env, curr)) {
+        if(!enc_end_array(e)) {
+            return enc_error(e, "internal_error");
+        }
+        return 0;
+    }
+    if(!enif_get_list_cell(env, curr, &item, &curr)) {
+        return enc_error(e, "internal_error");
+    }
+    if(!first && !enc_comma(e)) {
+        return enc_error(e, "internal_error");
+    }
+    stack = enif_make_list_cell(env, curr, stack);
+    stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
+    stack = enif_make_list_cell(env, item, stack);
+    *stackp = stack;
+    return 0;
+}
+
+ERL_NIF_TERM
 encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
@@ -732,24 +761,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            if(enif_is_empty_list(env, curr)) {
-                if(!enc_end_array(e)) {
-                    ret = enc_error(e, "internal_error");
-                    goto done;
-                }
-                continue;
-            }
-            if(!enc_comma(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
-            stack = enif_make_list_cell(env, item, stack);
+            ret = enc_array_element(e, 0, curr, &stack);
+            if(ret) { goto done; }
         } else if(enif_compare(curr, e->atoms->atom_null) == 0) {
             if(!enc_literal(e, "null", 4)) {
                 ret = enc_error(e, "null");
@@ -813,24 +826,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             stack = enif_make_list_cell(env, curr, stack);
 #endif
         } else if(enif_is_list(env, curr)) {
-            if(!enc_start_array(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            if(enif_is_empty_list(env, curr)) {
-                if(!enc_end_array(e)) {
-                    ret = enc_error(e, "internal_error");
-                    goto done;
-                }
-                continue;
-            }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
-            stack = enif_make_list_cell(env, item, stack);
+            ret = enc_array_element(e, 1, curr, &stack);
+            if(ret) { goto done; }
         } else {
             if(!enc_unknown(e, curr)) {
                 ret = enc_error(e, "internal_error");
