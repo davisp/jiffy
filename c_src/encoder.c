@@ -632,6 +632,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM stack;
     ERL_NIF_TERM curr;
     ERL_NIF_TERM item;
+    ERL_NIF_TERM tmp;
     const ERL_NIF_TERM* tuple;
     int arity;
     ErlNifSInt64 lval;
@@ -689,9 +690,11 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 }
                 continue;
             }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
+            if(!enif_get_list_cell(env, curr, &item, &tmp)) {
+                item = curr;
+                curr = enif_make_list(env, 0);
+            } else {
+                curr = tmp;
             }
             if(!enif_get_tuple(env, item, &arity, &tuple)) {
                 ret = enc_obj_error(e, "invalid_object_member", item);
@@ -732,9 +735,11 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
+            if(!enif_get_list_cell(env, curr, &item, &tmp)) {
+                item = curr;
+                curr = enif_make_list(env, 0);
+            } else {
+                curr = tmp;
             }
             stack = enif_make_list_cell(env, curr, stack);
             stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
