@@ -207,7 +207,7 @@ unicode_to_utf8(int c, unsigned char* buf)
         } else {
             return -1;
         }
-    } else if(c < 0x10FFFF) {
+    } else if(c <= 0x10FFFF) {
         buf[0] = (unsigned char) 0xF0 + (c >> 18);
         buf[1] = (unsigned char) 0x80 + ((c >> 12) & 0x3F);
         buf[2] = (unsigned char) 0x80 + ((c >> 6) & 0x3F);
