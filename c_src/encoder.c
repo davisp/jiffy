@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "erl_nif.h"
 #include "jiffy.h"
+#include "termstack.h"
 
 #define BIN_INC_SIZE 2048
 
@@ -588,7 +588,7 @@ encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
     tmp_argv[0] = enif_make_resource(env, e);
-    tmp_argv[1] = enif_make_list(env, 1, argv[0]);
+    tmp_argv[1] = enif_make_tuple1(env, argv[0]);
     tmp_argv[2] = enif_make_list(env, 0);
 
     enif_release_resource(e);
@@ -624,14 +624,15 @@ encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 ERL_NIF_TERM
 encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    Encoder* e;
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    Encoder* e;
+    TermStack stack;
 
     ERL_NIF_TERM ret = 0;
 
-    ERL_NIF_TERM stack;
     ERL_NIF_TERM curr;
     ERL_NIF_TERM item;
+    ERL_NIF_TERM saved_stack;
     const ERL_NIF_TERM* tuple;
     int arity;
     ErlNifSInt64 lval;
@@ -644,8 +645,6 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     } else if(!enif_get_resource(env, argv[0], st->res_enc, (void**) &e)) {
         return enif_make_badarg(env);
-    } else if(!enif_is_list(env, argv[1])) {
-        return enif_make_badarg(env);
     } else if(!enif_is_list(env, argv[2])) {
         return enif_make_badarg(env);
     }
@@ -654,34 +653,35 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    stack = argv[1];
+    if(!termstack_restore(env, argv[1], &stack)) {
+        return enif_make_badarg(env);
+    }
+
     e->iolist = argv[2];
 
     start = e->iosize + e->i;
 
-    while(!enif_is_empty_list(env, stack)) {
-
+    while(!termstack_is_empty(&stack)) {
         bytes_written += (e->iosize + e->i) - start;
 
         if(should_yield(env, &bytes_written, e->bytes_per_red)) {
+            saved_stack = termstack_save(env, &stack);
+            termstack_destroy(&stack);
+
             return enif_make_tuple4(
                     env,
                     st->atom_iter,
                     argv[0],
-                    stack,
+                    saved_stack,
                     e->iolist
                 );
         }
 
-        if(!enif_get_list_cell(env, stack, &curr, &stack)) {
-            ret = enc_error(e, "internal_error");
-            goto done;
-        }
+        curr = termstack_pop(&stack);
+
         if(enif_is_identical(curr, e->atoms->ref_object)) {
-            if(!enif_get_list_cell(env, stack, &curr, &stack)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
+            curr = termstack_pop(&stack);
+
             if(enif_is_empty_list(env, curr)) {
                 if(!enc_end_object(e)) {
                     ret = enc_error(e, "internal_error");
@@ -713,14 +713,13 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
-            stack = enif_make_list_cell(env, tuple[1], stack);
+
+            termstack_push(&stack, curr);
+            termstack_push(&stack, e->atoms->ref_object);
+            termstack_push(&stack, tuple[1]);
         } else if(enif_is_identical(curr, e->atoms->ref_array)) {
-            if(!enif_get_list_cell(env, stack, &curr, &stack)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
+            curr = termstack_pop(&stack);
+
             if(enif_is_empty_list(env, curr)) {
                 if(!enc_end_array(e)) {
                     ret = enc_error(e, "internal_error");
@@ -736,9 +735,10 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
-            stack = enif_make_list_cell(env, item, stack);
+
+            termstack_push(&stack, curr);
+            termstack_push(&stack, e->atoms->ref_array);
+            termstack_push(&stack, item);
         } else if(enif_compare(curr, e->atoms->atom_null) == 0) {
             if(!enc_literal(e, "null", 4)) {
                 ret = enc_error(e, "null");
@@ -819,16 +819,18 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
-            stack = enif_make_list_cell(env, tuple[1], stack);
+
+            termstack_push(&stack, curr);
+            termstack_push(&stack, e->atoms->ref_object);
+            termstack_push(&stack, tuple[1]);
 #if MAP_TYPE_PRESENT
         } else if(enif_is_map(env, curr)) {
             if(!enc_map_to_ejson(env, curr, &curr)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            stack = enif_make_list_cell(env, curr, stack);
+
+            termstack_push(&stack, curr);
 #endif
         } else if(enif_is_list(env, curr)) {
             if(!enc_start_array(e)) {
@@ -846,9 +848,10 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
-            stack = enif_make_list_cell(env, item, stack);
+
+            termstack_push(&stack, curr);
+            termstack_push(&stack, e->atoms->ref_array);
+            termstack_push(&stack, item);
         } else {
             if(!enc_unknown(e, curr)) {
                 ret = enc_error(e, "internal_error");
@@ -869,6 +872,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 done:
+    termstack_destroy(&stack);
 
     return ret;
 }
