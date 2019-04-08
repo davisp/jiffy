@@ -243,13 +243,14 @@ enc_literal(Encoder* e, const char* literal, size_t len)
 static inline int
 enc_string(Encoder* e, ERL_NIF_TERM val)
 {
+    static const int MAX_ESCAPE_LEN = 12;
     ErlNifBinary bin;
     char atom[512];
 
     unsigned char* data;
     size_t size;
 
-    int esc_extra = 0;
+    int esc_len;
     int ulen;
     int uval;
     int i;
@@ -270,50 +271,8 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
         return 0;
     }
 
-    i = 0;
-    while(i < size) {
-        switch((char) data[i]) {
-            case '\"':
-            case '\\':
-            case '\b':
-            case '\f':
-            case '\n':
-            case '\r':
-            case '\t':
-                esc_extra += 1;
-                i++;
-                continue;
-            case '/':
-                if(e->escape_forward_slashes) {
-                    esc_extra += 1;
-                    i++;
-                    continue;
-                }
-            default:
-                if(data[i] < 0x20) {
-                    esc_extra += 5;
-                    i++;
-                    continue;
-                } else if(data[i] < 0x80) {
-                    i++;
-                    continue;
-                }
-                ulen = utf8_validate(&(data[i]), size - i);
-                if(ulen < 0) {
-                    return 0;
-                }
-                if(e->uescape) {
-                    uval = utf8_to_unicode(&(data[i]), ulen);
-                    if(uval < 0) {
-                        return 0;
-                    }
-                    esc_extra += utf8_esc_len(uval) - ulen;
-                }
-                i += ulen;
-        }
-    }
-
-    if(!enc_ensure(e, size + esc_extra + 2)) {
+    /* Reserve space for the first quotation mark and most of the output. */
+    if(!enc_ensure(e, size + MAX_ESCAPE_LEN + 1)) {
         return 0;
     }
 
@@ -321,6 +280,10 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
 
     i = 0;
     while(i < size) {
+        if(!enc_ensure(e, MAX_ESCAPE_LEN)) {
+            return 0;
+        }
+
         switch((char) data[i]) {
             case '\"':
             case '\\':
@@ -356,39 +319,50 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
             case '/':
                 if(e->escape_forward_slashes) {
                     e->p[e->i++] = '\\';
-                    e->u[e->i++] = data[i];
-                    i++;
-                    continue;
                 }
+                e->u[e->i++] = '/';
+                i++;
+                continue;
             default:
                 if(data[i] < 0x20) {
                     ulen = unicode_uescape(data[i], &(e->p[e->i]));
                     if(ulen < 0) {
                         return 0;
                     }
+
                     e->i += ulen;
                     i++;
-                } else if((data[i] & 0x80) && e->uescape) {
-                    uval = utf8_to_unicode(&(data[i]), size-i);
-                    if(uval < 0) {
+                } else if(data[i] & 0x80) {
+                    ulen = utf8_validate(&(data[i]), size - i);
+
+                    if (ulen < 0) {
                         return 0;
+                    } else if (e->uescape) {
+                        uval = utf8_to_unicode(&(data[i]), size-i);
+                        if(uval < 0) {
+                            return 0;
+                        }
+
+                        esc_len = unicode_uescape(uval, &(e->p[e->i]));
+                        if(esc_len < 0) {
+                            return 0;
+                        }
+
+                        e->i += esc_len;
+                    } else {
+                        memcpy(&e->u[e->i], &data[i], ulen);
+                        e->i += ulen;
                     }
 
-                    ulen = unicode_uescape(uval, &(e->p[e->i]));
-                    if(ulen < 0) {
-                        return 0;
-                    }
-                    e->i += ulen;
-
-                    ulen = utf8_len(uval);
-                    if(ulen < 0) {
-                        return 0;
-                    }
                     i += ulen;
                 } else {
                     e->u[e->i++] = data[i++];
                 }
         }
+    }
+
+    if(!enc_ensure(e, 1)) {
+        return 0;
     }
 
     e->p[e->i++] = '\"';
