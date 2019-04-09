@@ -66,13 +66,11 @@ decode(Data) ->
 
 -spec decode(iolist() | binary(), decode_options()) -> jiffy_decode_result().
 decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
-    case nif_decode_init(Data, Opts) of
+    case nif_decode(Data, Opts) of
         {error, _} = Error ->
             throw(Error);
         {partial, EJson} ->
             finish_decode(EJson);
-        {iter, Decoder, Val, Objs, Curr} ->
-            decode_loop(Data, Decoder, Val, Objs, Curr);
         EJson ->
             EJson
     end;
@@ -88,7 +86,7 @@ encode(Data) ->
 -spec encode(json_value(), encode_options()) -> iodata().
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
-    case nif_encode_init(Data, Options) of
+    case nif_encode(Data, Options) of
         {error, {invalid_string, _}} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
             encode(FixedData, Options -- [force_utf8]);
@@ -99,8 +97,6 @@ encode(Data, Options) ->
             throw(Error);
         {partial, IOData} ->
             finish_encode(IOData, []);
-        {iter, Encoder, Stack, IOBuf} ->
-            encode_loop(Data, Options, Encoder, Stack, IOBuf);
         IOData ->
             IOData
     end.
@@ -177,51 +173,11 @@ init() ->
     end,
     erlang:load_nif(filename:join(PrivDir, "jiffy"), 0).
 
-
-decode_loop(Data, Decoder, Val, Objs, Curr) ->
-    case nif_decode_iter(Data, Decoder, Val, Objs, Curr) of
-        {error, _} = Error ->
-            throw(Error);
-        {partial, EJson} ->
-            finish_decode(EJson);
-        {iter, NewDecoder, NewVal, NewObjs, NewCurr} ->
-            decode_loop(Data, NewDecoder, NewVal, NewObjs, NewCurr);
-        EJson ->
-            EJson
-    end.
-
-
-encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
-    ForceUTF8 = lists:member(force_utf8, Options),
-    case nif_encode_iter(Encoder, Stack, IOBuf) of
-        {error, {invalid_string, _}} when ForceUTF8 == true ->
-            FixedData = jiffy_utf8:fix(Data),
-            encode(FixedData, Options -- [force_utf8]);
-        {error, {invalid_object_member_key, _}} when ForceUTF8 == true ->
-            FixedData = jiffy_utf8:fix(Data),
-            encode(FixedData, Options -- [force_utf8]);
-        {error, _} = Error ->
-            throw(Error);
-        {partial, IOData} ->
-            finish_encode(IOData, []);
-        {iter, NewEncoder, NewStack, NewIOBuf} ->
-            encode_loop(Data, Options, NewEncoder, NewStack, NewIOBuf);
-        IOData ->
-            IOData
-    end.
-
-
 not_loaded(Line) ->
     erlang:nif_error({not_loaded, [{module, ?MODULE}, {line, Line}]}).
 
-nif_decode_init(_Data, _Opts) ->
+nif_decode(_Data, _Opts) ->
     ?NOT_LOADED.
 
-nif_decode_iter(_Data, _Decoder, _, _, _) ->
-    ?NOT_LOADED.
-
-nif_encode_init(_Data, _Options) ->
-    ?NOT_LOADED.
-
-nif_encode_iter(_Encoder, _Stack, _IoList) ->
+nif_encode(_Data, _Options) ->
     ?NOT_LOADED.

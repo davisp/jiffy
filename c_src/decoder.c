@@ -715,7 +715,9 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM val = argv[2];
     ERL_NIF_TERM trailer;
     ERL_NIF_TERM ret;
-    size_t bytes_read = 0;
+
+    size_t start;
+    size_t bytes_processed = 0;
 
     if(argc != 5) {
         return enif_make_badarg(env);
@@ -733,19 +735,28 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     objs = argv[3];
     curr = argv[4];
 
-    while(d->i < bin.size) {
-        if(should_yield(env, &bytes_read, d->bytes_per_red)) {
-            return enif_make_tuple5(
-                    env,
-                    st->atom_iter,
-                    argv[1],
-                    val,
-                    objs,
-                    curr
-                );
-        }
+    start = d->i;
 
-        bytes_read += 1;
+    while(d->i < bin.size) {
+        bytes_processed = d->i - start;
+
+        if(should_yield(env, bytes_processed, d->bytes_per_red)) {
+            ERL_NIF_TERM tmp_argv[5];
+
+            tmp_argv[0] = argv[0];
+            tmp_argv[1] = argv[1];
+            tmp_argv[2] = val;
+            tmp_argv[3] = objs;
+            tmp_argv[4] = curr;
+
+            bump_used_reds(env, bytes_processed, d->bytes_per_red);
+            return enif_schedule_nif(env,
+                                     "nif_decode_iter",
+                                     0,
+                                     decode_iter,
+                                     5,
+                                     tmp_argv);
+        }
 
         switch(dec_curr(d)) {
             case st_value:
@@ -1040,5 +1051,7 @@ decode_done:
     }
 
 done:
+    bump_used_reds(env, bytes_processed, d->bytes_per_red);
+
     return ret;
 }

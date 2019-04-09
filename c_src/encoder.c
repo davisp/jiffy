@@ -823,7 +823,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     double dval;
 
     size_t start;
-    size_t bytes_written = 0;
+    size_t bytes_processed = 0;
 
     if(argc != 3) {
         return enif_make_badarg(env);
@@ -846,20 +846,24 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     start = e->iosize + e->i;
 
     while(!termstack_is_empty(&stack)) {
-        bytes_written += (e->iosize + e->i) - start;
+        size_t bytes_processed = (e->iosize + e->i) - start;
 
-        if(should_yield(env, &bytes_written, e->bytes_per_red)) {
-            ERL_NIF_TERM saved_stack = termstack_save(env, &stack);
+        if(should_yield(env, bytes_processed, e->bytes_per_red)) {
+            ERL_NIF_TERM tmp_argv[3];
+
+            tmp_argv[0] = argv[0];
+            tmp_argv[1] = termstack_save(env, &stack);
+            tmp_argv[2] = e->iolist;
 
             termstack_destroy(&stack);
 
-            return enif_make_tuple4(
-                    env,
-                    st->atom_iter,
-                    argv[0],
-                    saved_stack,
-                    e->iolist
-                );
+            bump_used_reds(env, bytes_processed, e->bytes_per_red);
+            return enif_schedule_nif(env,
+                                     "nif_encode_iter",
+                                     0,
+                                     encode_iter,
+                                     3,
+                                     tmp_argv);
         }
 
         curr = termstack_pop(&stack);
@@ -1042,6 +1046,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 done:
+    bump_used_reds(env, bytes_processed, e->bytes_per_red);
     termstack_destroy(&stack);
 
     return ret;

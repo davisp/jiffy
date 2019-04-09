@@ -122,20 +122,34 @@ get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term)
 }
 
 int
-should_yield(ErlNifEnv* env, size_t* used, size_t bytes_per_red)
+should_yield(ErlNifEnv* env, size_t used, size_t bytes_per_red)
+{
+    (void)env;
+    (void)used;
+    (void)bytes_per_red;
+
+    return (used / bytes_per_red) >= DEFAULT_ERLANG_REDUCTION_COUNT;
+}
+
+void
+bump_used_reds(ErlNifEnv* env, size_t used, size_t bytes_per_red)
 {
 #if(ERL_NIF_MAJOR_VERSION >= 2 && ERL_NIF_MINOR_VERSION >= 4)
+    size_t reds_used, pct_used;
 
-    if(((*used) / bytes_per_red) >= 20) {
-        *used = 0;
-        return enif_consume_timeslice(env, 1);
+    reds_used = used / bytes_per_red;
+    pct_used = 100 * reds_used / DEFAULT_ERLANG_REDUCTION_COUNT;
+
+    if(pct_used > 0) {
+        if(pct_used > 100) {
+            pct_used = 100;
+        }
+
+        enif_consume_timeslice(env, pct_used);
     }
-
-    return 0;
-
-#else
-
-    return ((*used) / bytes_per_red) >= DEFAULT_ERLANG_REDUCTION_COUNT;
-
 #endif
+
+    (void)env;
+    (void)used;
+    (void)bytes_per_red;
 }
