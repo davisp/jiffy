@@ -726,15 +726,15 @@ encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
     while(enif_get_list_cell(env, opts, &val, &opts)) {
-        if(enif_compare(val, e->atoms->atom_uescape) == 0) {
+        if(enif_is_identical(val, e->atoms->atom_uescape)) {
             e->uescape = 1;
-        } else if(enif_compare(val, e->atoms->atom_pretty) == 0) {
+        } else if(enif_is_identical(val, e->atoms->atom_pretty)) {
             e->pretty = 1;
-        } else if(enif_compare(val, e->atoms->atom_escape_forward_slashes) == 0) {
+        } else if(enif_is_identical(val, e->atoms->atom_escape_forward_slashes)) {
             e->escape_forward_slashes = 1;
-        } else if(enif_compare(val, e->atoms->atom_use_nil) == 0) {
+        } else if(enif_is_identical(val, e->atoms->atom_use_nil)) {
             e->use_nil = 1;
-        } else if(enif_compare(val, e->atoms->atom_force_utf8) == 0) {
+        } else if(enif_is_identical(val, e->atoms->atom_force_utf8)) {
             // Ignore, handled in Erlang
         } else if(get_bytes_per_iter(env, val, &(e->bytes_per_red))) {
             continue;
@@ -858,22 +858,22 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             termstack_push(&stack, curr);
             termstack_push(&stack, e->atoms->ref_array);
             termstack_push(&stack, item);
-        } else if(enif_compare(curr, e->atoms->atom_null) == 0) {
+        } else if(enif_is_identical(curr, e->atoms->atom_null)) {
             if(!enc_literal(e, "null", 4)) {
                 ret = enc_error(e, "null");
                 goto done;
             }
-        } else if(e->use_nil && enif_compare(curr, e->atoms->atom_nil) == 0) {
+        } else if(e->use_nil && enif_is_identical(curr, e->atoms->atom_nil)) {
             if(!enc_literal(e, "null", 4)) {
                 ret = enc_error(e, "null");
                 goto done;
             }
-        } else if(enif_compare(curr, e->atoms->atom_true) == 0) {
+        } else if(enif_is_identical(curr, e->atoms->atom_true)) {
             if(!enc_literal(e, "true", 4)) {
                 ret = enc_error(e, "true");
                 goto done;
             }
-        } else if(enif_compare(curr, e->atoms->atom_false) == 0) {
+        } else if(enif_is_identical(curr, e->atoms->atom_false)) {
             if(!enc_literal(e, "false", 5)) {
                 ret = enc_error(e, "false");
                 goto done;

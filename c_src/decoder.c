@@ -678,19 +678,19 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             continue;
         } else if(get_bytes_per_red(env, val, &(d->bytes_per_red))) {
             continue;
-        } else if(enif_compare(val, d->atoms->atom_return_maps) == 0) {
+        } else if(enif_is_identical(val, d->atoms->atom_return_maps)) {
 #if MAP_TYPE_PRESENT
             d->return_maps = 1;
 #else
             return enif_make_badarg(env);
 #endif
-        } else if(enif_compare(val, d->atoms->atom_return_trailer) == 0) {
+        } else if(enif_is_identical(val, d->atoms->atom_return_trailer)) {
             d->return_trailer = 1;
-        } else if(enif_compare(val, d->atoms->atom_dedupe_keys) == 0) {
+        } else if(enif_is_identical(val, d->atoms->atom_dedupe_keys)) {
             d->dedupe_keys = 1;
-        } else if(enif_compare(val, d->atoms->atom_copy_strings) == 0) {
+        } else if(enif_is_identical(val, d->atoms->atom_copy_strings)) {
             d->copy_strings = 1;
-        } else if(enif_compare(val, d->atoms->atom_use_nil) == 0) {
+        } else if(enif_is_identical(val, d->atoms->atom_use_nil)) {
             d->null_term = d->atoms->atom_nil;
         } else if(get_null_term(env, val, &(d->null_term))) {
             continue;
