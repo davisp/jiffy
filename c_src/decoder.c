@@ -93,7 +93,7 @@ dec_new(ErlNifEnv* env)
     d->len = -1;
     d->i = -1;
 
-    d->st_data = (char*) enif_alloc(STACK_SIZE_INC * sizeof(char));
+    d->st_data = (char*) enif_alloc(STACK_SIZE_INC);
     d->st_size = STACK_SIZE_INC;
     d->st_top = 0;
 
