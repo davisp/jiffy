@@ -241,35 +241,65 @@ enc_literal(Encoder* e, const char* literal, size_t len)
 }
 
 static inline int
-enc_string(Encoder* e, ERL_NIF_TERM val)
+enc_special_character(Encoder* e, int val) {
+    switch(val) {
+        case '\"':
+        case '\\':
+            e->p[e->i++] = '\\';
+            e->u[e->i++] = val;
+            return 1;
+        case '\b':
+            e->p[e->i++] = '\\';
+            e->p[e->i++] = 'b';
+            return 1;
+        case '\f':
+            e->p[e->i++] = '\\';
+            e->p[e->i++] = 'f';
+            return 1;
+        case '\n':
+            e->p[e->i++] = '\\';
+            e->p[e->i++] = 'n';
+            return 1;
+        case '\r':
+            e->p[e->i++] = '\\';
+            e->p[e->i++] = 'r';
+            return 1;
+        case '\t':
+            e->p[e->i++] = '\\';
+            e->p[e->i++] = 't';
+            return 1;
+        case '/':
+            if(e->escape_forward_slashes) {
+                e->p[e->i++] = '\\';
+            }
+            e->u[e->i++] = '/';
+            return 1;
+        default:
+            if(val < 0x20) {
+                e->i += unicode_uescape(val, &(e->p[e->i]));
+                return 1;
+            }
+
+            return 0;
+    }
+}
+
+static int
+enc_atom(Encoder* e, ERL_NIF_TERM val)
 {
     static const int MAX_ESCAPE_LEN = 12;
-    ErlNifBinary bin;
     char atom[512];
 
     unsigned char* data;
     size_t size;
-
-    int esc_len;
-    int ulen;
-    int uval;
     int i;
 
-    if(enif_is_binary(e->env, val)) {
-        if(!enif_inspect_binary(e->env, val, &bin)) {
-            return 0;
-        }
-        data = bin.data;
-        size = bin.size;
-    } else if(enif_is_atom(e->env, val)) {
-        if(!enif_get_atom(e->env, val, atom, 512, ERL_NIF_LATIN1)) {
-            return 0;
-        }
-        data = (unsigned char*) atom;
-        size = strlen(atom);
-    } else {
+    if(!enif_get_atom(e->env, val, atom, 512, ERL_NIF_LATIN1)) {
         return 0;
     }
+
+    data = (unsigned char*) atom;
+    size = strlen(atom);
 
     /* Reserve space for the first quotation mark and most of the output. */
     if(!enc_ensure(e, size + MAX_ESCAPE_LEN + 1)) {
@@ -284,80 +314,21 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
             return 0;
         }
 
-        switch((char) data[i]) {
-            case '\"':
-            case '\\':
-                e->p[e->i++] = '\\';
-                e->u[e->i++] = data[i];
-                i++;
-                continue;
-            case '\b':
-                e->p[e->i++] = '\\';
-                e->p[e->i++] = 'b';
-                i++;
-                continue;
-            case '\f':
-                e->p[e->i++] = '\\';
-                e->p[e->i++] = 'f';
-                i++;
-                continue;
-            case '\n':
-                e->p[e->i++] = '\\';
-                e->p[e->i++] = 'n';
-                i++;
-                continue;
-            case '\r':
-                e->p[e->i++] = '\\';
-                e->p[e->i++] = 'r';
-                i++;
-                continue;
-            case '\t':
-                e->p[e->i++] = '\\';
-                e->p[e->i++] = 't';
-                i++;
-                continue;
-            case '/':
-                if(e->escape_forward_slashes) {
-                    e->p[e->i++] = '\\';
-                }
-                e->u[e->i++] = '/';
-                i++;
-                continue;
-            default:
-                if(data[i] < 0x20) {
-                    ulen = unicode_uescape(data[i], &(e->p[e->i]));
-                    if(ulen < 0) {
-                        return 0;
-                    }
+        if(enc_special_character(e, data[i])) {
+            i++;
+        } else if(data[i] < 0x80) {
+            e->u[e->i++] = data[i];
+            i++;
+        } else if(data[i] >= 0x80) {
+            /* The atom encoding is latin1, so we don't need validation
+             * as all latin1 characters are valid Unicode codepoints. */
+            if (!e->uescape) {
+                e->i += unicode_to_utf8(data[i], &e->u[e->i]);
+            } else {
+                e->i += unicode_uescape(data[i], &e->p[e->i]);
+            }
 
-                    e->i += ulen;
-                    i++;
-                } else if(data[i] & 0x80) {
-                    ulen = utf8_validate(&(data[i]), size - i);
-
-                    if (ulen < 0) {
-                        return 0;
-                    } else if (e->uescape) {
-                        uval = utf8_to_unicode(&(data[i]), size-i);
-                        if(uval < 0) {
-                            return 0;
-                        }
-
-                        esc_len = unicode_uescape(uval, &(e->p[e->i]));
-                        if(esc_len < 0) {
-                            return 0;
-                        }
-
-                        e->i += esc_len;
-                    } else {
-                        memcpy(&e->u[e->i], &data[i], ulen);
-                        e->i += ulen;
-                    }
-
-                    i += ulen;
-                } else {
-                    e->u[e->i++] = data[i++];
-                }
+            i++;
         }
     }
 
@@ -369,6 +340,89 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
     e->count++;
 
     return 1;
+}
+
+static int
+enc_string(Encoder* e, ERL_NIF_TERM val)
+{
+    static const int MAX_ESCAPE_LEN = 12;
+    ErlNifBinary bin;
+
+    unsigned char* data;
+    size_t size;
+    int esc_len;
+    int ulen;
+    int uval;
+    int i;
+
+    if(!enif_inspect_binary(e->env, val, &bin)) {
+        return 0;
+    }
+
+    data = bin.data;
+    size = bin.size;
+
+    /* Reserve space for the first quotation mark and most of the output. */
+    if(!enc_ensure(e, size + MAX_ESCAPE_LEN + 1)) {
+        return 0;
+    }
+
+    e->p[e->i++] = '\"';
+
+    i = 0;
+    while(i < size) {
+        if(!enc_ensure(e, MAX_ESCAPE_LEN)) {
+            return 0;
+        }
+
+        if(enc_special_character(e, data[i])) {
+            i++;
+        } else if(data[i] < 0x80) {
+            e->u[e->i++] = data[i++];
+        } else if(data[i] >= 0x80) {
+            ulen = utf8_validate(&(data[i]), size - i);
+
+            if (ulen < 0) {
+                return 0;
+            } else if (e->uescape) {
+                uval = utf8_to_unicode(&(data[i]), size-i);
+                if(uval < 0) {
+                    return 0;
+                }
+
+                esc_len = unicode_uescape(uval, &(e->p[e->i]));
+                if(esc_len < 0) {
+                    return 0;
+                }
+
+                e->i += esc_len;
+            } else {
+                memcpy(&e->u[e->i], &data[i], ulen);
+                e->i += ulen;
+            }
+
+            i += ulen;
+        }
+    }
+
+    if(!enc_ensure(e, 1)) {
+        return 0;
+    }
+
+    e->p[e->i++] = '\"';
+    e->count++;
+
+    return 1;
+}
+
+static inline int
+enc_object_key(ErlNifEnv *env, Encoder* e, ERL_NIF_TERM val)
+{
+    if(enif_is_atom(env, val)) {
+        return enc_atom(e, val);
+    }
+
+    return enc_string(e, val);
 }
 
 // From https://www.slideshare.net/andreialexandrescu1/three-optimization-tips-for-c-15708507
@@ -746,7 +800,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            if(!enc_string(e, tuple[0])) {
+            if(!enc_object_key(env, e, tuple[0])) {
                 ret = enc_obj_error(e, "invalid_object_member_key", tuple[0]);
                 goto done;
             }
@@ -802,7 +856,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
         } else if(enif_is_atom(env, curr)) {
-            if(!enc_string(e, curr)) {
+            if(!enc_atom(e, curr)) {
                 ret = enc_obj_error(e, "invalid_string", curr);
                 goto done;
             }
@@ -844,7 +898,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_obj_error(e, "invalid_object_member_arity", item);
                 goto done;
             }
-            if(!enc_string(e, tuple[0])) {
+            if(!enc_object_key(env, e, tuple[0])) {
                 ret = enc_obj_error(e, "invalid_object_member_key", tuple[0]);
                 goto done;
             }
