@@ -731,20 +731,15 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     ERL_NIF_TERM curr;
     ERL_NIF_TERM item;
-    ERL_NIF_TERM saved_stack;
     const ERL_NIF_TERM* tuple;
     int arity;
     ErlNifSInt64 lval;
     double dval;
 
     size_t start;
-    size_t bytes_written = 0;
+    size_t bytes_processed = 0;
 
-    if(argc != 3) {
-        return enif_make_badarg(env);
-    } else if(!enif_get_resource(env, argv[0], st->res_enc, (void**) &e)) {
-        return enif_make_badarg(env);
-    } else if(!enif_is_list(env, argv[2])) {
+    if(!enif_get_resource(env, argv[0], st->res_enc, (void**) &e)) {
         return enif_make_badarg(env);
     }
 
@@ -761,19 +756,36 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     start = e->iosize + e->i;
 
     while(!termstack_is_empty(&stack)) {
-        bytes_written += (e->iosize + e->i) - start;
+        bytes_processed = (e->iosize + e->i) - start;
 
-        if(should_yield(env, &bytes_written, e->bytes_per_red)) {
-            saved_stack = termstack_save(env, &stack);
+        if(should_yield(bytes_processed, e->bytes_per_red)) {
+            ERL_NIF_TERM tmp_argv[3];
+
+            assert(enif_is_list(env, e->iolist));
+
+            tmp_argv[0] = argv[0];
+            tmp_argv[1] = termstack_save(env, &stack);
+            tmp_argv[2] = e->iolist;
+
             termstack_destroy(&stack);
+            bump_used_reds(env, bytes_processed, e->bytes_per_red);
 
-            return enif_make_tuple4(
+#if SCHEDULE_NIF_PRESENT
+            return enif_schedule_nif(
+                    env,
+                    "nif_encode_iter",
+                    0,
+                    encode_iter,
+                    3,
+                    tmp_argv
+                );
+#else
+            return enif_make_tuple2(
                     env,
                     st->atom_iter,
-                    argv[0],
-                    saved_stack,
-                    e->iolist
+                    enif_make_tuple(env, 3, tmp_argv)
                 );
+#endif
         }
 
         curr = termstack_pop(&stack);
@@ -956,6 +968,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 done:
+    bump_used_reds(env, bytes_processed, e->bytes_per_red);
     termstack_destroy(&stack);
 
     return ret;

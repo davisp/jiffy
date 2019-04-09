@@ -91,7 +91,7 @@ dec_new(ErlNifEnv* env)
     d->p = NULL;
     d->u = NULL;
     d->len = -1;
-    d->i = -1;
+    d->i = 0;
 
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC);
     d->st_size = STACK_SIZE_INC;
@@ -116,16 +116,6 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
     d->p = (char*) bin->data;
     d->u = bin->data;
     d->len = bin->size;
-
-    // I'd like to be more forceful on this check so that when
-    // we run a second iteration of the decoder we are sure
-    // that we're using the same binary. Unfortunately, I don't
-    // think there's a value to base this assertion on.
-    if(d->i < 0) {
-        d->i = 0;
-    } else {
-        assert(d->i <= d->len && "mismatched binary lengths");
-    }
 }
 
 void
@@ -715,17 +705,14 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM val = argv[2];
     ERL_NIF_TERM trailer;
     ERL_NIF_TERM ret;
-    size_t bytes_read = 0;
+    ERL_NIF_TERM tmp_argv[5];
 
-    if(argc != 5) {
-        return enif_make_badarg(env);
-    } else if(!enif_inspect_binary(env, argv[0], &bin)) {
+    size_t start;
+    size_t bytes_processed = 0;
+
+    if(!enif_inspect_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
     } else if(!enif_get_resource(env, argv[1], st->res_dec, (void**) &d)) {
-        return enif_make_badarg(env);
-    } else if(!enif_is_list(env, argv[3])) {
-        return enif_make_badarg(env);
-    } else if(!enif_is_list(env, argv[4])) {
         return enif_make_badarg(env);
     }
 
@@ -733,19 +720,40 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     objs = argv[3];
     curr = argv[4];
 
+    start = d->i;
+
     while(d->i < bin.size) {
-        if(should_yield(env, &bytes_read, d->bytes_per_red)) {
-            return enif_make_tuple5(
+        bytes_processed = d->i - start;
+
+        if(should_yield(bytes_processed, d->bytes_per_red)) {
+            assert(enif_is_list(env, objs));
+            assert(enif_is_list(env, curr));
+
+            tmp_argv[0] = argv[0];
+            tmp_argv[1] = argv[1];
+            tmp_argv[2] = val;
+            tmp_argv[3] = objs;
+            tmp_argv[4] = curr;
+
+            bump_used_reds(env, bytes_processed, d->bytes_per_red);
+
+#if SCHEDULE_NIF_PRESENT
+            return enif_schedule_nif(
+                    env,
+                    "nif_decode_iter",
+                    0,
+                    decode_iter,
+                    5,
+                    tmp_argv
+                );
+#else
+            return enif_make_tuple2(
                     env,
                     st->atom_iter,
-                    argv[1],
-                    val,
-                    objs,
-                    curr
+                    enif_make_tuple(env, 5, tmp_argv)
                 );
+#endif
         }
-
-        bytes_read += 1;
 
         switch(dec_curr(d)) {
             case st_value:
@@ -1040,5 +1048,7 @@ decode_done:
     }
 
 done:
+    bump_used_reds(env, bytes_processed, d->bytes_per_red);
+
     return ret;
 }
