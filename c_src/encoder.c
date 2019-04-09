@@ -455,6 +455,83 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
     return 1;
 }
 
+// From https://www.slideshare.net/andreialexandrescu1/three-optimization-tips-for-c-15708507
+
+#define P01 10
+#define P02 100
+#define P03 1000
+#define P04 10000
+#define P05 100000
+#define P06 1000000
+#define P07 10000000
+#define P08 100000000
+#define P09 1000000000
+#define P10 10000000000
+#define P11 100000000000L
+#define P12 1000000000000L
+
+int
+digits10(ErlNifUInt64 v)
+{
+    if (v < P01) return 1;
+    if (v < P02) return 2;
+    if (v < P03) return 3;
+    if (v < P12) {
+        if (v < P08) {
+            if (v < P06) {
+                if (v < P04) return 4;
+                return 5 + (v >= P05);
+            }
+            return 7 + (v >= P07);
+        }
+        if (v < P10) {
+            return 9 + (v >= P09);
+        }
+        return 11 + (v >= P11);
+    }
+    return 12 + digits10(v / P12);
+}
+
+unsigned int
+u64ToAsciiTable(char *dst, ErlNifUInt64 value)
+{
+    static const char digits[201] =
+        "0001020304050607080910111213141516171819"
+        "2021222324252627282930313233343536373839"
+        "4041424344454647484950515253545556575859"
+        "6061626364656667686970717273747576777879"
+        "8081828384858687888990919293949596979899";
+    const int length = digits10(value);
+    int next = length - 1;
+    while (value >= 100) {
+        const int i = (value % 100) * 2;
+        value /= 100;
+        dst[next] = digits[i + 1];
+        dst[next - 1] = digits[i];
+        next -= 2;
+    }
+    // Handle last 1-2 digits.
+    if (value < 10) {
+        dst[next] = '0' + (ErlNifUInt) value;
+    } else {
+        const int i = (ErlNifUInt) value * 2;
+        dst[next] = digits[i + 1];
+        dst[next - 1] = digits[i];
+    }
+    return length;
+}
+
+unsigned
+i64ToAsciiTable(char *dst, ErlNifSInt64 value)
+{
+    if (value < 0) {
+        *dst++ = '-';
+        return 1 + u64ToAsciiTable(dst, -value);
+    } else {
+        return u64ToAsciiTable(dst, value);
+    }
+}
+
 static inline int
 enc_long(Encoder* e, ErlNifSInt64 val)
 {
@@ -462,15 +539,7 @@ enc_long(Encoder* e, ErlNifSInt64 val)
         return 0;
     }
 
-#if (defined(__WIN32__) || defined(_WIN32) || defined(_WIN32_))
-    snprintf(&(e->p[e->i]), 32, "%lld", val);
-#elif SIZEOF_LONG == 8
-    snprintf(&(e->p[e->i]), 32, "%ld", val);
-#else
-    snprintf(&(e->p[e->i]), 32, "%lld", val);
-#endif
-
-    e->i += strlen(&(e->p[e->i]));
+    e->i += i64ToAsciiTable(&(e->p[e->i]), val);
     e->count++;
 
     return 1;
