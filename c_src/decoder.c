@@ -162,22 +162,19 @@ dec_top(Decoder* d)
 void
 dec_push(Decoder* d, char val)
 {
-    char* tmp;
     int new_sz;
     int i;
 
-    if(d->st_top >= d->st_size) {
+    if(d->st_top == d->st_size) {
         new_sz = d->st_size + STACK_SIZE_INC;
-        tmp = (char*) enif_alloc(new_sz * sizeof(char));
-        memcpy(tmp, d->st_data, d->st_size * sizeof(char));
-        enif_free(d->st_data);
-        d->st_data = tmp;
+        d->st_data = (char*) enif_realloc(d->st_data, new_sz);
         d->st_size = new_sz;
         for(i = d->st_top; i < d->st_size; i++) {
             d->st_data[i] = st_invalid;
         }
     }
 
+    assert(d->st_top < d->st_size);
     d->st_data[d->st_top++] = val;
 }
 
