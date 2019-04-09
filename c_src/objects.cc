@@ -19,11 +19,12 @@ BEGIN_C
 
 int
 make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
-        int ret_map, int dedupe_keys)
+	int ret_map, int dedupe_keys)
 {
     ERL_NIF_TERM ret;
     ERL_NIF_TERM key;
     ERL_NIF_TERM val;
+    ERL_NIF_TERM old_val;
 
     std::set<std::string> seen;
 
@@ -34,13 +35,7 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
             if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
                 assert(0 == 1 && "Unbalanced object pairs.");
             }
-            ErlNifBinary bin;
-            if(!enif_inspect_binary(env, key, &bin)) {
-                return 0;
-            }
-            std::string skey((char*) bin.data, bin.size);
-            if(seen.count(skey) == 0) {
-                seen.insert(skey);
+            if(!enif_get_map_value(env, ret, key, &old_val)) {
                 if(!enif_make_map_put(env, ret, key, val, &ret)) {
                     return 0;
                 }
