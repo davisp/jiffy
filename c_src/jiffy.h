@@ -13,6 +13,12 @@
     ((ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION >= 6) \
     || (ERL_NIF_MAJOR_VERSION > 2))
 
+#define CONSUME_TIMESLICE_PRESENT \
+        ((ERL_NIF_MAJOR_VERSION >= 2 && ERL_NIF_MINOR_VERSION >= 4))
+
+#define SCHEDULE_NIF_PRESENT \
+        ((ERL_NIF_MAJOR_VERSION >= 2 && ERL_NIF_MINOR_VERSION >= 7))
+
 typedef struct {
     ERL_NIF_TERM    atom_ok;
     ERL_NIF_TERM    atom_error;
@@ -53,7 +59,8 @@ ERL_NIF_TERM make_obj_error(jiffy_st* st, ErlNifEnv* env, const char* error,
 int get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi);
 int get_bytes_per_red(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpr);
 int get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term);
-int should_yield(ErlNifEnv* env, size_t* used, size_t bytes_per_red);
+int should_yield(size_t used, size_t bytes_per_red);
+void bump_used_reds(ErlNifEnv* env, size_t used, size_t bytes_per_red);
 
 ERL_NIF_TERM decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);

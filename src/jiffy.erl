@@ -71,7 +71,7 @@ decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
             throw(Error);
         {partial, EJson} ->
             finish_decode(EJson);
-        {iter, Decoder, Val, Objs, Curr} ->
+        {iter, {_, Decoder, Val, Objs, Curr}} ->
             decode_loop(Data, Decoder, Val, Objs, Curr);
         EJson ->
             EJson
@@ -99,7 +99,7 @@ encode(Data, Options) ->
             throw(Error);
         {partial, IOData} ->
             finish_encode(IOData, []);
-        {iter, Encoder, Stack, IOBuf} ->
+        {iter, {Encoder, Stack, IOBuf}} ->
             encode_loop(Data, Options, Encoder, Stack, IOBuf);
         IOData ->
             IOData
@@ -184,7 +184,7 @@ decode_loop(Data, Decoder, Val, Objs, Curr) ->
             throw(Error);
         {partial, EJson} ->
             finish_decode(EJson);
-        {iter, NewDecoder, NewVal, NewObjs, NewCurr} ->
+        {iter, {_, NewDecoder, NewVal, NewObjs, NewCurr}} ->
             decode_loop(Data, NewDecoder, NewVal, NewObjs, NewCurr);
         EJson ->
             EJson
@@ -204,7 +204,7 @@ encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
             throw(Error);
         {partial, IOData} ->
             finish_encode(IOData, []);
-        {iter, NewEncoder, NewStack, NewIOBuf} ->
+        {iter, {NewEncoder, NewStack, NewIOBuf}} ->
             encode_loop(Data, Options, NewEncoder, NewStack, NewIOBuf);
         IOData ->
             IOData
