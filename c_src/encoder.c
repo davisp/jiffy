@@ -868,85 +868,85 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
         curr = termstack_pop(&stack);
 
-        if(enif_is_identical(curr, e->atoms->ref_object)) {
-            curr = termstack_pop(&stack);
+        if(enif_is_atom(env, curr)) {
+            if(enif_is_identical(curr, e->atoms->ref_object)) {
+                curr = termstack_pop(&stack);
 
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                if(!enc_end_object(e)) {
+                if(!enif_get_list_cell(env, curr, &item, &curr)) {
+                    if(!enc_end_object(e)) {
+                        ret = enc_error(e, "internal_error");
+                        goto done;
+                    }
+                    continue;
+                }
+                if(!enif_get_tuple(env, item, &arity, &tuple)) {
+                    ret = enc_obj_error(e, "invalid_object_member", item);
+                    goto done;
+                }
+                if(arity != 2) {
+                    ret = enc_obj_error(e, "invalid_object_member_arity", item);
+                    goto done;
+                }
+                if(!enc_comma(e)) {
                     ret = enc_error(e, "internal_error");
                     goto done;
                 }
-                continue;
-            }
-            if(!enif_get_tuple(env, item, &arity, &tuple)) {
-                ret = enc_obj_error(e, "invalid_object_member", item);
-                goto done;
-            }
-            if(arity != 2) {
-                ret = enc_obj_error(e, "invalid_object_member_arity", item);
-                goto done;
-            }
-            if(!enc_comma(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            if(!enc_object_key(env, e, tuple[0])) {
-                ret = enc_obj_error(e, "invalid_object_member_key", tuple[0]);
-                goto done;
-            }
-            if(!enc_colon(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-
-            termstack_push(&stack, curr);
-            termstack_push(&stack, e->atoms->ref_object);
-            termstack_push(&stack, tuple[1]);
-        } else if(enif_is_identical(curr, e->atoms->ref_array)) {
-            curr = termstack_pop(&stack);
-
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                if(!enc_end_array(e)) {
+                if(!enc_object_key(env, e, tuple[0])) {
+                    ret = enc_obj_error(e, "invalid_object_member_key", tuple[0]);
+                    goto done;
+                }
+                if(!enc_colon(e)) {
                     ret = enc_error(e, "internal_error");
                     goto done;
                 }
-                continue;
-            }
-            if(!enc_comma(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
 
-            termstack_push(&stack, curr);
-            termstack_push(&stack, e->atoms->ref_array);
-            termstack_push(&stack, item);
-        } else if(enif_is_identical(curr, e->atoms->atom_null)) {
-            if(!enc_literal(e, "null", 4)) {
-                ret = enc_error(e, "null");
-                goto done;
-            }
-        } else if(e->use_nil && enif_is_identical(curr, e->atoms->atom_nil)) {
-            if(!enc_literal(e, "null", 4)) {
-                ret = enc_error(e, "null");
-                goto done;
-            }
-        } else if(enif_is_identical(curr, e->atoms->atom_true)) {
-            if(!enc_literal(e, "true", 4)) {
-                ret = enc_error(e, "true");
-                goto done;
-            }
-        } else if(enif_is_identical(curr, e->atoms->atom_false)) {
-            if(!enc_literal(e, "false", 5)) {
-                ret = enc_error(e, "false");
+                termstack_push(&stack, curr);
+                termstack_push(&stack, e->atoms->ref_object);
+                termstack_push(&stack, tuple[1]);
+            } else if(enif_is_identical(curr, e->atoms->ref_array)) {
+                curr = termstack_pop(&stack);
+
+                if(!enif_get_list_cell(env, curr, &item, &curr)) {
+                    if(!enc_end_array(e)) {
+                        ret = enc_error(e, "internal_error");
+                        goto done;
+                    }
+                    continue;
+                }
+                if(!enc_comma(e)) {
+                    ret = enc_error(e, "internal_error");
+                    goto done;
+                }
+
+                termstack_push(&stack, curr);
+                termstack_push(&stack, e->atoms->ref_array);
+                termstack_push(&stack, item);
+            } else if(enif_is_identical(curr, e->atoms->atom_null)) {
+                if(!enc_literal(e, "null", 4)) {
+                    ret = enc_error(e, "null");
+                    goto done;
+                }
+            } else if(e->use_nil && enif_is_identical(curr, e->atoms->atom_nil)) {
+                if(!enc_literal(e, "null", 4)) {
+                    ret = enc_error(e, "null");
+                    goto done;
+                }
+            } else if(enif_is_identical(curr, e->atoms->atom_true)) {
+                if(!enc_literal(e, "true", 4)) {
+                    ret = enc_error(e, "true");
+                    goto done;
+                }
+            } else if(enif_is_identical(curr, e->atoms->atom_false)) {
+                if(!enc_literal(e, "false", 5)) {
+                    ret = enc_error(e, "false");
+                    goto done;
+                }
+            } else if(!enc_atom(e, curr)) {
+                ret = enc_obj_error(e, "invalid_string", curr);
                 goto done;
             }
         } else if(enif_is_binary(env, curr)) {
             if(!enc_string(e, curr)) {
-                ret = enc_obj_error(e, "invalid_string", curr);
-                goto done;
-            }
-        } else if(enif_is_atom(env, curr)) {
-            if(!enc_atom(e, curr)) {
                 ret = enc_obj_error(e, "invalid_string", curr);
                 goto done;
             }
