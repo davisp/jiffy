@@ -740,16 +740,12 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         if(enif_is_identical(curr, e->atoms->ref_object)) {
             curr = termstack_pop(&stack);
 
-            if(enif_is_empty_list(env, curr)) {
+            if(!enif_get_list_cell(env, curr, &item, &curr)) {
                 if(!enc_end_object(e)) {
                     ret = enc_error(e, "internal_error");
                     goto done;
                 }
                 continue;
-            }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
             }
             if(!enif_get_tuple(env, item, &arity, &tuple)) {
                 ret = enc_obj_error(e, "invalid_object_member", item);
@@ -778,7 +774,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         } else if(enif_is_identical(curr, e->atoms->ref_array)) {
             curr = termstack_pop(&stack);
 
-            if(enif_is_empty_list(env, curr)) {
+            if(!enif_get_list_cell(env, curr, &item, &curr)) {
                 if(!enc_end_array(e)) {
                     ret = enc_error(e, "internal_error");
                     goto done;
@@ -786,10 +782,6 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 continue;
             }
             if(!enc_comma(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
@@ -850,16 +842,12 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            if(enif_is_empty_list(env, tuple[0])) {
+            if(!enif_get_list_cell(env, tuple[0], &item, &curr)) {
                 if(!enc_end_object(e)) {
                     ret = enc_error(e, "internal_error");
                     goto done;
                 }
                 continue;
-            }
-            if(!enif_get_list_cell(env, tuple[0], &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
             }
             if(!enif_get_tuple(env, item, &arity, &tuple)) {
                 ret = enc_obj_error(e, "invalid_object_member", item);
@@ -895,16 +883,13 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            if(enif_is_empty_list(env, curr)) {
+
+            if(!enif_get_list_cell(env, curr, &item, &curr)) {
                 if(!enc_end_array(e)) {
                     ret = enc_error(e, "internal_error");
                     goto done;
                 }
                 continue;
-            }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
             }
 
             termstack_push(&stack, curr);
