@@ -570,9 +570,9 @@ u64ToAsciiTable(char *dst, ErlNifUInt64 value)
     }
     // Handle last 1-2 digits.
     if (value < 10) {
-        dst[next] = '0' + (ErlNifUInt) value;
+        dst[next] = '0' + (unsigned int) value;
     } else {
-        const int i = (ErlNifUInt) value * 2;
+        const int i = (unsigned int) value * 2;
         dst[next] = digits[i + 1];
         dst[next - 1] = digits[i];
     }
