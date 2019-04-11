@@ -89,7 +89,7 @@ dec_new(ErlNifEnv* env)
 
     d->p = NULL;
     d->len = -1;
-    d->i = -1;
+    d->i = 0;
 
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC);
     d->st_size = STACK_SIZE_INC;
@@ -113,16 +113,6 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
 
     d->p = bin->data;
     d->len = bin->size;
-
-    // I'd like to be more forceful on this check so that when
-    // we run a second iteration of the decoder we are sure
-    // that we're using the same binary. Unfortunately, I don't
-    // think there's a value to base this assertion on.
-    if(d->i < 0) {
-        d->i = 0;
-    } else {
-        assert(d->i <= d->len && "mismatched binary lengths");
-    }
 }
 
 void
@@ -730,15 +720,9 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     size_t start;
     size_t bytes_processed = 0;
 
-    if(argc != 5) {
-        return enif_make_badarg(env);
-    } else if(!enif_inspect_binary(env, argv[0], &bin)) {
+    if(!enif_inspect_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
     } else if(!enif_get_resource(env, argv[1], st->res_dec, (void**) &d)) {
-        return enif_make_badarg(env);
-    } else if(!enif_is_list(env, argv[3])) {
-        return enif_make_badarg(env);
-    } else if(!enif_is_list(env, argv[4])) {
         return enif_make_badarg(env);
     }
 
@@ -753,6 +737,9 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
         if(should_yield(env, bytes_processed, d->bytes_per_red)) {
             ERL_NIF_TERM tmp_argv[5];
+
+            assert(enif_is_list(env, objs));
+            assert(enif_is_list(env, curr));
 
             tmp_argv[0] = argv[0];
             tmp_argv[1] = argv[1];

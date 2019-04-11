@@ -776,11 +776,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     size_t start;
     size_t bytes_processed = 0;
 
-    if(argc != 3) {
-        return enif_make_badarg(env);
-    } else if(!enif_get_resource(env, argv[0], st->res_enc, (void**) &e)) {
-        return enif_make_badarg(env);
-    } else if(!enif_is_list(env, argv[2])) {
+    if(!enif_get_resource(env, argv[0], st->res_enc, (void**) &e)) {
         return enif_make_badarg(env);
     }
 
@@ -801,6 +797,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
         if(should_yield(env, bytes_processed, e->bytes_per_red)) {
             ERL_NIF_TERM tmp_argv[3];
+
+            assert(enif_is_list(env, e->iolist));
 
             tmp_argv[0] = argv[0];
             tmp_argv[1] = termstack_save(env, &stack);
