@@ -19,7 +19,7 @@ BEGIN_C
 
 int
 make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
-            const int ret_map, const int dedupe_keys)
+            int ret_map, int dedupe_keys)
 {
     ERL_NIF_TERM ret;
     ERL_NIF_TERM key;
