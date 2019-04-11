@@ -23,7 +23,7 @@ run(Fd, Acc) ->
             V1 = re:replace(iolist_to_binary(Data), <<"\.\n">>, <<"">>),
             V2 = iolist_to_binary(V1),
             V3 = <<34, V2/binary, 34>>,
-            R = jiffy:encode(jiffy:decode(V3)),
+            R = enc(dec(V3)),
             case R == V3 of
                 true -> run(Fd, Acc);
                 false -> run(Fd, Acc + 1)

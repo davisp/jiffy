@@ -39,12 +39,12 @@ typedef struct {
     int             shiftcnt;
     int             count;
 
-    size_t          iolen;
     size_t          iosize;
     ERL_NIF_TERM    iolist;
-    ErlNifBinary    bin;
-    ErlNifBinary*   curr;
+    int             partial_output;
 
+    ErlNifBinary    buffer;
+    int             have_buffer;
 
     char*           p;
     unsigned char*  u;
@@ -82,19 +82,20 @@ enc_new(ErlNifEnv* env)
     e->shiftcnt = 0;
     e->count = 0;
 
-    e->iolen = 0;
     e->iosize = 0;
-    e->curr = &(e->bin);
-    if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
-        e->curr = NULL;
+    e->iolist = enif_make_list(env, 0);
+
+    e->partial_output = 0;
+
+    if(!enif_alloc_binary(BIN_INC_SIZE, &e->buffer)) {
         enif_release_resource(e);
         return NULL;
     }
 
-    memset(e->curr->data, 0, e->curr->size);
+    e->have_buffer = 1;
 
-    e->p = (char*) e->curr->data;
-    e->u = (unsigned char*) e->curr->data;
+    e->p = (char*)e->buffer.data;
+    e->u = (unsigned char*)e->buffer.data;
     e->i = 0;
 
     return e;
@@ -112,8 +113,8 @@ enc_destroy(ErlNifEnv* env, void* obj)
 {
     Encoder* e = (Encoder*) obj;
 
-    if(e->curr != NULL) {
-        enif_release_binary(e->curr);
+    if(e->have_buffer) {
+        enif_release_binary(&e->buffer);
     }
 }
 
@@ -130,56 +131,55 @@ enc_obj_error(Encoder* e, const char* msg, ERL_NIF_TERM obj)
     return make_obj_error(e->atoms, e->env, msg, obj);
 }
 
+int
+enc_flush(Encoder* e)
+{
+    ERL_NIF_TERM bin;
+
+    if(e->i == 0) {
+        return 1;
+    }
+
+    if(e->i < e->buffer.size) {
+        if(!enif_realloc_binary(&e->buffer, e->i)) {
+            return 0;
+        }
+    }
+
+    bin = enif_make_binary(e->env, &e->buffer);
+    e->have_buffer = 0;
+
+    e->iolist = enif_make_list_cell(e->env, bin, e->iolist);
+    e->iosize += e->i;
+
+    return 1;
+}
+
 static inline int
 enc_ensure(Encoder* e, size_t req)
 {
-    size_t need = e->curr->size;
-    while(req >= (need - e->i)) need <<= 1;
+    size_t new_size = BIN_INC_SIZE;
 
-    if(need != e->curr->size) {
-        if(!enif_realloc_binary(e->curr, need)) {
-            return 0;
-        }
-        e->p = (char*) e->curr->data;
-        e->u = (unsigned char*) e->curr->data;
+    if(req < (e->buffer.size - e->i)) {
+        return 1;
     }
 
-    return 1;
-}
-
-int
-enc_result(Encoder* e, ERL_NIF_TERM* value)
-{
-    if(e->i != e->curr->size) {
-        if(!enif_realloc_binary(e->curr, e->i)) {
-            return 0;
-        }
+    if(!enc_flush(e)) {
+        return 0;
     }
 
-    *value = enif_make_binary(e->env, e->curr);
-    e->curr = NULL;
-    return 1;
-}
+    for(new_size = BIN_INC_SIZE; new_size < req; new_size <<= 1);
 
-int
-enc_done(Encoder* e, ERL_NIF_TERM* value)
-{
-    ERL_NIF_TERM last;
-
-    if(e->iolen == 0) {
-        return enc_result(e, value);
+    if(!enif_alloc_binary(new_size, &e->buffer)) {
+        return 0;
     }
 
-    if(e->i > 0 ) {
-        if(!enc_result(e, &last)) {
-            return 0;
-        }
+    e->have_buffer = 1;
 
-        e->iolist = enif_make_list_cell(e->env, last, e->iolist);
-        e->iolen++;
-    }
+    e->p = (char*)e->buffer.data;
+    e->u = (unsigned char*)e->buffer.data;
+    e->i = 0;
 
-    *value = e->iolist;
     return 1;
 }
 
@@ -264,50 +264,6 @@ termstack_destroy(TermStack *stack)
     if(stack->elements != &stack->__default_elements[0]) {
         enif_free(stack->elements);
     }
-}
-
-static inline int
-enc_unknown(Encoder* e, ERL_NIF_TERM value)
-{
-    ErlNifBinary* bin = e->curr;
-    ERL_NIF_TERM curr;
-
-    if(e->i > 0) {
-        if(!enc_result(e, &curr)) {
-            return 0;
-        }
-
-        e->iolist = enif_make_list_cell(e->env, curr, e->iolist);
-        e->iolen++;
-    }
-
-    e->iolist = enif_make_list_cell(e->env, value, e->iolist);
-    e->iolen++;
-
-    // Track the total number of bytes produced before
-    // splitting our IO buffer. We add 16 to this value
-    // as a rough estimate of the number of bytes that
-    // a bignum might produce when encoded.
-    e->iosize += e->i + 16;
-
-    // Reinitialize our binary for the next buffer if we
-    // used any data in the buffer. If we haven't used any
-    // bytes in the buffer then we can safely reuse it
-    // for anything following the unknown value.
-    if(e->i > 0) {
-        e->curr = bin;
-        if(!enif_alloc_binary(BIN_INC_SIZE, e->curr)) {
-            return 0;
-        }
-
-        memset(e->curr->data, 0, e->curr->size);
-
-        e->p = (char*) e->curr->data;
-        e->u = (unsigned char*) e->curr->data;
-        e->i = 0;
-    }
-
-    return 1;
 }
 
 static inline int
@@ -615,7 +571,7 @@ enc_double(Encoder* e, double val)
 
     start = &(e->p[e->i]);
 
-    if(!double_to_shortest(start, e->curr->size, &len, val)) {
+    if(!double_to_shortest(start, e->buffer.size, &len, val)) {
         return 0;
     }
 
@@ -1026,23 +982,36 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             termstack_push(&stack, curr);
             termstack_push(&stack, e->atoms->ref_array);
             termstack_push(&stack, item);
-        } else {
-            if(!enc_unknown(e, curr)) {
+        } else if(enif_is_number(env, curr)) {
+            /* This is a bignum and we need to handle it up in Erlang code as
+             * the NIF API doesn't support them yet.
+             *
+             * Flush our current output and mark ourselves as needing a fixup
+             * after we return. */
+            if(!enc_flush(e)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
+
+            e->iolist = enif_make_list_cell(e->env, curr, e->iolist);
+            e->partial_output = 1;
+        } else {
+            ret = enc_obj_error(e, "invalid_ejson", curr);
+            goto done;
         }
     }
 
-    if(!enc_done(e, &item)) {
+    if(!enc_flush(e)) {
         ret = enc_error(e, "internal_error");
         goto done;
     }
 
-    if(e->iolen == 0) {
-        ret = item;
+    assert(enif_is_list(env, e->iolist));
+
+    if(e->partial_output) {
+        ret = enif_make_tuple2(env, e->atoms->atom_partial, e->iolist);
     } else {
-        ret = enif_make_tuple2(env, e->atoms->atom_partial, item);
+        ret = e->iolist;
     }
 
 done:

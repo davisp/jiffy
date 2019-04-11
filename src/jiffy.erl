@@ -95,10 +95,10 @@ encode(Data, Options) ->
             encode(FixedData, Options -- [force_utf8]);
         {error, _} = Error ->
             throw(Error);
-        {partial, IOData} ->
-            finish_encode(IOData, []);
-        IOData ->
-            IOData
+        {partial, IOList} ->
+            finish_encode(IOList, []);
+        Rev_IOVec when is_list(Rev_IOVec) ->
+            lists:reverse(Rev_IOVec)
     end.
 
 
