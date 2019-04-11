@@ -706,12 +706,16 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ErlNifSInt64 lval;
     double dval;
 
+    void* res;
+
     size_t start;
     size_t bytes_processed = 0;
 
-    if(!enif_get_resource(env, argv[0], st->res_enc, (void**) &e)) {
+    if(!enif_get_resource(env, argv[0], st->res_enc, &res)) {
         return enif_make_badarg(env);
     }
+
+    e = (Encoder*) res;
 
     if(!enc_init(e, env)) {
         return enif_make_badarg(env);

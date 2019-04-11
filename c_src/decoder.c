@@ -718,14 +718,18 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM ret;
     ERL_NIF_TERM tmp_argv[5];
 
+    void* res;
+
     size_t start;
     size_t bytes_processed = 0;
 
     if(!enif_inspect_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
-    } else if(!enif_get_resource(env, argv[1], st->res_dec, (void**) &d)) {
+    } else if(!enif_get_resource(env, argv[1], st->res_dec, &res)) {
         return enif_make_badarg(env);
     }
+
+    d = (Decoder*) res;
 
     dec_init(d, env, argv[0], &bin);
     objs = argv[3];
