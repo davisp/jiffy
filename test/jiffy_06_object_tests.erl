@@ -15,6 +15,10 @@ object_success_test_() ->
 object_failure_test_() ->
     [gen(error, Case) || Case <- cases(error)].
 
+latin1_atom_test_() ->
+    Key = binary_to_atom(<<228>>, latin1), %% `ä`
+    Expected = <<"{\"", 195, 164, "\":\"bar\"}">>,
+    ?_assertEqual(Expected, enc(#{ Key => <<"bar">> })).
 
 gen(ok, {J, E}) ->
     gen(ok, {J, E, J});
