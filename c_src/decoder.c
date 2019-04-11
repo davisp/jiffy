@@ -57,8 +57,7 @@ typedef struct {
     int             copy_strings;
     ERL_NIF_TERM    null_term;
 
-    char*           p;
-    unsigned char*  u;
+    unsigned char*  p;
     int             i;
     int             len;
 
@@ -89,7 +88,6 @@ dec_new(ErlNifEnv* env)
     d->null_term = d->atoms->atom_null;
 
     d->p = NULL;
-    d->u = NULL;
     d->len = -1;
     d->i = 0;
 
@@ -113,8 +111,7 @@ dec_init(Decoder* d, ErlNifEnv* env, ERL_NIF_TERM arg, ErlNifBinary* bin)
     d->env = env;
     d->arg = arg;
 
-    d->p = (char*) bin->data;
-    d->u = bin->data;
+    d->p = bin->data;
     d->len = bin->size;
 }
 
@@ -211,7 +208,7 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     st = d->i;
 
     while(d->i < d->len) {
-        if(d->u[d->i] < 0x20) {
+        if(d->p[d->i] < 0x20) {
             return 0;
         } else if(d->p[d->i] == '\"') {
             d->i++;
@@ -241,7 +238,7 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
                     if(d->i + 4 >= d->len) {
                         return 0;
                     }
-                    hi = int_from_hex(&(d->u[d->i]));
+                    hi = int_from_hex(&(d->p[d->i]));
                     if(hi < 0) {
                         return 0;
                     }
@@ -255,7 +252,7 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
                         } else if(d->p[d->i++] != 'u') {
                             return 0;
                         }
-                        lo = int_from_hex(&(d->u[d->i]));
+                        lo = int_from_hex(&(d->p[d->i]));
                         if(lo < 0) {
                             return 0;
                         }
@@ -277,10 +274,10 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
                 default:
                     return 0;
             }
-        } else if(d->u[d->i] < 0x80) {
+        } else if(d->p[d->i] < 0x80) {
             d->i++;
         } else {
-            ulen = utf8_validate(&(d->u[d->i]), d->len - d->i);
+            ulen = utf8_validate(&(d->p[d->i]), d->len - d->i);
             if(ulen < 0) {
                 return 0;
             }
@@ -346,12 +343,12 @@ parse:
                 break;
             case 'u':
                 ui++;
-                hi = int_from_hex(&(d->u[ui]));
+                hi = int_from_hex(&(d->p[ui]));
                 if(hi < 0) {
                     return 0;
                 }
                 if(hi >= 0xD800 && hi < 0xDC00) {
-                    lo = int_from_hex(&(d->u[ui+6]));
+                    lo = int_from_hex(&(d->p[ui+6]));
                     if(lo < 0) {
                         return 0;
                     }

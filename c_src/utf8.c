@@ -49,7 +49,7 @@ int_from_hex(const unsigned char* p)
 }
 
 int
-int_to_hex(int val, char* p)
+int_to_hex(int val, unsigned char* p)
 {
     if(val < 0 || val > 65535)
         return -1;
@@ -163,7 +163,7 @@ utf8_to_unicode(unsigned char* buf, size_t size)
     int ret;
     if((buf[0] & 0x80) == 0x00) {
         // 0xxxxxxx
-        ret = (int) buf[0];
+        ret = buf[0];
     } else if((buf[0] & 0xE0) == 0xC0 && size >= 2) {
         // 110xxxxy 10yyyyyy
         ret = ((buf[0] & 0x1F) << 6)
@@ -192,26 +192,26 @@ int
 unicode_to_utf8(int c, unsigned char* buf)
 {
     if(c < 0x80) {
-        buf[0] = (unsigned char) c;
+        buf[0] = c;
         return 1;
     } else if(c < 0x800) {
-        buf[0] = (unsigned char) 0xC0 + (c >> 6);
-        buf[1] = (unsigned char) 0x80 + (c & 0x3F);
+        buf[0] = 0xC0 + (c >> 6);
+        buf[1] = 0x80 + (c & 0x3F);
         return 2;
     } else if(c < 0x10000) {
         if(c < 0xD800 || (c > 0xDFFF)) {
-            buf[0] = (unsigned char) 0xE0 + (c >> 12);
-            buf[1] = (unsigned char) 0x80 + ((c >> 6) & 0x3F);
-            buf[2] = (unsigned char) 0x80 + (c & 0x3F);
+            buf[0] = 0xE0 + (c >> 12);
+            buf[1] = 0x80 + ((c >> 6) & 0x3F);
+            buf[2] = 0x80 + (c & 0x3F);
             return 3;
         } else {
             return -1;
         }
     } else if(c <= 0x10FFFF) {
-        buf[0] = (unsigned char) 0xF0 + (c >> 18);
-        buf[1] = (unsigned char) 0x80 + ((c >> 12) & 0x3F);
-        buf[2] = (unsigned char) 0x80 + ((c >> 6) & 0x3F);
-        buf[3] = (unsigned char) 0x80 + (c & 0x3F);
+        buf[0] = 0xF0 + (c >> 18);
+        buf[1] = 0x80 + ((c >> 12) & 0x3F);
+        buf[2] = 0x80 + ((c >> 6) & 0x3F);
+        buf[3] = 0x80 + (c & 0x3F);
         return 4;
     }
     return -1;
@@ -226,7 +226,7 @@ unicode_from_pair(int hi, int lo)
 }
 
 int
-unicode_uescape(int val, char* p)
+unicode_uescape(int val, unsigned char* p)
 {
     int n;
     if(val < 0x10000) {
