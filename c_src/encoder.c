@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "erl_nif.h"
 #include "jiffy.h"
+#include "termstack.h"
 
 #define BIN_INC_SIZE 2048
 
@@ -178,89 +178,6 @@ enc_ensure(Encoder* e, size_t req)
     e->i = 0;
 
     return 1;
-}
-
-#define SMALL_TERMSTACK_SIZE 16
-
-typedef struct {
-    ERL_NIF_TERM *elements;
-    size_t size;
-    size_t top;
-
-    ERL_NIF_TERM __default_elements[SMALL_TERMSTACK_SIZE];
-} TermStack;
-
-static inline void
-termstack_push(TermStack *stack, ERL_NIF_TERM term)
-{
-    if(stack->top == stack->size) {
-        size_t new_size = stack->size * 2;
-
-        if (stack->elements == &stack->__default_elements[0]) {
-            stack->elements = enif_alloc(new_size * sizeof(ERL_NIF_TERM));
-            stack->size = new_size;
-        } else {
-            stack->elements = enif_realloc(stack->elements,
-                                           new_size * sizeof(ERL_NIF_TERM));
-            stack->size = new_size;
-        }
-    }
-
-    assert(stack->top < stack->size);
-    stack->elements[stack->top++] = term;
-}
-
-static inline ERL_NIF_TERM
-termstack_pop(TermStack *stack)
-{
-    assert(stack->top > 0 && stack->top <= stack->size);
-    return stack->elements[--stack->top];
-}
-
-static inline int
-termstack_is_empty(TermStack *stack)
-{
-    return stack->top == 0;
-}
-
-ERL_NIF_TERM termstack_save(ErlNifEnv *env, TermStack *stack)
-{
-    return enif_make_tuple_from_array(env, stack->elements, stack->top);
-}
-
-int termstack_restore(ErlNifEnv *env, ERL_NIF_TERM from, TermStack *stack)
-{
-    const ERL_NIF_TERM *elements;
-    int arity;
-
-    if(enif_get_tuple(env, from, &arity, &elements)) {
-        stack->top = arity;
-
-        if(arity <= SMALL_TERMSTACK_SIZE) {
-            stack->elements = &stack->__default_elements[0];
-            stack->size = SMALL_TERMSTACK_SIZE;
-        } else {
-            stack->size = arity * 2;
-            stack->elements = enif_alloc(stack->size * sizeof(ERL_NIF_TERM));
-
-            if(!stack->elements) {
-                return 0;
-            }
-        }
-
-        memcpy(stack->elements, elements, arity * sizeof(ERL_NIF_TERM));
-        return 1;
-    }
-
-    return 0;
-}
-
-static void
-termstack_destroy(TermStack *stack)
-{
-    if(stack->elements != &stack->__default_elements[0]) {
-        enif_free(stack->elements);
-    }
 }
 
 static inline int
