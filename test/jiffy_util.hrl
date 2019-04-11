@@ -1,5 +1,5 @@
-
--compile(export_all).
+% This file is part of Jiffy released under the MIT license.
+% See the LICENSE file for more information.
 
 msg(Fmt, Args) ->
     M1 = io_lib:format(Fmt, Args),
@@ -17,6 +17,10 @@ hex(Bin) when is_binary(Bin) ->
 
 dec(V) ->
     jiffy:decode(V).
+
+
+dec(V, Opts) ->
+    jiffy:decode(V, Opts).
 
 
 enc(V) ->

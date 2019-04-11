@@ -5,6 +5,10 @@
 
 -ifdef(HAVE_EQC).
 
+
+-compile(export_all).
+
+
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("jiffy_util.hrl").
@@ -41,8 +45,8 @@ prop_enc_dec() ->
 prop_dec_trailer() ->
     ?FORALL({T1, Comb, T2}, {json(), combiner(), json()},
         begin
-            B1 = jiffy:encode(T1),
-            B2 = jiffy:encode(T2),
+            B1 = iolist_to_binary(jiffy:encode(T1)),
+            B2 = iolist_to_binary(jiffy:encode(T2)),
             Bin = <<B1/binary, Comb/binary, B2/binary>>,
             {has_trailer, T1, Rest} = jiffy:decode(Bin, [return_trailer]),
             T2 = jiffy:decode(Rest),
