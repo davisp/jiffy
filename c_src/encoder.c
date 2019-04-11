@@ -46,8 +46,7 @@ typedef struct {
     ErlNifBinary    buffer;
     int             have_buffer;
 
-    char*           p;
-    unsigned char*  u;
+    unsigned char*  p;
     size_t          i;
 } Encoder;
 
@@ -94,8 +93,7 @@ enc_new(ErlNifEnv* env)
 
     e->have_buffer = 1;
 
-    e->p = (char*)e->buffer.data;
-    e->u = (unsigned char*)e->buffer.data;
+    e->p = e->buffer.data;
     e->i = 0;
 
     return e;
@@ -176,8 +174,7 @@ enc_ensure(Encoder* e, size_t req)
 
     e->have_buffer = 1;
 
-    e->p = (char*)e->buffer.data;
-    e->u = (unsigned char*)e->buffer.data;
+    e->p = e->buffer.data;
     e->i = 0;
 
     return 1;
@@ -285,7 +282,7 @@ enc_special_character(Encoder* e, int val) {
         case '\"':
         case '\\':
             e->p[e->i++] = '\\';
-            e->u[e->i++] = val;
+            e->p[e->i++] = val;
             return 1;
         case '\b':
             e->p[e->i++] = '\\';
@@ -311,7 +308,7 @@ enc_special_character(Encoder* e, int val) {
             if(e->escape_forward_slashes) {
                 e->p[e->i++] = '\\';
             }
-            e->u[e->i++] = '/';
+            e->p[e->i++] = '/';
             return 1;
         default:
             if(val < 0x20) {
@@ -327,19 +324,17 @@ static int
 enc_atom(Encoder* e, ERL_NIF_TERM val)
 {
     static const int MAX_ESCAPE_LEN = 12;
-    char atom[512];
+    unsigned char data[512];
 
-    unsigned char* data;
     size_t size;
 
     int i;
 
-    if(!enif_get_atom(e->env, val, atom, 512, ERL_NIF_LATIN1)) {
+    if(!enif_get_atom(e->env, val, (char*)data, 512, ERL_NIF_LATIN1)) {
         return 0;
     }
 
-    data = (unsigned char*) atom;
-    size = strlen(atom);
+    size = strlen((const char*)data);
 
     /* Reserve space for the first quotation mark and most of the output. */
     if(!enc_ensure(e, size + MAX_ESCAPE_LEN + 1)) {
@@ -359,15 +354,15 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
         if(enc_special_character(e, val)) {
             i++;
         } else if(val < 0x80) {
-            e->u[e->i++] = val;
+            e->p[e->i++] = val;
             i++;
         } else if(val >= 0x80) {
             /* The atom encoding is latin1, so we don't need validation
              * as all latin1 characters are valid UTF-8 characters. */
             if (!e->uescape) {
-                e->i += unicode_to_utf8(val, &e->u[e->i]);
+                e->i += unicode_to_utf8(val, &e->p[e->i]);
             } else {
-                e->i += unicode_uescape(val, &(e->p[e->i]));
+                e->i += unicode_uescape(val, &e->p[e->i]);
             }
 
             i++;
@@ -420,7 +415,7 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
         if(enc_special_character(e, data[i])) {
             i++;
         } else if(data[i] < 0x80) {
-            e->u[e->i++] = data[i++];
+            e->p[e->i++] = data[i++];
         } else if(data[i] >= 0x80) {
             ulen = utf8_validate(&(data[i]), size - i);
 
@@ -441,7 +436,7 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
 
                 e->i += esc_len;
             } else {
-                memcpy(&e->u[e->i], &data[i], ulen);
+                memcpy(&e->p[e->i], &data[i], ulen);
                 e->i += ulen;
             }
 
@@ -507,7 +502,7 @@ digits10(ErlNifUInt64 v)
 }
 
 unsigned int
-u64ToAsciiTable(char *dst, ErlNifUInt64 value)
+u64ToAsciiTable(unsigned char *dst, ErlNifUInt64 value)
 {
     static const char digits[201] =
         "0001020304050607080910111213141516171819"
@@ -536,7 +531,7 @@ u64ToAsciiTable(char *dst, ErlNifUInt64 value)
 }
 
 unsigned
-i64ToAsciiTable(char *dst, ErlNifSInt64 value)
+i64ToAsciiTable(unsigned char *dst, ErlNifSInt64 value)
 {
     if (value < 0) {
         *dst++ = '-';
@@ -562,7 +557,7 @@ enc_long(Encoder* e, ErlNifSInt64 val)
 static inline int
 enc_double(Encoder* e, double val)
 {
-    char* start;
+    unsigned char* start;
     size_t len;
 
     if(!enc_ensure(e, 32)) {

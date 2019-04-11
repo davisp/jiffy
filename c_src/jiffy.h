@@ -68,14 +68,14 @@ int make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
         int ret_map, int dedupe_keys);
 
 int int_from_hex(const unsigned char* p);
-int int_to_hex(int val, char* p);
+int int_to_hex(int val, unsigned char* p);
 int utf8_len(int c);
 int utf8_esc_len(int c);
 int utf8_validate(unsigned char* data, size_t size);
 int utf8_to_unicode(unsigned char* buf, size_t size);
 int unicode_to_utf8(int c, unsigned char* buf);
 int unicode_from_pair(int hi, int lo);
-int unicode_uescape(int c, char* buf);
-int double_to_shortest(char *buf, size_t size, size_t* len, double val);
+int unicode_uescape(int c, unsigned char* buf);
+int double_to_shortest(unsigned char *buf, size_t size, size_t* len, double val);
 
 #endif // Included JIFFY_H
