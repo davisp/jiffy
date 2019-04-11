@@ -17,6 +17,8 @@ hex(Bin) when is_binary(Bin) ->
 
 dec(V) ->
     jiffy:decode(V).
+dec(V, Opts) ->
+    jiffy:decode(V, Opts).
 
 
 enc(V) ->

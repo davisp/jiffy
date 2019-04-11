@@ -65,15 +65,15 @@ gen(utf8, {Case, Fixed}) ->
     Case2 = <<34, Case/binary, 34>>,
     Fixed2 = <<34, Fixed/binary, 34>>,
     {msg("UTF-8: ~s", [hex(Case)]), [
-        ?_assertThrow({error, {invalid_string, _}}, jiffy:encode(Case)),
-        ?_assertEqual(Fixed2, jiffy:encode(Case, [force_utf8])),
-        ?_assertThrow({error, {_, invalid_string}}, jiffy:decode(Case2))
+        ?_assertThrow({error, {invalid_string, _}}, enc(Case)),
+        ?_assertEqual(Fixed2, enc(Case, [force_utf8])),
+        ?_assertThrow({error, {_, invalid_string}}, dec(Case2))
     ]};
 
 gen(bad_utf8_key, {J, E}) ->
     {msg("Bad UTF-8 key: - ~p", [size(term_to_binary(J))]), [
-        ?_assertThrow({error, {invalid_object_member_key, _}}, jiffy:encode(J)),
-        ?_assertEqual(E, jiffy:decode(jiffy:encode(J, [force_utf8])))
+        ?_assertThrow({error, {invalid_object_member_key, _}}, enc(J)),
+        ?_assertEqual(E, dec(enc(J, [force_utf8])))
     ]};
 
 gen(escaped_slashes, {J, E}) ->

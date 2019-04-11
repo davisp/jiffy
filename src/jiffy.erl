@@ -101,8 +101,8 @@ encode(Data, Options) ->
             finish_encode(IOData, []);
         {iter, {Encoder, Stack, IOBuf}} ->
             encode_loop(Data, Options, Encoder, Stack, IOBuf);
-        IOData ->
-            IOData
+        RevIOData when is_list(RevIOData) ->
+            lists:reverse(RevIOData)
     end.
 
 
@@ -206,8 +206,8 @@ encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
             finish_encode(IOData, []);
         {iter, {NewEncoder, NewStack, NewIOBuf}} ->
             encode_loop(Data, Options, NewEncoder, NewStack, NewIOBuf);
-        IOData ->
-            IOData
+        RevIOData when is_list(RevIOData) ->
+            lists:reverse(RevIOData)
     end.
 
 
