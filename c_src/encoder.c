@@ -158,12 +158,14 @@ enc_ensure(Encoder* e, size_t req)
 {
     size_t new_size = BIN_INC_SIZE;
 
-    if(req < (e->buffer.size - e->i)) {
-        return 1;
-    }
+    if(e->have_buffer) {
+        if(req < (e->buffer.size - e->i)) {
+            return 1;
+        }
 
-    if(!enc_flush(e)) {
-        return 0;
+        if(!enc_flush(e)) {
+            return 0;
+        }
     }
 
     for(new_size = BIN_INC_SIZE; new_size < req; new_size <<= 1);
@@ -190,6 +192,23 @@ enc_literal(Encoder* e, const char* literal, size_t len)
     memcpy(&(e->p[e->i]), literal, len);
     e->i += len;
     e->count++;
+    return 1;
+}
+
+static inline int
+enc_bignum(Encoder* e, ERL_NIF_TERM value) {
+    /* This is a bignum and we need to handle it up in Erlang code as
+     * the NIF API doesn't support them yet.
+     *
+     * Flush our current output and mark ourselves as needing a fixup
+     * after we return. */
+    if(!enc_flush(e)) {
+        return 0;
+    }
+
+    e->iolist = enif_make_list_cell(e->env, value, e->iolist);
+    e->partial_output = 1;
+
     return 1;
 }
 
@@ -893,18 +912,10 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             termstack_push(&stack, e->atoms->ref_array);
             termstack_push(&stack, item);
         } else if(enif_is_number(env, curr)) {
-            /* This is a bignum and we need to handle it up in Erlang code as
-             * the NIF API doesn't support them yet.
-             *
-             * Flush our current output and mark ourselves as needing a fixup
-             * after we return. */
-            if(!enc_flush(e)) {
+            if(!enc_bignum(e, curr)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-
-            e->iolist = enif_make_list_cell(e->env, curr, e->iolist);
-            e->partial_output = 1;
         } else {
             ret = enc_obj_error(e, "invalid_ejson", curr);
             goto done;
