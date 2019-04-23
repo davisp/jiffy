@@ -15,7 +15,11 @@ termstack_push(TermStack *stack, ERL_NIF_TERM term)
         size_t new_size = stack->size * 2;
 
         if (stack->elements == &stack->__default_elements[0]) {
-            stack->elements = enif_alloc(new_size * sizeof(ERL_NIF_TERM));
+            ERL_NIF_TERM *new_elements = enif_alloc(new_size * sizeof(ERL_NIF_TERM));
+
+            memcpy(new_elements, stack->elements, stack->size * sizeof(ERL_NIF_TERM));
+
+            stack->elements = new_elements;
         } else {
             stack->elements = enif_realloc(stack->elements,
                                            new_size * sizeof(ERL_NIF_TERM));

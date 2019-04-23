@@ -20,6 +20,14 @@ latin1_atom_test_() ->
     Expected = <<"{\"", 195, 164, "\":\"bar\"}">>,
     ?_assertEqual(Expected, enc(#{ Key => <<"bar">> })).
 
+nested_object_segv_test_() ->
+    Obj = nested(128),
+    Enc = enc(Obj),
+    ?_assertEqual(Obj, dec(Enc)).
+
+nested(0) -> <<"bottom">>;
+nested(N) -> {[{integer_to_binary(N), nested(N - 1)}]}.
+
 gen(ok, {J, E}) ->
     gen(ok, {J, E, J});
 gen(ok, {J1, E, J2}) ->
