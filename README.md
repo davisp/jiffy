@@ -18,7 +18,7 @@ it returns a binary most of the time.
 A quick note on unicode. Jiffy only understands UTF-8 in binaries. End
 of story.
 
-Errors are raised as exceptions.
+Errors are raised as error exceptions.
 
     Eshell V5.8.2  (abort with ^G)
     1> jiffy:decode(<<"{\"foo\": \"bar\"}">>).
