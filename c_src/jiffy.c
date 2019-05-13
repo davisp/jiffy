@@ -16,6 +16,8 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_null = make_atom(env, "null");
     st->atom_true = make_atom(env, "true");
     st->atom_false = make_atom(env, "false");
+    st->atom_partial_object = make_atom(env, "$partial_object$");
+    st->atom_partial_array = make_atom(env, "$partial_array$");
     st->atom_bignum = make_atom(env, "bignum");
     st->atom_bignum_e = make_atom(env, "bignum_e");
     st->atom_bigdbl = make_atom(env, "bigdbl");

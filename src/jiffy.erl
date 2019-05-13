@@ -2,7 +2,7 @@
 % See the LICENSE file for more information.
 
 -module(jiffy).
--export([decode/1, decode/2, encode/1, encode/2]).
+-export([decode/1, decode/2, encode/1, encode/2, partial_encode/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
 -compile([no_native]).
@@ -16,22 +16,28 @@
                     | json_string()
                     | json_number()
                     | json_object()
-                    | json_array().
+                    | json_array()
+                    | json_preencoded().
 
--type json_array()  :: [json_value()].
+-type json_array()  :: [json_value()|json_partial_array()].
 -type json_string() :: atom() | binary().
 -type json_number() :: integer() | float().
 
+-type json_partial_array() :: {'$partial_array$', iodata()}.
+-type json_partial_object() :: {'$partial_object$', iodata()}.
+
 -ifdef(JIFFY_NO_MAPS).
 
--type json_object() :: {[{json_string(),json_value()}]}.
+-type json_object() :: {[({json_string(),json_value()})|json_partial_object()]}.
 
 -else.
 
--type json_object() :: {[{json_string(),json_value()}]}
+-type json_object() :: {[({json_string(),json_value()})|json_partial_object()]}
                         | #{json_string() => json_value()}.
 
 -endif.
+
+-type json_preencoded() :: {json, Json::iodata()}.
 
 -type jiffy_decode_result() :: json_value()
                         | {has_trailer, json_value(), binary()}.
@@ -106,6 +112,16 @@ encode(Data, Options) ->
     end.
 
 
+-spec partial_encode(json_array(), encode_options()) -> json_partial_array();
+                    (json_object(), encode_options()) -> json_partial_object().
+partial_encode(Data, Options) when is_list(Data) ->
+    Json = iolist_to_binary(encode(Data, Options)),
+    {'$partial_array$', binary_part(Json, 1, byte_size(Json) - 2)};
+partial_encode(Data, Options) when is_tuple(Data) ->
+    Json = iolist_to_binary(encode(Data, Options)),
+    {'$partial_object$', binary_part(Json, 1, byte_size(Json) - 2)}.
+
+
 finish_decode({bignum, Value}) ->
     list_to_integer(binary_to_list(Value));
 finish_decode({bignum_e, Value}) ->
@@ -160,6 +176,8 @@ finish_encode([<<_/binary>>=B | Rest], Acc) ->
 finish_encode([Val | Rest], Acc) when is_integer(Val) ->
     Bin = list_to_binary(integer_to_list(Val)),
     finish_encode(Rest, [Bin | Acc]);
+finish_encode([{json, Json} | Rest], Acc) ->
+    finish_encode(Rest, [Json | Acc]);
 finish_encode([InvalidEjson | _], _) ->
     error({invalid_ejson, InvalidEjson});
 finish_encode(_, _) ->
