@@ -398,6 +398,33 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
 }
 
 static inline int
+enc_json(Encoder* e, ERL_NIF_TERM val)
+{
+    ErlNifBinary bin;
+    unsigned char* data;
+    size_t size;
+
+    if(!enif_is_binary(e->env, val)) {
+        return 0;
+    }
+    if(!enif_inspect_binary(e->env, val, &bin)) {
+        return 0;
+    }
+    data = bin.data;
+    size = bin.size;
+
+    if(!enc_ensure(e, size + 2)) {
+        return 0;
+    }
+
+    memcpy(e->p + e->i, data, size);
+    e->i += size;
+    e->count++;
+
+    return 1;
+}
+
+static inline int
 enc_long(Encoder* e, ErlNifSInt64 val)
 {
     if(!enc_ensure(e, 32)) {
@@ -569,6 +596,91 @@ enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
 #endif
 
 ERL_NIF_TERM
+enc_object_element(Encoder* e, int first, ERL_NIF_TERM curr, ERL_NIF_TERM* stackp)
+{
+    ErlNifEnv* env = e->env;
+    ERL_NIF_TERM stack = *stackp;
+    ERL_NIF_TERM item;
+    const ERL_NIF_TERM* tuple;
+    int arity;
+
+    if(first && !enc_start_object(e)) {
+        return enc_error(e, "internal_error");
+    }
+    if(enif_is_empty_list(env, curr)) {
+        if(!enc_end_object(e)) {
+            return enc_error(e, "internal_error");
+        }
+        return 0;
+    }
+    if(!enif_get_list_cell(env, curr, &item, &curr)) {
+        return enc_error(e, "internal_error");
+    }
+    if(!enif_get_tuple(env, item, &arity, &tuple)) {
+        return enc_obj_error(e, "invalid_object_member", item);
+    }
+    if(arity != 2) {
+        return enc_obj_error(e, "invalid_object_member_arity", item);
+    }
+    if(!first && !enc_comma(e)) {
+        return enc_error(e, "internal_error");
+    }
+    if(enif_compare(tuple[0], e->atoms->atom_partial_object) == 0) {
+        if(!enif_is_binary(env, tuple[1])) {
+            return enc_obj_error(e, "invalid_json_string", curr);
+        }
+        if(!enc_json(e, tuple[1])) {
+            return enc_error(e, "internal_error");
+        }
+        stack = enif_make_list_cell(env, curr, stack);
+        stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
+        *stackp = stack;
+    } else {
+        if(!enc_string(e, tuple[0])) {
+            return enc_obj_error(e, "invalid_object_member_key", tuple[0]);
+        }
+        if(!enc_colon(e)) {
+            return enc_error(e, "internal_error");
+        }
+        stack = enif_make_list_cell(env, curr, stack);
+        stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
+        stack = enif_make_list_cell(env, tuple[1], stack);
+        *stackp = stack;
+    }
+    return 0;
+}
+
+ERL_NIF_TERM
+enc_array_element(Encoder* e, int first, ERL_NIF_TERM curr, ERL_NIF_TERM* stackp)
+{
+    ErlNifEnv* env = e->env;
+    ERL_NIF_TERM stack = *stackp;
+    ERL_NIF_TERM item;
+
+    if(first && !enc_start_array(e)) {
+        return enc_error(e, "internal_error");
+    }
+    if(enif_is_empty_list(env, curr)) {
+        if(!enc_end_array(e)) {
+            return enc_error(e, "internal_error");
+        }
+        return 0;
+    }
+    if(!first && !enc_comma(e)) {
+        return enc_error(e, "internal_error");
+    }
+    if(!enif_get_list_cell(env, curr, &item, &curr)) {
+        return enc_error(e, "internal_error");
+    }
+    stack = enif_make_list_cell(env, curr, stack);
+    stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
+    stack = enif_make_list_cell(env, item, stack);
+    *stackp = stack;
+    return 0;
+}
+
+
+ERL_NIF_TERM
 encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
@@ -682,63 +794,15 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            if(enif_is_empty_list(env, curr)) {
-                if(!enc_end_object(e)) {
-                    ret = enc_error(e, "internal_error");
-                    goto done;
-                }
-                continue;
-            }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            if(!enif_get_tuple(env, item, &arity, &tuple)) {
-                ret = enc_obj_error(e, "invalid_object_member", item);
-                goto done;
-            }
-            if(arity != 2) {
-                ret = enc_obj_error(e, "invalid_object_member_arity", item);
-                goto done;
-            }
-            if(!enc_comma(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            if(!enc_string(e, tuple[0])) {
-                ret = enc_obj_error(e, "invalid_object_member_key", tuple[0]);
-                goto done;
-            }
-            if(!enc_colon(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
-            stack = enif_make_list_cell(env, tuple[1], stack);
+            ret = enc_object_element(e, 0, curr, &stack);
+            if(ret) { goto done; }
         } else if(enif_is_identical(curr, e->atoms->ref_array)) {
             if(!enif_get_list_cell(env, stack, &curr, &stack)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-            if(enif_is_empty_list(env, curr)) {
-                if(!enc_end_array(e)) {
-                    ret = enc_error(e, "internal_error");
-                    goto done;
-                }
-                continue;
-            }
-            if(!enc_comma(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
-            stack = enif_make_list_cell(env, item, stack);
+            ret = enc_array_element(e, 0, curr, &stack);
+            if(ret) { goto done; }
         } else if(enif_compare(curr, e->atoms->atom_null) == 0) {
             if(!enc_literal(e, "null", 4)) {
                 ret = enc_error(e, "null");
@@ -780,48 +844,31 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
         } else if(enif_get_tuple(env, curr, &arity, &tuple)) {
-            if(arity != 1) {
-                ret = enc_obj_error(e, "invalid_ejson", curr);
-                goto done;
-            }
-            if(!enif_is_list(env, tuple[0])) {
-                ret = enc_obj_error(e, "invalid_object", curr);
-                goto done;
-            }
-            if(!enc_start_object(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            if(enif_is_empty_list(env, tuple[0])) {
-                if(!enc_end_object(e)) {
+            if(arity == 1) {
+                if(!enif_is_list(env, tuple[0])) {
+                    ret = enc_obj_error(e, "invalid_object", curr);
+                    goto done;
+                }
+                ret = enc_object_element(e, 1, tuple[0], &stack);
+                if (ret) { goto done; }
+            } else if(arity == 2) {
+                if((enif_compare(tuple[0], e->atoms->atom_json) != 0) &&
+                   (enif_compare(tuple[0], e->atoms->atom_partial_array) != 0)) {
+                    ret = enc_obj_error(e, "invalid_ejson", curr);
+                    goto done;
+                }
+                if(!enif_is_binary(env, tuple[1])) {
+                    ret = enc_obj_error(e, "invalid_json_string", curr);
+                    goto done;
+                }
+                if(!enc_json(e, tuple[1])) {
                     ret = enc_error(e, "internal_error");
                     goto done;
                 }
-                continue;
-            }
-            if(!enif_get_list_cell(env, tuple[0], &item, &curr)) {
-                ret = enc_error(e, "internal_error");
+            } else {
+                ret = enc_obj_error(e, "invalid_ejson", curr);
                 goto done;
             }
-            if(!enif_get_tuple(env, item, &arity, &tuple)) {
-                ret = enc_obj_error(e, "invalid_object_member", item);
-                goto done;
-            }
-            if(arity != 2) {
-                ret = enc_obj_error(e, "invalid_object_member_arity", item);
-                goto done;
-            }
-            if(!enc_string(e, tuple[0])) {
-                ret = enc_obj_error(e, "invalid_object_member_key", tuple[0]);
-                goto done;
-            }
-            if(!enc_colon(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_object, stack);
-            stack = enif_make_list_cell(env, tuple[1], stack);
 #if MAP_TYPE_PRESENT
         } else if(enif_is_map(env, curr)) {
             if(!enc_map_to_ejson(env, curr, &curr)) {
@@ -831,24 +878,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             stack = enif_make_list_cell(env, curr, stack);
 #endif
         } else if(enif_is_list(env, curr)) {
-            if(!enc_start_array(e)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            if(enif_is_empty_list(env, curr)) {
-                if(!enc_end_array(e)) {
-                    ret = enc_error(e, "internal_error");
-                    goto done;
-                }
-                continue;
-            }
-            if(!enif_get_list_cell(env, curr, &item, &curr)) {
-                ret = enc_error(e, "internal_error");
-                goto done;
-            }
-            stack = enif_make_list_cell(env, curr, stack);
-            stack = enif_make_list_cell(env, e->atoms->ref_array, stack);
-            stack = enif_make_list_cell(env, item, stack);
+            ret = enc_array_element(e, 1, curr, &stack);
+            if(ret) { goto done; }
         } else {
             if(!enc_unknown(e, curr)) {
                 ret = enc_error(e, "internal_error");

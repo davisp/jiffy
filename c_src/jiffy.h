@@ -19,6 +19,9 @@ typedef struct {
     ERL_NIF_TERM    atom_null;
     ERL_NIF_TERM    atom_true;
     ERL_NIF_TERM    atom_false;
+    ERL_NIF_TERM    atom_json;
+    ERL_NIF_TERM    atom_partial_object;
+    ERL_NIF_TERM    atom_partial_array;
     ERL_NIF_TERM    atom_bignum;
     ERL_NIF_TERM    atom_bignum_e;
     ERL_NIF_TERM    atom_bigdbl;

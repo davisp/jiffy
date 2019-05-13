@@ -2,7 +2,7 @@
 % See the LICENSE file for more information.
 
 -module(jiffy).
--export([decode/1, decode/2, encode/1, encode/2]).
+-export([decode/1, decode/2, encode/1, encode/2, partial_encode/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
 -compile([no_native]).
@@ -16,7 +16,8 @@
                     | json_string()
                     | json_number()
                     | json_object()
-                    | json_array().
+                    | json_array()
+                    | json_preencoded().
 
 -type json_array()  :: [json_value()].
 -type json_string() :: atom() | binary().
@@ -32,6 +33,8 @@
                         | #{json_string() => json_value()}.
 
 -endif.
+
+-type json_preencoded() :: {json, Json::binary()}.
 
 -type jiffy_decode_result() :: json_value()
                         | {has_trailer, json_value(), binary()}.
@@ -104,6 +107,16 @@ encode(Data, Options) ->
         IOData ->
             IOData
     end.
+
+
+-spec partial_encode(json_array(), encode_options()) -> {'$partial_array$', binary()};
+                    (json_object(), encode_options()) -> {'$partial_object$', binary()}.
+partial_encode(Data, Options) when is_list(Data) ->
+    Json = iolist_to_binary(encode(Data, Options)),
+    {'$partial_array$', binary_part(Json, 1, byte_size(Json) - 2)};
+partial_encode(Data, Options) when is_tuple(Data) ->
+    Json = iolist_to_binary(encode(Data, Options)),
+    {'$partial_object$', binary_part(Json, 1, byte_size(Json) - 2)}.
 
 
 finish_decode({bignum, Value}) ->
