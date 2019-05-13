@@ -24,11 +24,13 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     ERL_NIF_TERM ret;
     ERL_NIF_TERM key;
     ERL_NIF_TERM val;
-    ERL_NIF_TERM old_val;
 
     std::set<std::string> seen;
 
 #if MAP_TYPE_PRESENT
+
+    ERL_NIF_TERM old_val;
+
     if(ret_map) {
         ret = enif_make_new_map(env);
         while(enif_get_list_cell(env, pairs, &val, &pairs)) {
