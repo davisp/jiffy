@@ -196,12 +196,9 @@ enc_literal(Encoder* e, const char* literal, size_t len)
 }
 
 static inline int
-enc_bignum(Encoder* e, ERL_NIF_TERM value) {
-    /* This is a bignum and we need to handle it up in Erlang code as
-     * the NIF API doesn't support them yet.
-     *
-     * Flush our current output and mark ourselves as needing a fixup
-     * after we return. */
+enc_unknown(Encoder* e, ERL_NIF_TERM value) {
+    // Bignums are encoded in Erlang as the NIF API
+    // does not have functions for dealing with them.
     if(!enc_flush(e)) {
         return 0;
     }
@@ -922,14 +919,11 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             termstack_push(&stack, curr);
             termstack_push(&stack, e->atoms->ref_array);
             termstack_push(&stack, item);
-        } else if(enif_is_number(env, curr)) {
-            if(!enc_bignum(e, curr)) {
+        } else {
+            if(!enc_unknown(e, curr)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-        } else {
-            ret = enc_obj_error(e, "invalid_ejson", curr);
-            goto done;
         }
     }
 
