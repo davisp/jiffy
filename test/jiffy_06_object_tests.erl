@@ -23,7 +23,11 @@ nested_object_test_() ->
 
 
 nested(0) -> <<"bottom">>;
-nested(N) -> {[{integer_to_binary(N), nested(N - 1)}]}.
+nested(N) -> {[{to_bin(N), nested(N - 1)}]}.
+
+
+to_bin(N) when is_integer(N) ->
+    list_to_binary(integer_to_list(N)).
 
 
 gen(ok, {J, E}) ->

@@ -699,6 +699,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM curr;
     ERL_NIF_TERM item;
     const ERL_NIF_TERM* tuple;
+    ERL_NIF_TERM tmp_argv[3];
     int arity;
     ErlNifSInt64 lval;
     double dval;
@@ -730,7 +731,6 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         bytes_processed = (e->iosize + e->i) - start;
 
         if(should_yield(bytes_processed, e->bytes_per_red)) {
-            ERL_NIF_TERM tmp_argv[3];
 
             assert(enif_is_list(env, e->iolist));
 
@@ -754,7 +754,12 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             return enif_make_tuple2(
                     env,
                     st->atom_iter,
-                    enif_make_tuple(env, 3, tmp_argv)
+                    enif_make_tuple3(
+                            env,
+                            tmp_argv[0],
+                            tmp_argv[1],
+                            tmp_argv[2]
+                        )
                 );
 #endif
         }

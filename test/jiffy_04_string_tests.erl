@@ -9,9 +9,9 @@
 
 
 latin1_atom_test_() ->
-    Key = binary_to_atom(<<228>>, latin1), %% `ä`
+    Key = list_to_atom([228]), %% `ä`
     Expected = <<"{\"", 195, 164, "\":\"bar\"}">>,
-    ?_assertEqual(Expected, enc(maps:put(Key, <<"bar">>, #{}))).
+    ?_assertEqual(Expected, jiffy:encode({[{Key, <<"bar">>}]})).
 
 
 string_success_test_() ->
