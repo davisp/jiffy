@@ -11,7 +11,7 @@
 latin1_atom_test_() ->
     Key = binary_to_atom(<<228>>, latin1), %% `ä`
     Expected = <<"{\"", 195, 164, "\":\"bar\"}">>,
-    ?_assertEqual(Expected, enc(#{ Key => <<"bar">> })).
+    ?_assertEqual(Expected, enc(maps:put(Key, <<"bar">>, #{}))).
 
 
 string_success_test_() ->
