@@ -765,14 +765,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             return enif_make_tuple2(
                     env,
                     st->atom_iter,
-                    enif_make_tuple5(
-                            env,
-                            tmp_argv[0],
-                            tmp_argv[1],
-                            tmp_argv[2],
-                            tmp_argv[3],
-                            tmp_argv[4]
-                        )
+                    enif_make_tuple_from_array(env, tmp_argv, 5)
                 );
 #endif
         }
