@@ -119,9 +119,19 @@ finish_decode({bignum_e, Value}) ->
             {E, []} = string:to_integer(ExpStr),
             {I, E}
     end,
-    IVal * math:pow(10, EVal);
+    try
+        IVal * math:pow(10, EVal)
+    catch
+        error:badarith ->
+            error({range, EVal})
+    end;
 finish_decode({bigdbl, Value}) ->
-    list_to_float(binary_to_list(Value));
+    try
+        list_to_float(binary_to_list(Value))
+    catch
+        error:badarg ->
+            error({range, Value})
+    end;
 finish_decode({Pairs}) when is_list(Pairs) ->
     finish_decode_obj(Pairs, []);
 finish_decode(Vals) when is_list(Vals) ->
