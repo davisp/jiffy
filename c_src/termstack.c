@@ -8,6 +8,10 @@
 #include "jiffy.h"
 #include "termstack.h"
 
+#if WINDOWS || WIN32
+#define inline 
+#endif
+
 ERL_NIF_TERM
 termstack_save(ErlNifEnv* env, TermStack* stack)
 {
