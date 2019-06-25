@@ -1,0 +1,2 @@
+# Unifying line endings so tests can pass on Windows
+*.json text eol=lf
