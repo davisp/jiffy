@@ -17,13 +17,12 @@ Config1 = case lists:keyfind(erl_opts, 1, CONFIG) of
         CONFIG ++ [{erl_opts, ErlOpts}]
 end,
 
-
-case os:cmd("rpm -q --queryformat '%{VERSION}' centos-release") of
-    "6\n" ->
+case os:cmd("echo 'int main(int argc, char *argv[]) {return 0;}' | cc -c -x c -o /dev/null -flto -") of
+    [] ->
+        Config1;
+    _ ->
         {port_env, PortEnv} = lists:keyfind(port_env, 1, Config1),
         NewFlag = {".*", "FLTO_FLAG", ""},
         NewPortEnv = lists:keyreplace("FLTO_FLAG", 2, PortEnv, NewFlag),
-        lists:keyreplace(port_env, 1, Config1, {port_env, NewPortEnv});
-    _ ->
-        Config1
+        lists:keyreplace(port_env, 1, Config1, {port_env, NewPortEnv})
 end.
