@@ -166,6 +166,10 @@ enc_ensure(Encoder* e, size_t req)
         if(!enc_flush(e)) {
             return 0;
         }
+
+        if(e->have_buffer) {
+            return 1;
+        }
     }
 
     for(new_size = BIN_INC_SIZE; new_size < req; new_size <<= 1);
