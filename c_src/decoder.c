@@ -64,6 +64,10 @@ typedef struct {
     char*           st_data;
     int             st_size;
     int             st_top;
+
+    unsigned int    current_level;
+    unsigned int    max_levels;
+    unsigned int    level_start;
 } Decoder;
 
 Decoder*
@@ -98,6 +102,10 @@ dec_new(ErlNifEnv* env)
     for(i = 0; i < d->st_size; i++) {
         d->st_data[i] = st_invalid;
     }
+
+    d->current_level = 0;
+    d->max_levels = 0;
+    d->level_start = 0;
 
     d->st_data[0] = st_value;
     d->st_top++;
@@ -185,6 +193,35 @@ dec_pop_assert(Decoder* d, char val)
     char current = dec_pop(d);
     assert(current == val && "popped invalid state.");
     (void)current;
+}
+
+static void inline
+level_increase(Decoder* d) {
+    if(d->max_levels && (d->max_levels == d->current_level++)) {
+        d->level_start = d->i;
+    }
+}
+
+static int inline
+level_decrease(Decoder* d, ERL_NIF_TERM* value) {
+    if (d->max_levels && d->max_levels == --d->current_level) {
+        ERL_NIF_TERM bin;
+        if(!d->copy_strings) {
+            bin = enif_make_sub_binary(d->env, d->arg, d->level_start, (d->i - d->level_start + 1));
+        } else {
+            unsigned ulen = d->i - d->level_start + 1;
+            char* chrbuf = (char*) enif_make_new_binary(d->env, ulen, &bin);
+            memcpy(chrbuf, &(d->p[d->level_start]), ulen);
+        }
+        *value = enif_make_tuple2(d->env, d->atoms->atom_json, bin);
+        return 1;
+    }
+    return 0;
+}
+
+static int inline
+level_allows_terms(Decoder* d) {
+    return (!d->max_levels) || (d->max_levels >= d->current_level);
 }
 
 int
@@ -291,7 +328,9 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     return 0;
 
 parse:
-    if(!has_escape && !d->copy_strings) {
+    if(!level_allows_terms(d)) {
+        return 1;
+    } else if(!has_escape && !d->copy_strings) {
         *value = enif_make_sub_binary(d->env, d->arg, st, (d->i - st - 1));
         return 1;
     } else if(!has_escape) {
@@ -572,6 +611,9 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
     }
 
 parse:
+    if(!level_allows_terms(d)) {
+        return 1;
+    }
 
     switch(state) {
         case nst_init:
@@ -643,6 +685,39 @@ make_array(ErlNifEnv* env, ERL_NIF_TERM list)
     return ret;
 }
 
+int
+get_max_levels(ErlNifEnv* env, ERL_NIF_TERM val, unsigned int* max_levels_p)
+{
+    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    const ERL_NIF_TERM* tuple;
+    int arity;
+    unsigned int max_levels;
+
+    if(!enif_get_tuple(env, val, &arity, &tuple)) {
+        return 0;
+    }
+
+    if(arity != 2) {
+        return 0;
+    }
+
+    if(enif_compare(tuple[0], st->atom_max_levels) != 0) {
+        return 0;
+    }
+
+    if(!enif_get_uint(env, tuple[1], &max_levels)) {
+        return 0;
+    }
+
+    if(max_levels == 0) {
+        return 0;
+    }
+
+    *max_levels_p = max_levels;
+
+    return 1;
+}
+
 ERL_NIF_TERM
 decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
@@ -694,6 +769,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         } else if(enif_is_identical(val, d->atoms->atom_use_nil)) {
             d->null_term = d->atoms->atom_nil;
         } else if(get_null_term(env, val, &(d->null_term))) {
+            continue;
+        } else if(get_max_levels(env, val, &(d->max_levels))) {
             continue;
         } else {
             return enif_make_badarg(env);
@@ -845,21 +922,31 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     case '{':
                         dec_push(d, st_object);
                         dec_push(d, st_key);
-                        objs = enif_make_list_cell(env, curr, objs);
-                        curr = enif_make_list(env, 0);
+
+                        level_increase(d);
+                        if(level_allows_terms(d)) {
+                            objs = enif_make_list_cell(env, curr, objs);
+                            curr = enif_make_list(env, 0);
+                        }
                         d->i++;
                         break;
                     case '[':
                         dec_push(d, st_array);
                         dec_push(d, st_value);
-                        objs = enif_make_list_cell(env, curr, objs);
-                        curr = enif_make_list(env, 0);
+
+                        level_increase(d);
+                        if(level_allows_terms(d)) {
+                            objs = enif_make_list_cell(env, curr, objs);
+                            curr = enif_make_list(env, 0);
+                        }
                         d->i++;
                         break;
                     case ']':
-                        if(!enif_is_empty_list(env, curr)) {
-                            ret = dec_error(d, "invalid_json");
-                            goto done;
+                        if(level_allows_terms(d)) {
+                            if(!enif_is_empty_list(env, curr)) {
+                                ret = dec_error(d, "invalid_json");
+                                goto done;
+                            }
                         }
                         dec_pop_assert(d, st_value);
                         if(dec_pop(d) != st_array) {
@@ -867,11 +954,16 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         dec_pop_assert(d, st_value);
-                        val = curr; // curr is []
-                        if(!enif_get_list_cell(env, objs, &curr, &objs)) {
-                            ret = dec_error(d, "internal_error");
-                            goto done;
+                        if(level_allows_terms(d)) {
+                            val = curr; // curr is []
+                            if(!enif_get_list_cell(env, objs, &curr, &objs)) {
+                                ret = dec_error(d, "internal_error");
+                                goto done;
+                            }
                         }
+
+                        level_decrease(d, &val);
+
                         d->i++;
                         break;
                     default:
@@ -882,7 +974,9 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     dec_push(d, st_done);
                 } else if(dec_curr(d) != st_value && dec_curr(d) != st_key) {
                     dec_push(d, st_comma);
-                    curr = enif_make_list_cell(env, val, curr);
+                    if(level_allows_terms(d)) {
+                        curr = enif_make_list_cell(env, val, curr);
+                    }
                 }
                 break;
 
@@ -901,27 +995,40 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         }
                         dec_pop_assert(d, st_key);
                         dec_push(d, st_colon);
-                        curr = enif_make_list_cell(env, val, curr);
+                        if(level_allows_terms(d)) {
+                            curr = enif_make_list_cell(env, val, curr);
+                        }
                         break;
                     case '}':
-                        if(!enif_is_empty_list(env, curr)) {
-                            ret = dec_error(d, "invalid_json");
-                            goto done;
+                        if(level_allows_terms(d)) {
+                            if(!enif_is_empty_list(env, curr)) {
+                                ret = dec_error(d, "invalid_json");
+                                goto done;
+                            }
                         }
                         dec_pop_assert(d, st_key);
                         dec_pop_assert(d, st_object);
                         dec_pop_assert(d, st_value);
-                        val = make_empty_object(env, d->return_maps);
-                        if(!enif_get_list_cell(env, objs, &curr, &objs)) {
-                            ret = dec_error(d, "internal_error");
-                            goto done;
+                        if(level_allows_terms(d)) {
+                            val = make_empty_object(env, d->return_maps);
+                            if(!enif_get_list_cell(env, objs, &curr, &objs)) {
+                                ret = dec_error(d, "internal_error");
+                                goto done;
+                            }
                         }
                         if(dec_top(d) == 0) {
                             dec_push(d, st_done);
                         } else {
                             dec_push(d, st_comma);
+                            if(level_allows_terms(d)) {
+                                curr = enif_make_list_cell(env, val, curr);
+                            }
+                        }
+
+                        if(level_decrease(d, &val)) {
                             curr = enif_make_list_cell(env, val, curr);
                         }
+
                         d->i++;
                         break;
                     default:
@@ -979,21 +1086,30 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         dec_pop_assert(d, st_value);
-                        if(!make_object(env, curr, &val,
-                                d->return_maps, d->dedupe_keys)) {
-                            ret = dec_error(d, "internal_object_error");
-                            goto done;
-                        }
-                        if(!enif_get_list_cell(env, objs, &curr, &objs)) {
-                            ret = dec_error(d, "internal_error");
-                            goto done;
+                        if(level_allows_terms(d)) {
+                            if(!make_object(env, curr, &val,
+                                        d->return_maps, d->dedupe_keys)) {
+                                ret = dec_error(d, "internal_object_error");
+                                goto done;
+                            }
+                            if(!enif_get_list_cell(env, objs, &curr, &objs)) {
+                                ret = dec_error(d, "internal_error");
+                                goto done;
+                            }
                         }
                         if(dec_top(d) > 0) {
                             dec_push(d, st_comma);
-                            curr = enif_make_list_cell(env, val, curr);
+                            if(level_allows_terms(d)) {
+                                curr = enif_make_list_cell(env, val, curr);
+                            }
                         } else {
                             dec_push(d, st_done);
                         }
+
+                        if(level_decrease(d, &val)) {
+                            curr = enif_make_list_cell(env, val, curr);
+                        }
+
                         d->i++;
                         break;
                     case ']':
@@ -1003,17 +1119,26 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         dec_pop_assert(d, st_value);
-                        val = make_array(env, curr);
-                        if(!enif_get_list_cell(env, objs, &curr, &objs)) {
-                            ret = dec_error(d, "internal_error");
-                            goto done;
+                        if(level_allows_terms(d)) {
+                            val = make_array(env, curr);
+                            if(!enif_get_list_cell(env, objs, &curr, &objs)) {
+                                ret = dec_error(d, "internal_error");
+                                goto done;
+                            }
                         }
                         if(dec_top(d) > 0) {
                             dec_push(d, st_comma);
-                            curr = enif_make_list_cell(env, val, curr);
+                            if(level_allows_terms(d)) {
+                                curr = enif_make_list_cell(env, val, curr);
+                            }
                         } else {
                             dec_push(d, st_done);
                         }
+
+                        if(level_decrease(d, &val)) {
+                            curr = enif_make_list_cell(env, val, curr);
+                        }
+
                         d->i++;
                         break;
                     default:
@@ -1064,3 +1189,4 @@ done:
 
     return ret;
 }
+

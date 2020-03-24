@@ -16,11 +16,13 @@
                     | json_string()
                     | json_number()
                     | json_object()
-                    | json_array().
+                    | json_array()
+                    | json_raw().
 
 -type json_array()  :: [json_value()].
 -type json_string() :: atom() | binary().
 -type json_number() :: integer() | float().
+-type json_raw()    :: {json, binary()}. % Only when decoding with max_levels
 
 -ifdef(JIFFY_NO_MAPS).
 
@@ -42,6 +44,7 @@
                         | dedupe_keys
                         | copy_strings
                         | {null_term, any()}
+                        | {max_levels, non_neg_integer()}
                         | {bytes_per_iter, non_neg_integer()}
                         | {bytes_per_red, non_neg_integer()}.
 

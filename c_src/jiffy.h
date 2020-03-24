@@ -44,6 +44,8 @@ typedef struct {
     ERL_NIF_TERM    atom_escape_forward_slashes;
     ERL_NIF_TERM    atom_dedupe_keys;
     ERL_NIF_TERM    atom_copy_strings;
+    ERL_NIF_TERM    atom_json;
+    ERL_NIF_TERM    atom_max_levels;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
