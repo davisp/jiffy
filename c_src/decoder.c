@@ -65,9 +65,10 @@ typedef struct {
     int             st_size;
     int             st_top;
 
-    unsigned int    current_level;
+    unsigned int    current_depth;
     unsigned int    max_levels;
     unsigned int    level_start;
+    unsigned int    empty_element;
 } Decoder;
 
 Decoder*
@@ -103,9 +104,10 @@ dec_new(ErlNifEnv* env)
         d->st_data[i] = st_invalid;
     }
 
-    d->current_level = 0;
+    d->current_depth = 0;
     d->max_levels = 0;
     d->level_start = 0;
+    d->empty_element = 1;
 
     d->st_data[0] = st_value;
     d->st_top++;
@@ -197,14 +199,15 @@ dec_pop_assert(Decoder* d, char val)
 
 static void inline
 level_increase(Decoder* d) {
-    if(d->max_levels && (d->max_levels == d->current_level++)) {
+    if(d->max_levels && (d->max_levels == d->current_depth++)) {
         d->level_start = d->i;
     }
 }
 
 static int inline
 level_decrease(Decoder* d, ERL_NIF_TERM* value) {
-    if (d->max_levels && d->max_levels == --d->current_level) {
+    if (d->max_levels && d->max_levels == --d->current_depth) {
+        // Only builds term in threshold
         ERL_NIF_TERM bin;
         if(!d->copy_strings) {
             bin = enif_make_sub_binary(d->env, d->arg, d->level_start, (d->i - d->level_start + 1));
@@ -221,7 +224,7 @@ level_decrease(Decoder* d, ERL_NIF_TERM* value) {
 
 static int inline
 level_allows_terms(Decoder* d) {
-    return (!d->max_levels) || (d->max_levels >= d->current_level);
+    return (!d->max_levels) || (d->max_levels >= d->current_depth);
 }
 
 int
@@ -234,7 +237,7 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     int ui;
     int hi;
     int lo;
-    char* chrbuf;
+    char* chrbuf = NULL;
     int chrpos;
 
     if(d->p[d->i] != '\"') {
@@ -328,7 +331,9 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     return 0;
 
 parse:
-    if(!level_allows_terms(d)) {
+    if(!has_escape && !level_allows_terms(d)) {
+        // If has_escape, the binary is still constructed as a side effect of
+        // the escape validation, although it's ignored by the caller
         return 1;
     } else if(!has_escape && !d->copy_strings) {
         *value = enif_make_sub_binary(d->env, d->arg, st, (d->i - st - 1));
@@ -611,10 +616,6 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
     }
 
 parse:
-    if(!level_allows_terms(d)) {
-        return 1;
-    }
-
     switch(state) {
         case nst_init:
         case nst_sign:
@@ -623,6 +624,10 @@ parse:
             return 0;
         default:
             break;
+    }
+
+    if(!level_allows_terms(d)) {
+        return 1;
     }
 
     errno = 0;
@@ -868,6 +873,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         val = d->null_term;
                         dec_pop_assert(d, st_value);
                         d->i += 4;
+                        d->empty_element = 0;
                         break;
                     case 't':
                         if(d->i + 3 >= d->len) {
@@ -881,6 +887,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         val = d->atoms->atom_true;
                         dec_pop_assert(d, st_value);
                         d->i += 4;
+                        d->empty_element = 0;
                         break;
                     case 'f':
                         if(d->i + 4 >= bin.size) {
@@ -894,6 +901,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         val = d->atoms->atom_false;
                         dec_pop_assert(d, st_value);
                         d->i += 5;
+                        d->empty_element = 0;
                         break;
                     case '\"':
                         if(!dec_string(d, &val)) {
@@ -901,6 +909,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         dec_pop_assert(d, st_value);
+                        d->empty_element = 0;
                         break;
                     case '-':
                     case '0':
@@ -918,6 +927,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         dec_pop_assert(d, st_value);
+                        d->empty_element = 0;
                         break;
                     case '{':
                         dec_push(d, st_object);
@@ -929,6 +939,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             curr = enif_make_list(env, 0);
                         }
                         d->i++;
+                        d->empty_element = 1;
                         break;
                     case '[':
                         dec_push(d, st_array);
@@ -940,13 +951,12 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             curr = enif_make_list(env, 0);
                         }
                         d->i++;
+                        d->empty_element = 1;
                         break;
                     case ']':
-                        if(level_allows_terms(d)) {
-                            if(!enif_is_empty_list(env, curr)) {
-                                ret = dec_error(d, "invalid_json");
-                                goto done;
-                            }
+                        if(!d->empty_element) {
+                            ret = dec_error(d, "invalid_json");
+                            goto done;
                         }
                         dec_pop_assert(d, st_value);
                         if(dec_pop(d) != st_array) {
@@ -961,10 +971,10 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                                 goto done;
                             }
                         }
-
                         level_decrease(d, &val);
 
                         d->i++;
+                        d->empty_element = 0;
                         break;
                     default:
                         ret = dec_error(d, "invalid_json");
@@ -1000,11 +1010,9 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         }
                         break;
                     case '}':
-                        if(level_allows_terms(d)) {
-                            if(!enif_is_empty_list(env, curr)) {
-                                ret = dec_error(d, "invalid_json");
-                                goto done;
-                            }
+                        if(!d->empty_element) {
+                            ret = dec_error(d, "invalid_json");
+                            goto done;
                         }
                         dec_pop_assert(d, st_key);
                         dec_pop_assert(d, st_object);
@@ -1016,6 +1024,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                                 goto done;
                             }
                         }
+                        level_decrease(d, &val);
+
                         if(dec_top(d) == 0) {
                             dec_push(d, st_done);
                         } else {
@@ -1025,11 +1035,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             }
                         }
 
-                        if(level_decrease(d, &val)) {
-                            curr = enif_make_list_cell(env, val, curr);
-                        }
-
                         d->i++;
+                        d->empty_element = 0;
                         break;
                     default:
                         ret = dec_error(d, "invalid_json");
@@ -1097,6 +1104,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                                 goto done;
                             }
                         }
+                        level_decrease(d, &val);
+
                         if(dec_top(d) > 0) {
                             dec_push(d, st_comma);
                             if(level_allows_terms(d)) {
@@ -1104,10 +1113,6 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             }
                         } else {
                             dec_push(d, st_done);
-                        }
-
-                        if(level_decrease(d, &val)) {
-                            curr = enif_make_list_cell(env, val, curr);
                         }
 
                         d->i++;
@@ -1126,6 +1131,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                                 goto done;
                             }
                         }
+                        level_decrease(d, &val);
+
                         if(dec_top(d) > 0) {
                             dec_push(d, st_comma);
                             if(level_allows_terms(d)) {
@@ -1133,10 +1140,6 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             }
                         } else {
                             dec_push(d, st_done);
-                        }
-
-                        if(level_decrease(d, &val)) {
-                            curr = enif_make_list_cell(env, val, curr);
                         }
 
                         d->i++;

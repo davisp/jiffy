@@ -61,8 +61,7 @@ The options for decode are:
   the decode result is still in use.
 * `{max_levels, N}` where N &gt;= 0 - This controls when to stop decoding
   by depth, after N levels are decoded, the rest is returned as a
-  `{json, binary()}`. Note that json validation is relaxed in levels deeper
-  than N.
+  `{json, binary()}`.
 * `{bytes_per_red, N}` where N &gt;= 0 - This controls the number of
   bytes that Jiffy will process as an equivalent to a reduction. Each
   20 reductions we consume 1% of our allocated time slice for the current
