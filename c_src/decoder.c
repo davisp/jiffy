@@ -236,7 +236,9 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     int hi;
     int lo;
     char* chrbuf = NULL;
+    char buf[4]; // Substitute for chrbuf when no term is needed
     int chrpos;
+    int chrpos_increment;
 
     if(d->p[d->i] != '\"') {
         return 0;
@@ -347,12 +349,22 @@ parse:
     lo = 0;
 
     ulen = (d->i - 1) - st - num_escapes;
-    chrbuf = (char*) enif_make_new_binary(d->env, ulen, value);
-    chrpos = 0;
+    if(level_allows_terms(d)) {
+        chrbuf = (char*) enif_make_new_binary(d->env, ulen, value);
+        chrpos_increment = 1;
+        chrpos = -1;
+    } else {
+        // No term is created, but the string is still validated
+        // (Thus the chrpos_increment = 0, so we overwrite buf)
+        chrbuf = &buf[0];
+        chrpos_increment = 0;
+        chrpos = 0;
+    }
     ui = st;
     while(ui < d->i - 1) {
+        chrpos += chrpos_increment;
         if(d->p[ui] != '\\') {
-            chrbuf[chrpos++] = d->p[ui++];
+            chrbuf[chrpos] = d->p[ui++];
             continue;
         }
         ui++;
@@ -360,27 +372,27 @@ parse:
             case '\"':
             case '\\':
             case '/':
-                chrbuf[chrpos++] = d->p[ui];
+                chrbuf[chrpos] = d->p[ui];
                 ui++;
                 break;
             case 'b':
-                chrbuf[chrpos++] = '\b';
+                chrbuf[chrpos] = '\b';
                 ui++;
                 break;
             case 'f':
-                chrbuf[chrpos++] = '\f';
+                chrbuf[chrpos] = '\f';
                 ui++;
                 break;
             case 'n':
-                chrbuf[chrpos++] = '\n';
+                chrbuf[chrpos] = '\n';
                 ui++;
                 break;
             case 'r':
-                chrbuf[chrpos++] = '\r';
+                chrbuf[chrpos] = '\r';
                 ui++;
                 break;
             case 't':
-                chrbuf[chrpos++] = '\t';
+                chrbuf[chrpos] = '\t';
                 ui++;
                 break;
             case 'u':
@@ -399,11 +411,11 @@ parse:
                 } else {
                     ui += 4;
                 }
-                hi = unicode_to_utf8(hi, (unsigned char*) chrbuf+chrpos);
+                hi = unicode_to_utf8(hi, (unsigned char*) &chrbuf[chrpos]);
                 if(hi < 0) {
                     return 0;
                 }
-                chrpos += hi;
+                chrpos += (hi-1) * chrpos_increment;
                 break;
             default:
                 return 0;
