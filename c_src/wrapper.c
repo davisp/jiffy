@@ -49,9 +49,20 @@ ERL_NIF_TERM
 wrap_enif_make_sub_binary(ErlNifEnv* env, ERL_NIF_TERM bin_term, size_t pos, size_t size)
 {
     ErlNifEnv* process_independent_env = enif_alloc_env();
-    // sub_bin must be created in the same env as the parent binary and then copied
+    // sub_bin must be created in the same env as the parent binary and then
+    // copied, segfaults sometimes otherwise
     ERL_NIF_TERM sub_bin = enif_make_sub_binary(env, bin_term, pos, size);
     return wrap_new(env, process_independent_env, enif_make_copy(process_independent_env, sub_bin));
+}
+
+char*
+wrap_enif_make_new_binary(ErlNifEnv* env, size_t size, ERL_NIF_TERM* termp)
+{
+    ErlNifEnv* process_independent_env = enif_alloc_env();
+    ERL_NIF_TERM bin;
+    char* chrbuf = (char*) enif_make_new_binary(process_independent_env, size, &bin);
+    *termp = wrap_new(env, process_independent_env, bin);
+    return chrbuf;
 }
 
 int

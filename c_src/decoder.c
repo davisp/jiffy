@@ -208,7 +208,13 @@ static int inline
 level_decrease(Decoder* d, ERL_NIF_TERM* value) {
     if (d->max_levels && d->max_levels == --d->current_depth) {
         // Only builds term in threshold
-        *value = wrap_enif_make_sub_binary(d->env, d->arg, d->level_start, (d->i - d->level_start + 1));
+        unsigned ulen = d->i - d->level_start + 1;
+        if(!d->copy_strings) {
+            *value = wrap_enif_make_sub_binary(d->env, d->arg, d->level_start, ulen);
+        } else {
+            char* chrbuf = wrap_enif_make_new_binary(d->env, ulen, value);
+            memcpy(chrbuf, &(d->p[d->level_start]), ulen);
+        }
         return 1;
     }
     return 0;

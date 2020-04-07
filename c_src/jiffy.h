@@ -89,6 +89,7 @@ int unicode_from_pair(int hi, int lo);
 int unicode_uescape(int c, unsigned char* buf);
 int double_to_shortest(unsigned char *buf, size_t size, size_t* len, double val);
 
+char* wrap_enif_make_new_binary(ErlNifEnv* env, size_t size, ERL_NIF_TERM* termp);
 ERL_NIF_TERM wrap_enif_make_sub_binary(ErlNifEnv* env, ERL_NIF_TERM bin_term, size_t pos, size_t size);
 int unwrap(ErlNifEnv* env, ERL_NIF_TERM wrapper_resource, ERL_NIF_TERM* bin_term_p);
 

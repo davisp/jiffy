@@ -8,33 +8,30 @@
 decode_levels_test_() ->
     MaxOptMaxLevels = 4,
     {"Test max_levels", lists:map(fun(Json) ->
-        [
-         begin
-             EJson = jiffy:decode(Json, [{max_levels, MaxLevels} | Opts]),
-             FullEJson = to_full_json(EJson, MaxLevels, Opts),
-             ?_assertEqual(jiffy:decode(Json, Opts), FullEJson)
+        [begin
+            EJson = jiffy:decode(Json, [{max_levels, MaxLevels} | Opts]),
+            FullEJson = to_full_json(EJson, MaxLevels, Opts),
+            ?_assertEqual(jiffy:decode(Json, Opts), FullEJson)
          end || MaxLevels <- lists:seq(1, MaxOptMaxLevels), Opts <- generate_options_groups()]
     end, jsons())}.
 
 encode_resources_test_() ->
     {"Test encode resources", lists:map(fun(Json) ->
-        [
-         begin
-             EJsonWithResources = jiffy:decode(Json, [{max_levels, 1} | Opts]),
-             JsonFromResources = jiffy:encode(EJsonWithResources),
-             ?_assertEqual(jiffy:decode(Json, Opts), jiffy:decode(JsonFromResources, Opts))
+        [begin
+            EJsonWithResources = jiffy:decode(Json, [{max_levels, 1} | Opts]),
+            JsonFromResources = jiffy:encode(EJsonWithResources),
+            ?_assertEqual(jiffy:decode(Json, Opts), jiffy:decode(JsonFromResources, Opts))
          end || Opts <- generate_options_groups()]
     end, jsons())}.
 
 encode_partials_test_() ->
     {"Test encode partials", lists:map(fun(Json) ->
-        [
-         begin
-             EJson = jiffy:decode(Json, Opts),
-             PartialResource = jiffy:encode(EJson, [partial]),
-             true = is_reference(PartialResource),
-             PartialIOData = jiffy:encode(PartialResource),
-             ?_assertEqual(EJson, jiffy:decode(PartialIOData, Opts))
+        [begin
+            EJson = jiffy:decode(Json, Opts),
+            PartialResource = jiffy:encode(EJson, [partial]),
+            true = is_reference(PartialResource),
+            PartialIOData = jiffy:encode(PartialResource),
+            ?_assertEqual(EJson, jiffy:decode(PartialIOData, Opts))
          end || Opts <- generate_options_groups()]
     end, jsons())}.
 
@@ -49,9 +46,9 @@ jsons() ->
 
 
 -ifndef(JIFFY_NO_MAPS).
-generate_options_groups() -> generate_options_groups([return_maps]).
+generate_options_groups() -> generate_options_groups([copy_strings, return_maps]).
 -else.
-generate_options_groups() -> generate_options_groups([]).
+generate_options_groups() -> generate_options_groups([copy_strings]).
 -endif.
 
 generate_options_groups(AvailableOptions) ->
@@ -69,6 +66,17 @@ to_full_json(_Val, Depth, MaxDepth, _DecodeOptions) when Depth > MaxDepth ->
 to_full_json(PartialResource, Depth, MaxDepth, DecodeOptions) when is_reference(PartialResource) ->
     MaxDepth = Depth,
     IOData = jiffy:encode(PartialResource),
+    [begin
+        ByteSize = byte_size(ValueBin),
+        case lists:member(copy_strings, DecodeOptions) of
+            true ->
+                ByteSize = binary:referenced_byte_size(ValueBin);
+            _ ->
+                % With small binaries, the copies between environments involve a
+                % full copy if the binary is small enough (thus the =)
+                true = ByteSize =< binary:referenced_byte_size(ValueBin)
+        end
+     end || ValueBin <- lists:flatten(IOData)],
     jiffy:decode(IOData, DecodeOptions);
 to_full_json({Pairs}, Depth, MaxDepth, DecodeOptions) when is_list(Pairs) ->
     {[{K, to_full_json(V, Depth+1, MaxDepth, DecodeOptions)} || {K, V} <- Pairs]};
