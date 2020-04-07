@@ -2,7 +2,7 @@
 % See the LICENSE file for more information.
 
 -module(jiffy).
--export([decode/1, decode/2, encode/1, encode/2]).
+-export([decode/1, decode/2, encode/1, encode/2, validate/1, validate/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
 -compile([no_native]).
@@ -113,6 +113,22 @@ encode(Data, Options) ->
         RevIOData when is_list(RevIOData) ->
             nif_wrap_binary(iolist_to_binary(lists:reverse(RevIOData)))
     end.
+
+
+-spec validate(iolist() | binary()) -> boolean() | {has_trailer, true, binary()}.
+validate(Data) ->
+    validate(Data, []).
+
+
+-spec validate(iolist() | binary(), decode_options()) -> boolean() | {has_trailer, true, binary()}.
+validate(Data, Opts) when is_binary(Data), is_list(Opts) ->
+    try decode(Data, lists:keystore(max_levels, 1, Opts, {max_levels, 0})) of
+        {has_trailer, _FlatEJson, Trailer} -> {has_trailer, true, Trailer};
+        _FlatEJson -> true
+    catch _:_ -> false
+    end;
+validate(Data, Opts) when is_list(Data) ->
+    validate(iolist_to_binary(Data), Opts).
 
 
 finish_decode({bignum, Value}) ->

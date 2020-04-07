@@ -12,7 +12,7 @@ decode_levels_test_() ->
             EJson = jiffy:decode(Json, [{max_levels, MaxLevels} | Opts]),
             FullEJson = to_full_json(EJson, MaxLevels, Opts),
             ?_assertEqual(jiffy:decode(Json, Opts), FullEJson)
-         end || MaxLevels <- lists:seq(1, MaxOptMaxLevels), Opts <- generate_options_groups()]
+         end || MaxLevels <- lists:seq(0, MaxOptMaxLevels), Opts <- generate_options_groups()]
     end, jsons())}.
 
 encode_resources_test_() ->

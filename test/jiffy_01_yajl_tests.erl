@@ -14,9 +14,9 @@ yajl_test_() ->
 
 
 gen({Name, Json, {error, Erl}}) ->
-    {Name, ?_assertError(Erl, jiffy:decode(Json))};
+    {Name, [?_assertEqual(false, jiffy:validate(Json)), ?_assertError(Erl, jiffy:decode(Json))]};
 gen({Name, Json, Erl}) ->
-    {Name, ?_assertEqual(Erl, jiffy:decode(Json))}.
+    {Name, [?_assertEqual(true, jiffy:validate(Json)), ?_assertEqual(Erl, jiffy:decode(Json))]}.
 
 
 read_cases() ->

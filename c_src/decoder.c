@@ -65,8 +65,8 @@ typedef struct {
     int             st_size;
     int             st_top;
 
-    unsigned int    current_depth;
-    unsigned int    max_levels;
+    int             current_depth;
+    int             max_levels;
     unsigned int    level_start;
     unsigned int    empty_element;
 } Decoder;
@@ -105,7 +105,7 @@ dec_new(ErlNifEnv* env)
     }
 
     d->current_depth = 0;
-    d->max_levels = 0;
+    d->max_levels = -1;
     d->level_start = 0;
     d->empty_element = 1;
 
@@ -199,14 +199,14 @@ dec_pop_assert(Decoder* d, char val)
 
 static void inline
 level_increase(Decoder* d) {
-    if(d->max_levels && (d->max_levels == d->current_depth++)) {
+    if(d->max_levels >= 0 && (d->max_levels == d->current_depth++)) {
         d->level_start = d->i;
     }
 }
 
 static int inline
 level_decrease(Decoder* d, ERL_NIF_TERM* value) {
-    if (d->max_levels && d->max_levels == --d->current_depth) {
+    if (d->max_levels >= 0 && d->max_levels == --d->current_depth) {
         // Only builds term in threshold
         unsigned ulen = d->i - d->level_start + 1;
         if(!d->copy_strings) {
@@ -222,7 +222,7 @@ level_decrease(Decoder* d, ERL_NIF_TERM* value) {
 
 static int inline
 level_allows_terms(Decoder* d) {
-    return (!d->max_levels) || (d->max_levels >= d->current_depth);
+    return (d->max_levels < 0) || (d->max_levels >= d->current_depth);
 }
 
 int
@@ -689,12 +689,12 @@ make_array(ErlNifEnv* env, ERL_NIF_TERM list)
 }
 
 int
-get_max_levels(ErlNifEnv* env, ERL_NIF_TERM val, unsigned int* max_levels_p)
+get_max_levels(ErlNifEnv* env, ERL_NIF_TERM val, int* max_levels_p)
 {
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
     const ERL_NIF_TERM* tuple;
     int arity;
-    unsigned int max_levels;
+    int max_levels;
 
     if(!enif_get_tuple(env, val, &arity, &tuple)) {
         return 0;
@@ -708,11 +708,11 @@ get_max_levels(ErlNifEnv* env, ERL_NIF_TERM val, unsigned int* max_levels_p)
         return 0;
     }
 
-    if(!enif_get_uint(env, tuple[1], &max_levels)) {
+    if(!enif_get_int(env, tuple[1], &max_levels)) {
         return 0;
     }
 
-    if(max_levels == 0) {
+    if(max_levels < 0) {
         return 0;
     }
 
@@ -1168,6 +1168,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 
 decode_done:
+    level_decrease(d, &val);
 
     if(d->i < bin.size && d->return_trailer) {
         trailer = enif_make_sub_binary(env, argv[0], d->i, bin.size - d->i);
