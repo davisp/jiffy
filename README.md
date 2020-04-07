@@ -97,6 +97,16 @@ The options for encode are:
 * `{bytes_per_red, N}` - Refer to the decode options
 * `{bytes_per_iter, N}` - Refer to the decode options
 
+`jiffy:validate/1,2`
+------------------
+
+* `jiffy:validate(IoData)`
+* `jiffy:validate(IoData, Options)`
+
+Performs a fast decode to validate the correct IoData, uses the same Options as
+`jiffy:decode/2` (although some may make no sense).
+Returns a boolean instead of an EJSON.
+
 Data Format
 -----------
 
@@ -138,11 +148,11 @@ Partial JSONs
 instead of some `json_value()`.
 
 These resources hold a `binary()` with the verified JSON data and can be used
-directly, or as a part of a larger ejson in `jiffy:encode/1,2`. These binaries
+directly, or as a part of a larger EJSON in `jiffy:encode/1,2`. These binaries
 won't be reencoded, instead, they will be placed directly in the result.
 
 However, using resources has some limitations: The resource is only valid in
 the node where it was created. If a resource is serialized and deserialized, or
-if it changes nodes back and forth, it will only be still valid if the original
-resource was not GC'd.
+if it changes nodes back and forth, it will only be still valid if the resource
+was not GC'd.
 
