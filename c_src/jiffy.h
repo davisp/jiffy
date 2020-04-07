@@ -44,7 +44,6 @@ typedef struct {
     ERL_NIF_TERM    atom_escape_forward_slashes;
     ERL_NIF_TERM    atom_dedupe_keys;
     ERL_NIF_TERM    atom_copy_strings;
-    ERL_NIF_TERM    atom_json;
     ERL_NIF_TERM    atom_max_levels;
 
     ERL_NIF_TERM    ref_object;
@@ -52,6 +51,7 @@ typedef struct {
 
     ErlNifResourceType* res_dec;
     ErlNifResourceType* res_enc;
+    ErlNifResourceType* res_wrapper;
 } jiffy_st;
 
 ERL_NIF_TERM make_atom(ErlNifEnv* env, const char* name);
@@ -69,9 +69,11 @@ ERL_NIF_TERM decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM wrap_binary(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 
 void dec_destroy(ErlNifEnv* env, void* obj);
 void enc_destroy(ErlNifEnv* env, void* obj);
+void wrapper_destroy(ErlNifEnv* env, void* obj);
 
 int make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
         int ret_map, int dedupe_keys);
@@ -86,5 +88,8 @@ int unicode_to_utf8(int c, unsigned char* buf);
 int unicode_from_pair(int hi, int lo);
 int unicode_uescape(int c, unsigned char* buf);
 int double_to_shortest(unsigned char *buf, size_t size, size_t* len, double val);
+
+ERL_NIF_TERM wrap_enif_make_sub_binary(ErlNifEnv* env, ERL_NIF_TERM bin_term, size_t pos, size_t size);
+int unwrap(ErlNifEnv* env, ERL_NIF_TERM wrapper_resource, ERL_NIF_TERM* bin_term_p);
 
 #endif // Included JIFFY_H
