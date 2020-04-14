@@ -68,7 +68,9 @@ defmodule Jiffy do
   """
   @spec encode!(any, opts :: :jiffy.encode_option()) :: {:ok, any()} | no_return()
   def encode!(data, opts \\ []) do
-    :jiffy.encode(data, @encode_options ++ opts)
+    data
+    |> :jiffy.encode(@encode_options ++ opts)
+    |> :erlang.iolist_to_binary()
   end
 
   @doc """
@@ -92,7 +94,7 @@ defmodule Jiffy do
       iex> Jiffy.decode("[1,2,3]")
       {:ok, [1, 2, 3]}
   """
-  @spec decode(String.t, opts :: :jiffy.decode_option()) :: {:ok, any()} | {:error, atom()}
+  @spec decode(String.t(), opts :: :jiffy.decode_option()) :: {:ok, any()} | {:error, atom()}
   def decode(data, opts \\ []) do
     {:ok, decode!(data, opts)}
   catch
@@ -109,7 +111,7 @@ defmodule Jiffy do
       iex> Jiffy.decode!("[1,2,3]")
       [1, 2, 3]
   """
-  @spec decode!(String.t, opts :: :jiffy.decode_option()) :: any() | no_return()
+  @spec decode!(String.t(), opts :: :jiffy.decode_option()) :: any() | no_return()
   def decode!(data, opts \\ []) do
     :jiffy.decode(data, @decode_options ++ opts)
   end
