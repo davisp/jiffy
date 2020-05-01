@@ -16,22 +16,24 @@
                     | json_string()
                     | json_number()
                     | json_object()
-                    | json_array()
-                    | json_raw().
+                    | json_array().
 
--type json_array()  :: [json_value()].
+-type json_array()  :: [json_value()] | json_raw().
 -type json_string() :: atom() | binary().
 -type json_number() :: integer() | float().
--type json_raw()    :: reference(). % Only when decoding with max_levels or encoding with partial
+%% json_raw() is only returned when using options 'partial' or 'max_levels'
+-opaque json_raw()  :: reference().
 
 -ifdef(JIFFY_NO_MAPS).
 
--type json_object() :: {[{json_string(),json_value()}]}.
+-type json_object() :: {[{json_string(),json_value()}]}
+                        | json_raw().
 
 -else.
 
 -type json_object() :: {[{json_string(),json_value()}]}
-                        | #{json_string() => json_value()}.
+                        | #{json_string() => json_value()}
+                        | json_raw().
 
 -endif.
 
@@ -60,7 +62,7 @@
 -type decode_options() :: [decode_option()].
 -type encode_options() :: [encode_option()].
 
--export_type([json_value/0, jiffy_decode_result/0]).
+-export_type([json_value/0, json_raw/0, jiffy_decode_result/0]).
 
 
 -spec decode(iolist() | binary()) -> jiffy_decode_result().
@@ -84,12 +86,12 @@ decode(Data, Opts) when is_list(Data) ->
     decode(iolist_to_binary(Data), Opts).
 
 
--spec encode(json_value()) -> iodata() | reference().
+-spec encode(json_value() | json_raw()) -> iodata() | json_raw().
 encode(Data) ->
     encode(Data, []).
 
 
--spec encode(json_value(), encode_options()) -> iodata() | reference().
+-spec encode(json_value() | json_raw(), encode_options()) -> iodata() | json_raw().
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
     ReturnPartial = lists:member(partial, Options),
