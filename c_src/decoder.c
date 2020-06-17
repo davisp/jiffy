@@ -208,7 +208,7 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     st = d->i;
 
     while(d->i < d->len) {
-        if(d->p[d->i] < 0x20) {
+        if((d->p[d->i] < 0x20) && (d->p[d->i] != 10) && (d->p[d->i] != 13)) {
             return 0;
         } else if(d->p[d->i] == '\"') {
             d->i++;
