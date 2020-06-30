@@ -17,7 +17,7 @@ check_binaries(Values) when is_list(Values) ->
 check_binaries(Bin) when is_binary(Bin) ->
     io:format("~s :: ~p ~p", [Bin, byte_size(Bin), binary:referenced_byte_size(Bin)]),
     byte_size(Bin) == binary:referenced_byte_size(Bin);
-check_binaries(Bin) ->
+check_binaries(_Bin) ->
     true.
 
 

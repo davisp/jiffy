@@ -1,6 +1,9 @@
 % This file is part of Jiffy released under the MIT license.
 % See the LICENSE file for more information.
 
+-compile(export_all).
+-compile(nowarn_export_all).
+
 msg(Fmt, Args) ->
     M1 = io_lib:format(Fmt, Args),
     M2 = re:replace(M1, <<"\r">>, <<"\\\\r">>, [global]),
