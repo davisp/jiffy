@@ -22,7 +22,7 @@
 -type json_string() :: atom() | binary().
 -type json_number() :: integer() | float().
 %% json_raw() is only returned when using options 'partial' or 'max_levels'
--opaque json_raw()  :: reference().
+-type json_raw()  :: reference().
 
 -ifdef(JIFFY_NO_MAPS).
 
