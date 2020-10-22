@@ -80,7 +80,7 @@ get_bytes_per_red(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
         return 0;
     }
 
-    if(enif_compare(tuple[0], st->atom_bytes_per_iter) != 0) {
+    if(enif_compare(tuple[0], st->atom_bytes_per_red) != 0) {
         return 0;
     }
 
