@@ -26,6 +26,10 @@ eunit:
 check: build eunit
 
 
+release:
+	rebar3 hex publish
+
+
 %.beam: %.erl
 	erlc -o test/ $<
 
