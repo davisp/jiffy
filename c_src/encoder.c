@@ -683,6 +683,8 @@ encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             continue;
         } else if(get_bytes_per_red(env, val, &(e->bytes_per_red))) {
             continue;
+        } else if(enif_is_identical(val, e->atoms->atom_partial)) {
+            // Ignore, handled in Erlang
         } else {
             return enif_make_badarg(env);
         }
@@ -923,6 +925,11 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             termstack_push(&stack, curr);
             termstack_push(&stack, e->atoms->ref_array);
             termstack_push(&stack, item);
+        } else if(unwrap(env, curr, &item)) {
+            if(!enc_unknown(e, item)) {
+                ret = enc_error(e, "internal_error");
+                goto done;
+            }
         } else {
             if(!enc_unknown(e, curr)) {
                 ret = enc_error(e, "internal_error");
