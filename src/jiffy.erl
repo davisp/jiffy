@@ -136,6 +136,8 @@ finish_decode({Pairs}) when is_list(Pairs) ->
     finish_decode_obj(Pairs, []);
 finish_decode(Vals) when is_list(Vals) ->
     finish_decode_arr(Vals, []);
+finish_decode({has_trailer, Value, Rest}) ->
+    {has_trailer, maybe_map(finish_decode(Value)), Rest};
 finish_decode(Val) ->
     maybe_map(Val).
 
