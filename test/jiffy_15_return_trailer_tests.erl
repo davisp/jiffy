@@ -18,6 +18,7 @@ trailer_test_() ->
         ?_assertEqual(Result, jiffy:decode(Data, Opts))
     end, Cases)}.
 
+-ifndef(JIFFY_NO_MAPS).
 
 trailer_bignum_test() ->
     Opts = [return_maps, return_trailer],
@@ -25,3 +26,5 @@ trailer_bignum_test() ->
     Obj = #{<<"amount">> => -50000000000000000000},
     Expect = {has_trailer, Obj, <<"{}">>},
     ?assertEqual(Expect, jiffy:decode(Data, Opts)).
+
+-endif.
