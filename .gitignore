@@ -7,6 +7,10 @@
 *.d
 *.o
 *.so
+*.pdb
+*.dll
+*.exp
+*.lib
 _build
 compile_commands.json
 deps
