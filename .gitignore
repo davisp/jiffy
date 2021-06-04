@@ -7,6 +7,7 @@
 *.d
 *.o
 *.so
+bin
 _build
 compile_commands.json
 deps

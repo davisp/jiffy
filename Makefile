@@ -1,4 +1,4 @@
-REBAR?=./rebar
+REBAR?=bin/rebar
 
 
 all: build
@@ -16,6 +16,11 @@ distclean: clean
 
 
 build:
+ifeq ($(OS),Windows_NT)
+	./configure.bat
+else
+	./configure
+endif
 	$(REBAR) compile
 
 
