@@ -16,11 +16,6 @@ distclean: clean
 
 
 build:
-ifeq ($(OS),Windows_NT)
-	./configure.ps1
-else
-	./configure
-endif
 	$(REBAR) compile
 
 
