@@ -17,7 +17,7 @@ distclean: clean
 
 build:
 ifeq ($(OS),Windows_NT)
-	./configure.bat
+	./configure.ps1
 else
 	./configure
 endif
