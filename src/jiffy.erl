@@ -56,8 +56,8 @@
 -type decode_options() :: [decode_option()].
 -type encode_options() :: [encode_option()].
 
+-export_type([decode_options/0, encode_options/0]).
 -export_type([json_value/0, jiffy_decode_result/0]).
-
 
 -spec decode(iolist() | binary()) -> jiffy_decode_result().
 decode(Data) ->
