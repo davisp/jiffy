@@ -1,5 +1,5 @@
 REBAR?=./rebar
-
+ENC?=./enc
 
 all: build
 

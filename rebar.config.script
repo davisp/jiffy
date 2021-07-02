@@ -17,7 +17,7 @@ Config1 = case lists:keyfind(erl_opts, 1, CONFIG) of
         CONFIG ++ [{erl_opts, ErlOpts}]
 end,
 
-case os:type() of
+Config2 = case os:type() of
     {unix, _} ->
         CC = case os:getenv("CC") of
             false -> "cc";
@@ -36,4 +36,14 @@ case os:type() of
         end;
     _ ->
         Config1
+end,
+
+case os:getenv("ENC") of
+    false ->
+        Config2;
+    ENC ->
+        PreHook = {pre_hooks, [{"", compile, "escript " ++ ENC ++ " compile"}]},
+        PostHook = {post_hooks, [{"", clean, "escript " ++ ENC ++ " compile"}]},
+        Config3 = lists:keyreplace(post_hooks, 1, Config2, PostHook),
+        lists:keyreplace(pre_hooks, 1, Config3, PreHook)
 end.
