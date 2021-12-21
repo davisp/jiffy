@@ -77,7 +77,7 @@ loose_decode(Bin, O, Acc) ->
         <<_:O/binary, _:8/integer, R/binary>> ->
             % Broken lead or continuation byte. Discard first
             % byte and all broken continuations. Replace the
-            % whole mess with a replacment code point.
+            % whole mess with a replacement code point.
             T = 1 + count_continuation_bytes(R, 0),
             loose_decode(Bin, O+T, [16#FFFD | Acc])
     end.
