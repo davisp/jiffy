@@ -2,6 +2,7 @@
 .rebar
 .tool-versions
 .jiffy.dev
+.jiffy-compile-check
 *.app
 *.beam
 *.d

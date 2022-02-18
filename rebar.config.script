@@ -17,7 +17,7 @@ Config1 = case lists:keyfind(erl_opts, 1, CONFIG) of
         CONFIG ++ [{erl_opts, ErlOpts}]
 end,
 
-case os:type() of
+Config2 = case os:type() of
     {unix, _} ->
         CC = case os:getenv("CC") of
             false -> "cc";
@@ -36,4 +36,21 @@ case os:type() of
         end;
     _ ->
         Config1
+end,
+
+IsRebar3 = code:which(rebar3) /= non_existing,
+case IsRebar3 of
+    false ->
+        Config2;
+    true ->
+        Config2 ++ [
+            {plugins, [{pc, "~> 1.0"}]},
+            {artifacts, ["priv/jiffy.so"]},
+            {provider_hooks, [
+                {post, [
+                    {compile, {pc, compile}},
+                    {clean, {pc, clean}}
+                ]}
+            ]}
+        ]
 end.
