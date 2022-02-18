@@ -17,7 +17,7 @@ Config1 = case lists:keyfind(erl_opts, 1, CONFIG) of
         CONFIG ++ [{erl_opts, ErlOpts}]
 end,
 
-case os:type() of
+Config2 = case os:type() of
     {unix, _} ->
         CC = case os:getenv("CC") of
             false -> "cc";
@@ -36,4 +36,32 @@ case os:type() of
         end;
     _ ->
         Config1
+end,
+
+IsRebar3 = code:which(rebar3) /= non_existing,
+OTPRel = erlang:system_info(otp_release),
+OTPVsn = case re:run(OTPRel, "R?(\\d+)", [{capture, all_but_first, list}]) of
+    {match, [V]} -> list_to_integer(V);
+    nomatch -> erlang:error(unknown_otp_release)
+end,
+
+case OTPVsn < 25 of
+    true ->
+        Config2;
+    false when IsRebar3 ->
+        Config3 = lists:keydelete(pre_hooks, 1, Config2),
+        Config4 = lists:keydelete(post_hooks, 1, Config3),
+        Config4 ++ [
+            {plugins, [{pc, "~> 1.0"}]},
+            {artifacts, ["priv/jiffy.so"]},
+            {provider_hooks, [
+                {post, [
+                    {compile, {pc, compile}},
+                    {clean, {pc, clean}}
+                ]}
+            ]}
+        ];
+    false ->
+        io:format("Rebar 2 is no longer supported as of Erlang 25.0~n", []),
+        halt(1)
 end.
