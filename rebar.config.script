@@ -45,13 +45,16 @@ OTPVsn = case re:run(OTPRel, "R?(\\d+)", [{capture, all_but_first, list}]) of
     nomatch -> erlang:error(unknown_otp_release)
 end,
 
-case OTPVsn < 25 of
-    true ->
+case {IsRebar3, OTPVsn} of
+    {false, _} ->
         Config2;
-    false when IsRebar3 ->
-        Config3 = lists:keydelete(pre_hooks, 1, Config2),
-        Config4 = lists:keydelete(post_hooks, 1, Config3),
-        Config4 ++ [
+    {true, Vsn} when Vsn < 25 ->
+        Config2 ++ [
+            {pre_hooks, [{"", compile, "escript enc compile"}]},
+            {post_hooks, [{"", clean, "escript enc clean"}]}
+        ];
+    {true, Vsn} when Vsn >= 25 ->
+        Config2 ++ [
             {plugins, [{pc, "~> 1.0"}]},
             {artifacts, ["priv/jiffy.so"]},
             {provider_hooks, [
@@ -60,8 +63,5 @@ case OTPVsn < 25 of
                     {clean, {pc, clean}}
                 ]}
             ]}
-        ];
-    false ->
-        io:format("Rebar 2 is no longer supported as of Erlang 25.0~n", []),
-        halt(1)
+        ]
 end.
