@@ -39,21 +39,10 @@ Config2 = case os:type() of
 end,
 
 IsRebar3 = code:which(rebar3) /= non_existing,
-OTPRel = erlang:system_info(otp_release),
-OTPVsn = case re:run(OTPRel, "R?(\\d+)", [{capture, all_but_first, list}]) of
-    {match, [V]} -> list_to_integer(V);
-    nomatch -> erlang:error(unknown_otp_release)
-end,
-
-case {IsRebar3, OTPVsn} of
-    {false, _} ->
+case IsRebar3 of
+    false ->
         Config2;
-    {true, Vsn} when Vsn < 25 ->
-        Config2 ++ [
-            {pre_hooks, [{"", compile, "escript enc compile"}]},
-            {post_hooks, [{"", clean, "escript enc clean"}]}
-        ];
-    {true, Vsn} when Vsn >= 25 ->
+    true ->
         Config2 ++ [
             {plugins, [{pc, "~> 1.0"}]},
             {artifacts, ["priv/jiffy.so"]},
