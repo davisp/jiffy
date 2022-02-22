@@ -1,4 +1,4 @@
-REBAR?=./rebar
+REBAR?=rebar3
 
 
 all: build

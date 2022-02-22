@@ -11,7 +11,6 @@
         "Makefile",
         "README.md",
         "c_src",
-        "enc",
         "plugins",
         "rebar.config",
         "rebar.config.script",
