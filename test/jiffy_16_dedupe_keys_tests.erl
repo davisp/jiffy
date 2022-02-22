@@ -38,7 +38,7 @@ dedupe_keys_test_() ->
             {[{<<"foo">>, {[{<<"bar">>, 1}, {<<"bar">>, 2}]}}]},
             {[{<<"foo">>, {[{<<"bar">>, 2}]}}]}
         },
-        % Objets in arrays are handled
+        % Objects in arrays are handled
         {
             [{[{<<"foo">>, 1}, {<<"foo">>, 2}]}],
             [{[{<<"foo">>, 2}]}]
