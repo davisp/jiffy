@@ -39,7 +39,8 @@ Config2 = case os:type() of
 end,
 
 IsRebar3 = code:which(rebar3) /= non_existing,
-case IsRebar3 of
+IsMix = lists:keymember(mix, 1, application:loaded_applications()),
+case IsRebar3 or IsMix of
     false ->
         Config2;
     true ->
