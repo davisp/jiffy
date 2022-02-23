@@ -38,11 +38,20 @@ Config2 = case os:type() of
         Config1
 end,
 
-IsRebar3 = code:which(rebar3) /= non_existing,
-case IsRebar3 of
+IsRebar2 = case lists:keyfind(rebar, 1, application:loaded_applications()) of
+    {rebar, _Desc, Vsn} ->
+        case string:split(Vsn, ".") of
+            ["2" | _] -> true;
+            _ -> false
+        end;
     false ->
-        Config2;
+        false
+end,
+
+case IsRebar2 of
     true ->
+        Config2;
+    false ->
         Config2 ++ [
             {plugins, [{pc, "~> 1.0"}]},
             {artifacts, ["priv/jiffy.so"]},
