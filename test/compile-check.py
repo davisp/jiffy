@@ -43,6 +43,14 @@ JTAPP2_URL = "https://github.com/davisp/jtapp2"
 REBAR2_URL = "https://github.com/rebar/rebar"
 REBAR3_URL = "https://github.com/erlang/rebar3"
 
+# Prevent rebar3 from reading any global configuration. The need
+# for setting HOME instead of REBAR3_* variables is because the
+# plugin cache can't be set via environment so we just use a
+# hammer and set a fake HOME.
+os.environ["ASDF_CONFIG_FILE"] = os.path.expanduser("~/.asdfrc")
+os.environ["ASDF_DATA_DIR"] = os.path.expanduser("~/.asdf")
+os.environ["HOME"] = "./hopefully-not-a-directory"
+
 
 def init_test_dir():
     if not os.path.exists(TEST_DIR):
