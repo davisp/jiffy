@@ -52,6 +52,16 @@ The options for decode are:
   will ensure that the parsed object only contains a single entry
   containing the last value seen. This mirrors the parsing beahvior
   of virtually every other JSON parser.
+* `{labels, Label}` - Controls if keys are returned as atoms. `Label`
+  accepts the following options:
+  * `binary` - the default, return all keys as binaries.
+  * `atom` - convert all keys to atoms. Use with caution, this can exhaust the atom space.
+	Creating atoms from a NIF with UTF-8 characters is only supported since OTP-26.
+	Attempting to decode JSON that has non 7bit ASCII will result in atoms with weird content
+	when the NIF has been compiled for an older OTP releases.
+  * `existing_atom` - convert keys to atoms, the atoms must exists or the decode will fail.
+  * `attempt_atom` - try to convert keys to existing atoms,
+	return key as binary if the atom does not exist.
 * `copy_strings` - Normally, when strings are decoded, they are
   created as sub-binaries of the input data. With some workloads, this
   leads to an undesirable bloating of memory: Strings in the decode
@@ -91,8 +101,8 @@ The options for encode are:
 Data Format
 -----------
 
-    Erlang                          JSON            Erlang
-    ==========================================================================
+    Erlang                          JSON            Erlang                           Notes
+    ======================================================================================
 
     null                       -> null           -> null
     true                       -> true           -> true
@@ -107,11 +117,17 @@ Data Format
     {[]}                       -> {}             -> {[]}
     {[{foo, bar}]}             -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
     {[{<<"foo">>, <<"bar">>}]} -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
-    #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{<<"foo">> => <<"bar">>}
+    #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{<<"foo">> => <<"bar">>}          (1)
+    {[{<<"foo">>, <<"bar">>}]} -> {"foo": "bar"} -> {[{foo, <<"bar">>}]}               (2)
+    #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{foo => <<"bar">>}             (1, 2)
 
-N.B. The last entry in this table is only valid for VM's that support
-the `maps` data type (i.e., 17.0 and newer) and client code must pass
-the `return_maps` option to `jiffy:decode/2`.
+Note 1: This entry is only valid for VM's that support the `maps` data type
+        (i.e., 17.0 and newer) and client code must pass the `return_maps`
+        option to `jiffy:decode/2`.
+
+Note 2: This entry is only valid if the atom existed before and the client code must
+        pass the `{labels, attempt_atom}` option to `jiffy:decode/2`.
+
 
 Improvements over EEP0018
 -------------------------

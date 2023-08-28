@@ -55,6 +55,7 @@ typedef struct {
     int             return_trailer;
     int             dedupe_keys;
     int             copy_strings;
+    js_labels       labels;
     ERL_NIF_TERM    null_term;
 
     unsigned char*  p;
@@ -85,6 +86,7 @@ dec_new(ErlNifEnv* env)
     d->return_trailer = 0;
     d->dedupe_keys = 0;
     d->copy_strings = 0;
+    d->labels = jsl_binary;
     d->null_term = d->atoms->atom_null;
 
     d->p = NULL;
@@ -651,6 +653,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM tmp_argv[5];
     ERL_NIF_TERM opts;
     ERL_NIF_TERM val;
+    const ERL_NIF_TERM *tuple;
+    int arity;
 
     if(argc != 2) {
         return enif_make_badarg(env);
@@ -695,6 +699,20 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             d->null_term = d->atoms->atom_nil;
         } else if(get_null_term(env, val, &(d->null_term))) {
             continue;
+        } else if(enif_get_tuple(env, val, &arity, &tuple)
+                  && arity == 2
+                  && enif_is_identical(tuple[0], d->atoms->atom_labels)) {
+            if (enif_is_identical(tuple[1], d->atoms->atom_binary)) {
+                d->labels = jsl_binary;
+            } else if (enif_is_identical(tuple[1], d->atoms->atom_atom)) {
+                d->labels = jsl_atom;
+            } else if (enif_is_identical(tuple[1], d->atoms->atom_existing_atom)) {
+                d->labels = jsl_existing_atom;
+            } else if (enif_is_identical(tuple[1], d->atoms->atom_attempt_atom)) {
+                d->labels = jsl_attempt_atom;
+            } else {
+                return enif_make_badarg(env);
+            }
         } else {
             return enif_make_badarg(env);
         }
@@ -980,7 +998,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         }
                         dec_pop_assert(d, st_value);
                         if(!make_object(env, curr, &val,
-                                d->return_maps, d->dedupe_keys)) {
+                                d->return_maps, d->dedupe_keys, d->labels)) {
                             ret = dec_error(d, "internal_object_error");
                             goto done;
                         }

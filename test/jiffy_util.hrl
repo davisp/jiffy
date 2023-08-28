@@ -45,3 +45,7 @@ cases_path(Suffix) ->
     end,
     Path = "test/cases",
     filename:join([Prefix, Path, Suffix]).
+
+mk_key() ->
+    erlang:iolist_to_binary(
+      [<<"key-">>, erlang:integer_to_binary(erlang:unique_integer([positive]))]).
