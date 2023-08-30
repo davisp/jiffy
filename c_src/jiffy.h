@@ -97,4 +97,9 @@ int unicode_from_pair(int hi, int lo);
 int unicode_uescape(int c, unsigned char* buf);
 int double_to_shortest(unsigned char *buf, size_t size, size_t* len, double val);
 
+#if (ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION < 17)
+/* ERL_NIF_UTF8 was introduce in OTP-26, fall back to LATIN1 for older versions */
+#define ERL_NIF_UTF8 ERL_NIF_LATIN1
+#endif
+
 #endif // Included JIFFY_H

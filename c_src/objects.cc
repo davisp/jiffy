@@ -19,18 +19,17 @@ BEGIN_C
 
 #include "jiffy.h"
 
-# if (ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION < 17)
+#if (ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION < 17)
 
-/* ERL_NIF_UTF8 and enif_make_new_atom where introduce in OTP-26 */
+/* enif_make_new_atom was introduce in OTP-26 */
 
-#define ERL_NIF_UTF8 ERL_NIF_LATIN1
-
-int enif_make_new_atom_len(ErlNifEnv *env, const char *name, size_t len,
-                           ERL_NIF_TERM *atom, ErlNifCharEncoding encoding)
+static int enif_make_new_atom_len(ErlNifEnv *env, const char *name, size_t len,
+                                  ERL_NIF_TERM *atom, ErlNifCharEncoding encoding)
 {
     *atom = enif_make_atom_len(env, name, len);
     return !enif_is_exception(env, *atom);
 }
+
 #endif
 
 static int

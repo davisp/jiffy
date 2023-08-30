@@ -257,20 +257,13 @@ enc_special_character(Encoder* e, int val) {
     }
 }
 
+#if (ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION < 17)
+
 static int
-enc_atom(Encoder* e, ERL_NIF_TERM val)
+enc_latin1(Encoder* e, unsigned char *data, size_t size)
 {
     static const int MAX_ESCAPE_LEN = 12;
-    unsigned char data[512];
-
-    size_t size;
     int i;
-
-    if(!enif_get_atom(e->env, val, (char*)data, 512, ERL_NIF_LATIN1)) {
-        return 0;
-    }
-
-    size = strlen((const char*)data);
 
     /* Reserve space for the first quotation mark and most of the output. */
     if(!enc_ensure(e, size + MAX_ESCAPE_LEN + 1)) {
@@ -311,27 +304,20 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
     e->count++;
 
     return 1;
+
 }
 
+#endif
+
 static int
-enc_string(Encoder* e, ERL_NIF_TERM val)
+enc_utf8(Encoder* e, unsigned char *data, size_t size)
 {
     static const int MAX_ESCAPE_LEN = 12;
-    ErlNifBinary bin;
-
-    unsigned char* data;
-    size_t size;
     int esc_len;
     int ulen;
     int uval;
     int i;
 
-    if(!enif_inspect_binary(e->env, val, &bin)) {
-        return 0;
-    }
-
-    data = bin.data;
-    size = bin.size;
 
     /* Reserve space for the first quotation mark and most of the output. */
     if(!enc_ensure(e, size + MAX_ESCAPE_LEN + 1)) {
@@ -384,6 +370,42 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
     e->count++;
 
     return 1;
+}
+
+static int
+enc_atom(Encoder* e, ERL_NIF_TERM val)
+{
+    unsigned char data[1024];
+
+#if (ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION < 17)
+
+    if(!enif_get_atom(e->env, val, (char*)data, sizeof(data), ERL_NIF_LATIN1)) {
+        return 0;
+    }
+
+    return enc_latin1(e, data, strlen((const char*)data));
+
+#else
+
+    if(!enif_get_atom(e->env, val, (char*)data, sizeof(data), ERL_NIF_UTF8)) {
+        return 0;
+    }
+
+    return enc_utf8(e, data, strlen((const char*)data));
+
+#endif
+}
+
+static int
+enc_string(Encoder* e, ERL_NIF_TERM val)
+{
+    ErlNifBinary bin;
+
+    if(!enif_inspect_binary(e->env, val, &bin)) {
+        return 0;
+    }
+
+    return enc_utf8(e, bin.data, bin.size);
 }
 
 static inline int
