@@ -35,6 +35,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_escape_forward_slashes = make_atom(env, "escape_forward_slashes");
     st->atom_dedupe_keys = make_atom(env, "dedupe_keys");
     st->atom_copy_strings = make_atom(env, "copy_strings");
+    st->atom_max_levels = make_atom(env, "max_levels");
 
     // Markers used in encoding
     st->ref_object = make_atom(env, "$object_ref$");
@@ -54,6 +55,15 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
             NULL,
             "encoder",
             enc_destroy,
+            ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER,
+            NULL
+        );
+
+    st->res_wrapper = enif_open_resource_type(
+            env,
+            NULL,
+            "wrapper",
+            wrapper_destroy,
             ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER,
             NULL
         );
@@ -87,7 +97,8 @@ static ErlNifFunc funcs[] =
     {"nif_decode_init", 2, decode_init},
     {"nif_decode_iter", 5, decode_iter},
     {"nif_encode_init", 2, encode_init},
-    {"nif_encode_iter", 3, encode_iter}
+    {"nif_encode_iter", 3, encode_iter},
+    {"nif_wrap_binary", 1, wrap_binary}
 };
 
 ERL_NIF_INIT(jiffy, funcs, &load, &reload, &upgrade, &unload);

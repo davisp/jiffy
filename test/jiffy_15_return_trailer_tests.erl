@@ -15,7 +15,11 @@ trailer_test_() ->
         {<<"1 2 3">>, {has_trailer, 1, <<"2 3">>}}
     ],
     {"Test return_trailer", lists:map(fun({Data, Result}) ->
-        ?_assertEqual(Result, jiffy:decode(Data, Opts))
+        ValidateResult = if is_tuple(Result) -> setelement(2, Result, true);
+                            true -> Result
+                         end,
+        [?_assertEqual(ValidateResult, jiffy:validate(Data, Opts)),
+         ?_assertEqual(Result, jiffy:decode(Data, Opts))]
     end, Cases)}.
 
 -ifndef(JIFFY_NO_MAPS).

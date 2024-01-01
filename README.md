@@ -59,6 +59,10 @@ The options for decode are:
   this option will instead allocate new binaries for each string, so
   the original JSON document can be garbage collected even though
   the decode result is still in use.
+* `{max_levels, N}` where N &gt;= 0 - This controls when to stop decoding
+  by depth, after N levels are decoded, the rest is returned as a
+  `Resource::reference()`. Resources have some limitations, check [partial jsons
+  section](#partial-jsons).
 * `{bytes_per_red, N}` where N &gt;= 0 - This controls the number of
   bytes that Jiffy will process as an equivalent to a reduction. Each
   20 reductions we consume 1% of our allocated time slice for the current
@@ -85,8 +89,23 @@ The options for encode are:
 * `use_nil` - Encodes the atom `nil` as `null`.
 * `escape_forward_slashes` - Escapes the `/` character which can be
   useful when encoding URLs in some cases.
+* `partial` - Instead of returning an `iodata()`, returns a
+  `Resource::reference()` which holds the verified raw json. This resource can be used
+  as a block to build more complex jsons, without the need to encode these
+  blocks again. Resources have some limitations, check [partial jsons
+  section](#partial-jsons).
 * `{bytes_per_red, N}` - Refer to the decode options
 * `{bytes_per_iter, N}` - Refer to the decode options
+
+`jiffy:validate/1,2`
+------------------
+
+* `jiffy:validate(IoData)`
+* `jiffy:validate(IoData, Options)`
+
+Performs a fast decode to validate the correct IoData, uses the same Options as
+`jiffy:decode/2` (although some may make no sense).
+Returns a boolean instead of an EJSON.
 
 Data Format
 -----------
@@ -119,4 +138,21 @@ Improvements over EEP0018
 Jiffy should be in all ways an improvement over EEP0018. It no longer
 imposes limits on the nesting depth. It is capable of encoding and
 decoding large numbers and it does quite a bit more validation of UTF-8 in strings.
+
+Partial JSONs
+-------------------------
+
+`jiffy:encode/2` with option `partial` returns a `Resource::reference()`.
+
+`jiffy:decode/2` with option `max_levels` may place a `Resource::reference()`
+instead of some `json_value()`.
+
+These resources hold a `binary()` with the verified JSON data and can be used
+directly, or as a part of a larger EJSON in `jiffy:encode/1,2`. These binaries
+won't be reencoded, instead, they will be placed directly in the result.
+
+However, using resources has some limitations: The resource is only valid in
+the node where it was created. If a resource is serialized and deserialized, or
+if it changes nodes back and forth, it will only be still valid if the resource
+was not GC'd.
 

@@ -2,7 +2,7 @@
 % See the LICENSE file for more information.
 
 -module(jiffy).
--export([decode/1, decode/2, encode/1, encode/2]).
+-export([decode/1, decode/2, encode/1, encode/2, validate/1, validate/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
 -compile([no_native]).
@@ -18,18 +18,22 @@
                     | json_object()
                     | json_array().
 
--type json_array()  :: [json_value()].
+-type json_array()  :: [json_value()] | json_raw().
 -type json_string() :: atom() | binary().
 -type json_number() :: integer() | float().
+%% json_raw() is only returned when using options 'partial' or 'max_levels'
+-type json_raw()  :: reference().
 
 -ifdef(JIFFY_NO_MAPS).
 
--type json_object() :: {[{json_string(),json_value()}]}.
+-type json_object() :: {[{json_string(),json_value()}]}
+                        | json_raw().
 
 -else.
 
 -type json_object() :: {[{json_string(),json_value()}]}
-                        | #{json_string() => json_value()}.
+                        | #{json_string() => json_value()}
+                        | json_raw().
 
 -endif.
 
@@ -42,6 +46,7 @@
                         | dedupe_keys
                         | copy_strings
                         | {null_term, any()}
+                        | {max_levels, non_neg_integer()}
                         | {bytes_per_iter, non_neg_integer()}
                         | {bytes_per_red, non_neg_integer()}.
 
@@ -50,13 +55,14 @@
                         | force_utf8
                         | use_nil
                         | escape_forward_slashes
+                        | partial
                         | {bytes_per_iter, non_neg_integer()}
                         | {bytes_per_red, non_neg_integer()}.
 
 -type decode_options() :: [decode_option()].
 -type encode_options() :: [encode_option()].
 
--export_type([json_value/0, jiffy_decode_result/0]).
+-export_type([json_value/0, json_raw/0, jiffy_decode_result/0]).
 
 
 -spec decode(iolist() | binary()) -> jiffy_decode_result().
@@ -80,14 +86,15 @@ decode(Data, Opts) when is_list(Data) ->
     decode(iolist_to_binary(Data), Opts).
 
 
--spec encode(json_value()) -> iodata().
+-spec encode(json_value() | json_raw()) -> iodata() | json_raw().
 encode(Data) ->
     encode(Data, []).
 
 
--spec encode(json_value(), encode_options()) -> iodata().
+-spec encode(json_value() | json_raw(), encode_options()) -> iodata() | json_raw().
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
+    ReturnPartial = lists:member(partial, Options),
     case nif_encode_init(Data, Options) of
         {error, {invalid_string, _}} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
@@ -98,14 +105,32 @@ encode(Data, Options) ->
         {error, Error} ->
             error(Error);
         {partial, IOData} ->
-            finish_encode(IOData, []);
+            finish_encode(IOData, [], ReturnPartial);
         {iter, {Encoder, Stack, IOBuf}} ->
             encode_loop(Data, Options, Encoder, Stack, IOBuf);
-        [Bin] when is_binary(Bin) ->
+        [Bin] when is_binary(Bin), not ReturnPartial ->
             Bin;
+        RevIOData when is_list(RevIOData), not ReturnPartial ->
+            lists:reverse(RevIOData);
         RevIOData when is_list(RevIOData) ->
-            lists:reverse(RevIOData)
+            nif_wrap_binary(iolist_to_binary(lists:reverse(RevIOData)))
     end.
+
+
+-spec validate(iolist() | binary()) -> boolean() | {has_trailer, true, binary()}.
+validate(Data) ->
+    validate(Data, []).
+
+
+-spec validate(iolist() | binary(), decode_options()) -> boolean() | {has_trailer, true, binary()}.
+validate(Data, Opts) when is_binary(Data), is_list(Opts) ->
+    try decode(Data, lists:keystore(max_levels, 1, Opts, {max_levels, 0})) of
+        {has_trailer, _FlatEJson, Trailer} -> {has_trailer, true, Trailer};
+        _FlatEJson -> true
+    catch _:_ -> false
+    end;
+validate(Data, Opts) when is_list(Data) ->
+    validate(iolist_to_binary(Data), Opts).
 
 
 finish_decode({bignum, Value}) ->
@@ -165,18 +190,22 @@ finish_decode_arr([V | Vals], Acc) ->
     finish_decode_arr(Vals, [finish_decode(V) | Acc]).
 
 
-finish_encode([], Acc) ->
+finish_encode([], Acc, false) ->
     %% No reverse! The NIF returned us
     %% the pieces in reverse order.
     Acc;
-finish_encode([<<_/binary>>=B | Rest], Acc) ->
-    finish_encode(Rest, [B | Acc]);
-finish_encode([Val | Rest], Acc) when is_integer(Val) ->
+finish_encode([], Acc, true) ->
+    %% No reverse! The NIF returned us
+    %% the pieces in reverse order.
+    nif_wrap_binary(iolist_to_binary(Acc));
+finish_encode([<<_/binary>>=B | Rest], Acc, ReturnPartial) ->
+    finish_encode(Rest, [B | Acc], ReturnPartial);
+finish_encode([Val | Rest], Acc, ReturnPartial) when is_integer(Val) ->
     Bin = list_to_binary(integer_to_list(Val)),
-    finish_encode(Rest, [Bin | Acc]);
-finish_encode([InvalidEjson | _], _) ->
+    finish_encode(Rest, [Bin | Acc], ReturnPartial);
+finish_encode([InvalidEjson | _], _, _) ->
     error({invalid_ejson, InvalidEjson});
-finish_encode(_, _) ->
+finish_encode(_, _, _) ->
     error(invalid_ejson).
 
 
@@ -207,6 +236,7 @@ decode_loop(Data, Decoder, Val, Objs, Curr) ->
 
 encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
     ForceUTF8 = lists:member(force_utf8, Options),
+    ReturnPartial = lists:member(partial, Options),
     case nif_encode_iter(Encoder, Stack, IOBuf) of
         {error, {invalid_string, _}} when ForceUTF8 == true ->
             FixedData = jiffy_utf8:fix(Data),
@@ -217,13 +247,15 @@ encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
         {error, Error} ->
             error(Error);
         {partial, IOData} ->
-            finish_encode(IOData, []);
+            finish_encode(IOData, [], ReturnPartial);
         {iter, {NewEncoder, NewStack, NewIOBuf}} ->
             encode_loop(Data, Options, NewEncoder, NewStack, NewIOBuf);
-        [Bin] when is_binary(Bin) ->
+        [Bin] when is_binary(Bin), not ReturnPartial ->
             Bin;
+        RevIOData when is_list(RevIOData), not ReturnPartial ->
+            lists:reverse(RevIOData);
         RevIOData when is_list(RevIOData) ->
-            lists:reverse(RevIOData)
+            nif_wrap_binary(iolist_to_binary(lists:reverse(RevIOData)))
     end.
 
 
@@ -240,4 +272,7 @@ nif_encode_init(_Data, _Options) ->
     ?NOT_LOADED.
 
 nif_encode_iter(_Encoder, _Stack, _IoList) ->
+    ?NOT_LOADED.
+
+nif_wrap_binary(_BinData) ->
     ?NOT_LOADED.
