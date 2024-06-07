@@ -36,8 +36,8 @@ gen(error, J) ->
 gen(floats, F) ->
     NegF = -1.0 * F,
     {msg("float round trip - ~p", [F]), [
-        {"Pos", ?_assertEqual(F, dec(enc(F)))},
-        {"Neg", ?_assertEqual(NegF, dec(enc(NegF)))}
+        {"Pos", ?_assert(F == dec(enc(F)))},
+        {"Neg", ?_assert(NegF == dec(enc(NegF)))}
     ]}.
 
 

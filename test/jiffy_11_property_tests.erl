@@ -21,20 +21,9 @@ property_test_() ->
         run(prop_dec_trailer),
         run(prop_enc_no_crash),
         run(prop_dec_no_crash_bin),
-        run(prop_dec_no_crash_any)
-    ] ++ map_props().
-
-
--ifndef(JIFFY_NO_MAPS).
-map_props() ->
-    [
+        run(prop_dec_no_crash_any),
         run(prop_map_enc_dec)
     ].
--else.
-map_props() ->
-    [].
--endif.
-
 
 prop_enc_dec() ->
     ?FORALL(Data, json(), begin
@@ -63,7 +52,6 @@ prop_enc_dec_pretty() ->
     ).
 
 
--ifndef(JIFFY_NO_MAPS).
 prop_map_enc_dec() ->
     ?FORALL(Data, json(),
         begin
@@ -71,7 +59,6 @@ prop_map_enc_dec() ->
             MapData == jiffy:decode(jiffy:encode(MapData), [return_maps])
         end
     ).
--endif.
 
 
 prop_enc_no_crash() ->
@@ -115,7 +102,6 @@ run(Name) ->
     ]}.
 
 
--ifndef(JIFFY_NO_MAPS).
 to_map_ejson({Props}) ->
     NewProps = [{K, to_map_ejson(V)} || {K, V} <- Props],
     maps:from_list(NewProps);
@@ -123,7 +109,6 @@ to_map_ejson(Vals) when is_list(Vals) ->
     [to_map_ejson(V) || V <- Vals];
 to_map_ejson(Val) ->
     Val.
--endif.
 
 
 % Random any term generation

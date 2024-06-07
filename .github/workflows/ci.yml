@@ -1,0 +1,86 @@
+name: ci
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  linux:
+    name: ${{matrix.os}}-${{matrix.otp_version}}-${{matrix.rebar}}
+    runs-on: ${{matrix.os}}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        otp_version: [20,23,26,27]
+        os: [ubuntu-latest]
+        rebar: [rebar, rebar3]
+
+    container:
+      image: erlang:${{matrix.otp_version}}
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: ${{matrix.rebar}} make check
+      run: |
+        make REBAR=${{matrix.rebar}} check
+
+  macos:
+    name: macos
+    runs-on: ${{matrix.os}}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-12, macos-14]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: install erlang
+      run: |
+        brew install erlang
+    - name: install rebar3
+      run: |
+        brew install rebar3
+    - name: make check
+      run: |
+        make check
+
+  windows:
+    name: windows
+    runs-on: ${{matrix.os}}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2019, windows-2022]
+
+    steps:
+    - name: prevent git from messing up our json test files
+      run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+    - uses: actions/checkout@v4
+    - name: install erlang
+      run: |
+        choco install erlang
+    - name: install rebar3
+      run: |
+        choco install rebar3
+    - name: make check
+      run: |
+        $path = vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -nologo -nocolor -property installationPath
+        if ($path) {
+            $path = join-path $path '\VC\Auxiliary\Build\vcvars64.bat'
+            if (test-path $path) {
+                cmd /s /c """$path"" $args && set" | where { $_ -match '(\w+)=(.*)' } | foreach {
+                    $null = new-item -force -path "Env:\$($Matches[1])" -value $Matches[2]
+                }
+            }
+        }
+        make check

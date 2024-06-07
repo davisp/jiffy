@@ -22,16 +22,8 @@
 -type json_string() :: atom() | binary().
 -type json_number() :: integer() | float().
 
--ifdef(JIFFY_NO_MAPS).
-
--type json_object() :: {[{json_string(),json_value()}]}.
-
--else.
-
 -type json_object() :: {[{json_string(),json_value()}]}
                         | #{json_string() => json_value()}.
-
--endif.
 
 -type jiffy_decode_result() :: json_value()
                         | {has_trailer, json_value(), binary()}.
@@ -141,7 +133,6 @@ finish_decode({has_trailer, Value, Rest}) ->
 finish_decode(Val) ->
     maybe_map(Val).
 
--ifndef(JIFFY_NO_MAPS).
 maybe_map(Obj) when is_map(Obj) ->
     maps:map(fun finish_decode_map/2, Obj);
 maybe_map(Val) ->
@@ -149,10 +140,6 @@ maybe_map(Val) ->
 
 finish_decode_map(_, V) ->
     finish_decode(V).
--else.
-maybe_map(Val) ->
-    Val.
--endif.
 
 finish_decode_obj([], Acc) ->
     {lists:reverse(Acc)};

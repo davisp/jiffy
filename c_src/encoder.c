@@ -595,7 +595,6 @@ enc_comma(Encoder* e)
     return 1;
 }
 
-#if MAP_TYPE_PRESENT
 int
 enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
 {
@@ -636,7 +635,6 @@ enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
     *out = enif_make_tuple1(env, list);
     return 1;
 }
-#endif
 
 ERL_NIF_TERM
 encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
@@ -897,7 +895,6 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             termstack_push(&stack, curr);
             termstack_push(&stack, e->atoms->ref_object);
             termstack_push(&stack, tuple[1]);
-#if MAP_TYPE_PRESENT
         } else if(enif_is_map(env, curr)) {
             if(!enc_map_to_ejson(env, curr, &curr)) {
                 ret = enc_error(e, "internal_error");
@@ -905,7 +902,6 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             }
 
             termstack_push(&stack, curr);
-#endif
         } else if(enif_is_list(env, curr)) {
             if(!enc_start_array(e)) {
                 ret = enc_error(e, "internal_error");
