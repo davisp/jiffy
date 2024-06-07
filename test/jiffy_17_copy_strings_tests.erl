@@ -24,10 +24,10 @@ check_binaries(_Bin) ->
 copy_strings_test_() ->
     Opts = [copy_strings],
     Cases = [
-        <<"\"foo\"">>,
-        <<"[\"bar\"]">>,
-        <<"{\"foo\":\"bar\"}">>,
-        <<"{\"foo\":[\"bar\"]}">>
+        <<"\"xoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\"">>,
+        <<"[\"yoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\"]">>,
+        <<"{\"zoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\":\"woooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\"}">>,
+        <<"{\"koooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\":[\"loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\"]}">>
     ],
     {"Test copy_strings", lists:map(fun(Json) ->
         EJson = jiffy:decode(Json, Opts),

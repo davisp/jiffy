@@ -8,10 +8,6 @@
 
 #include "erl_nif.h"
 
-#define MAP_TYPE_PRESENT \
-    ((ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION >= 6) \
-    || (ERL_NIF_MAJOR_VERSION > 2))
-
 #define BEGIN_C extern "C" {
 #define END_C }
 
@@ -26,8 +22,6 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     ERL_NIF_TERM val;
 
     std::set<std::string> seen;
-
-#if MAP_TYPE_PRESENT
 
     ERL_NIF_TERM old_val;
 
@@ -46,7 +40,6 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
         *out = ret;
         return 1;
     }
-#endif
 
     ret = enif_make_list(env, 0);
     while(enif_get_list_cell(env, pairs, &val, &pairs)) {

@@ -53,8 +53,11 @@ case IsRebar2 of
         Config2;
     false ->
         Config2 ++ [
-            {plugins, [{pc, "~> 1.0"}]},
-            {artifacts, ["priv/jiffy.so"]},
+            {plugins, [{pc, "~> 1.15"}]},
+            case os:type() of
+                {win32, _} -> {artifacts, ["priv/jiffy.dll"]};
+                {_, _} -> {artifacts, ["priv/jiffy.so"]}
+            end,
             {provider_hooks, [
                 {post, [
                     {compile, {pc, compile}},

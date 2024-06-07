@@ -621,11 +621,9 @@ parse:
 ERL_NIF_TERM
 make_empty_object(ErlNifEnv* env, int ret_map)
 {
-#if MAP_TYPE_PRESENT
     if(ret_map) {
         return enif_make_new_map(env);
     }
-#endif
 
     return enif_make_tuple1(env, enif_make_list(env, 0));
 }
@@ -680,11 +678,7 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         } else if(get_bytes_per_red(env, val, &(d->bytes_per_red))) {
             continue;
         } else if(enif_is_identical(val, d->atoms->atom_return_maps)) {
-#if MAP_TYPE_PRESENT
             d->return_maps = 1;
-#else
-            return enif_make_badarg(env);
-#endif
         } else if(enif_is_identical(val, d->atoms->atom_return_trailer)) {
             d->return_trailer = 1;
         } else if(enif_is_identical(val, d->atoms->atom_dedupe_keys)) {
