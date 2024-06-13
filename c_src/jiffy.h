@@ -40,6 +40,11 @@ typedef struct {
     ERL_NIF_TERM    atom_escape_forward_slashes;
     ERL_NIF_TERM    atom_dedupe_keys;
     ERL_NIF_TERM    atom_copy_strings;
+    ERL_NIF_TERM    atom_labels;
+    ERL_NIF_TERM    atom_binary;
+    ERL_NIF_TERM    atom_atom;
+    ERL_NIF_TERM    atom_existing_atom;
+    ERL_NIF_TERM    atom_attempt_atom;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
@@ -47,6 +52,13 @@ typedef struct {
     ErlNifResourceType* res_dec;
     ErlNifResourceType* res_enc;
 } jiffy_st;
+
+typedef enum {
+    jsl_binary=0,
+    jsl_atom,
+    jsl_existing_atom,
+    jsl_attempt_atom
+} js_labels;
 
 ERL_NIF_TERM make_atom(ErlNifEnv* env, const char* name);
 ERL_NIF_TERM make_ok(jiffy_st* st, ErlNifEnv* env, ERL_NIF_TERM data);
@@ -68,7 +80,7 @@ void dec_destroy(ErlNifEnv* env, void* obj);
 void enc_destroy(ErlNifEnv* env, void* obj);
 
 int make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
-        int ret_map, int dedupe_keys);
+        int ret_map, int dedupe_keys, js_labels labels);
 
 int int_from_hex(const unsigned char* p);
 int int_to_hex(int val, unsigned char* p);
@@ -80,5 +92,10 @@ int unicode_to_utf8(int c, unsigned char* buf);
 int unicode_from_pair(int hi, int lo);
 int unicode_uescape(int c, unsigned char* buf);
 int double_to_shortest(unsigned char *buf, size_t size, size_t* len, double val);
+
+#if (ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION < 17)
+/* ERL_NIF_UTF8 was introduce in OTP-26, fall back to LATIN1 for older versions */
+#define ERL_NIF_UTF8 ERL_NIF_LATIN1
+#endif
 
 #endif // Included JIFFY_H
