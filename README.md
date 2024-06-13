@@ -83,6 +83,7 @@ The options for encode are:
   surrogate pairs and/or using the replacement character to remove
   broken UTF-8 sequences in data.
 * `use_nil` - Encodes the atom `nil` as `null`.
+* `use_undefined` - Encodes the atom `undefined` as `null`.
 * `escape_forward_slashes` - Escapes the `/` character which can be
   useful when encoding URLs in some cases.
 * `{bytes_per_red, N}` - Refer to the decode options
