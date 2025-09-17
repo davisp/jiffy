@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        otp_version: [20,23,26,27]
+        otp_version: [20,23,26,27,28]
         os: [ubuntu-latest]
         rebar: [rebar, rebar3]
 
@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, macos-14]
+        os: [macos-13, macos-14, macos-15]
 
     steps:
     - uses: actions/checkout@v4
@@ -58,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2019, windows-2022]
+        os: [windows-2022]
 
     steps:
     - name: prevent git from messing up our json test files
@@ -66,9 +66,6 @@ jobs:
           git config --global core.autocrlf false
           git config --global core.eol lf
     - uses: actions/checkout@v4
-    - name: install erlang
-      run: |
-        choco install erlang
     - name: install rebar3
       run: |
         choco install rebar3
