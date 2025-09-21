@@ -19,6 +19,7 @@ typedef struct {
     ERL_NIF_TERM    atom_ok;
     ERL_NIF_TERM    atom_error;
     ERL_NIF_TERM    atom_null;
+    ERL_NIF_TERM    atom_undefined;
     ERL_NIF_TERM    atom_true;
     ERL_NIF_TERM    atom_false;
     ERL_NIF_TERM    atom_bignum;
@@ -36,6 +37,7 @@ typedef struct {
     ERL_NIF_TERM    atom_has_trailer;
     ERL_NIF_TERM    atom_nil;
     ERL_NIF_TERM    atom_use_nil;
+    ERL_NIF_TERM    atom_use_undefined;
     ERL_NIF_TERM    atom_null_term;
     ERL_NIF_TERM    atom_escape_forward_slashes;
     ERL_NIF_TERM    atom_dedupe_keys;

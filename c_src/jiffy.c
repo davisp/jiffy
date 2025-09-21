@@ -14,6 +14,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_ok = make_atom(env, "ok");
     st->atom_error = make_atom(env, "error");
     st->atom_null = make_atom(env, "null");
+    st->atom_undefined = make_atom(env, "undefined");
     st->atom_true = make_atom(env, "true");
     st->atom_false = make_atom(env, "false");
     st->atom_bignum = make_atom(env, "bignum");
@@ -31,6 +32,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_has_trailer = make_atom(env, "has_trailer");
     st->atom_nil = make_atom(env, "nil");
     st->atom_use_nil = make_atom(env, "use_nil");
+    st->atom_use_undefined = make_atom(env, "use_undefined");
     st->atom_null_term = make_atom(env, "null_term");
     st->atom_escape_forward_slashes = make_atom(env, "escape_forward_slashes");
     st->atom_dedupe_keys = make_atom(env, "dedupe_keys");

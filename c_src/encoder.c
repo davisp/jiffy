@@ -34,6 +34,7 @@ typedef struct {
     int             uescape;
     int             pretty;
     int             use_nil;
+    int             use_undefined;
     int             escape_forward_slashes;
 
     int             shiftcnt;
@@ -77,6 +78,7 @@ enc_new(ErlNifEnv* env)
     e->uescape = 0;
     e->pretty = 0;
     e->use_nil = 0;
+    e->use_undefined = 0;
     e->escape_forward_slashes = 0;
     e->shiftcnt = 0;
     e->count = 0;
@@ -675,6 +677,8 @@ encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             e->escape_forward_slashes = 1;
         } else if(enif_is_identical(val, e->atoms->atom_use_nil)) {
             e->use_nil = 1;
+        } else if(enif_is_identical(val, e->atoms->atom_use_undefined)) {
+            e->use_undefined = 1;
         } else if(enif_is_identical(val, e->atoms->atom_force_utf8)) {
             // Ignore, handled in Erlang
         } else if(get_bytes_per_iter(env, val, &(e->bytes_per_red))) {
@@ -822,6 +826,11 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     goto done;
                 }
             } else if(e->use_nil && enif_is_identical(curr, e->atoms->atom_nil)) {
+                if(!enc_literal(e, "null", 4)) {
+                    ret = enc_error(e, "null");
+                    goto done;
+                }
+            } else if(e->use_undefined && enif_is_identical(curr, e->atoms->atom_undefined)) {
                 if(!enc_literal(e, "null", 4)) {
                     ret = enc_error(e, "null");
                     goto done;
