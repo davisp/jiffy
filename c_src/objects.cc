@@ -13,9 +13,23 @@
 
 BEGIN_C
 
+static ERL_NIF_TERM
+key_attempt_atom(ErlNifEnv* env, ERL_NIF_TERM key) {
+    ERL_NIF_TERM keyatom;
+    ErlNifBinary keybin;
+
+    if(enif_inspect_binary(env, key, &keybin) && keybin.size < 256) {
+      if(enif_make_existing_atom_len(env, (char *)keybin.data, keybin.size,
+                                     &keyatom, ERL_NIF_UTF8)) {
+            return keyatom;
+        }
+    }
+    return key;
+}
+
 int
 make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
-	int ret_map, int dedupe_keys)
+	int ret_map, int dedupe_keys, int attempt_atom)
 {
     ERL_NIF_TERM ret;
     ERL_NIF_TERM key;
@@ -31,6 +45,9 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
             if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
                 assert(0 == 1 && "Unbalanced object pairs.");
             }
+            if(attempt_atom) {
+                key = key_attempt_atom(env, key);
+            }
             if(!enif_get_map_value(env, ret, key, &old_val)) {
                 if(!enif_make_map_put(env, ret, key, val, &ret)) {
                     return 0;
@@ -45,6 +62,9 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     while(enif_get_list_cell(env, pairs, &val, &pairs)) {
         if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
             assert(0 == 1 && "Unbalanced object pairs.");
+        }
+        if(attempt_atom) {
+            key = key_attempt_atom(env, key);
         }
         if(dedupe_keys) {
             ErlNifBinary bin;
