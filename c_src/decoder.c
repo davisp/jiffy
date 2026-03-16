@@ -55,6 +55,7 @@ typedef struct {
     int             return_trailer;
     int             dedupe_keys;
     int             copy_strings;
+    int             attempt_atom;
     ERL_NIF_TERM    null_term;
 
     unsigned char*  p;
@@ -85,6 +86,7 @@ dec_new(ErlNifEnv* env)
     d->return_trailer = 0;
     d->dedupe_keys = 0;
     d->copy_strings = 0;
+    d->attempt_atom = 0;
     d->null_term = d->atoms->atom_null;
 
     d->p = NULL;
@@ -689,6 +691,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             d->null_term = d->atoms->atom_nil;
         } else if(get_null_term(env, val, &(d->null_term))) {
             continue;
+        } else if(enif_is_identical(val, d->atoms->atom_attempt_atom)) {
+            d->attempt_atom = 1;
         } else {
             return enif_make_badarg(env);
         }
@@ -974,7 +978,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         }
                         dec_pop_assert(d, st_value);
                         if(!make_object(env, curr, &val,
-                                d->return_maps, d->dedupe_keys)) {
+                                d->return_maps, d->dedupe_keys, d->attempt_atom)) {
                             ret = dec_error(d, "internal_object_error");
                             goto done;
                         }
