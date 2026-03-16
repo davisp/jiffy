@@ -24,7 +24,7 @@ Config2 = case os:type() of
             Else -> Else
         end,
         FLTO_CHECK = "echo 'int main(int argc, char *argv[]) {return 0;}' | "
-                ++ CC ++ " -c -x c -o /dev/null -flto -",
+                ++ CC ++ " -x c -o /dev/null -flto -",
         case os:cmd(FLTO_CHECK) of
             [] ->
                 {port_env, PortEnv} = lists:keyfind(port_env, 1, Config1),
