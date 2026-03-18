@@ -119,7 +119,7 @@ utf8_validate(unsigned char* data, size_t size)
 
     if((data[0] & 0x80) == 0x00) {
         ulen = 1;
-    } if((data[0] & 0xE0) == 0xC0) {
+    } else if((data[0] & 0xE0) == 0xC0) {
         ulen = 2;
     } else if((data[0] & 0xF0) == 0xE0) {
         ulen = 3;
