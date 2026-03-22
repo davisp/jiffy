@@ -264,7 +264,7 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
     unsigned char data[512];
 
     size_t size;
-    int i;
+    size_t i;
 
     if(!enif_get_atom(e->env, val, (char*)data, 512, ERL_NIF_LATIN1)) {
         return 0;
@@ -322,9 +322,9 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
     unsigned char* data;
     size_t size;
     int esc_len;
-    int ulen;
+    size_t ulen;
     int uval;
-    int i;
+    size_t i;
 
     if(!enif_inspect_binary(e->env, val, &bin)) {
         return 0;
@@ -353,7 +353,7 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
         } else if(data[i] >= 0x80) {
             ulen = utf8_validate(&(data[i]), size - i);
 
-            if (ulen < 0) {
+            if (ulen == 0) {
                 return 0;
             } else if (e->uescape) {
                 uval = utf8_to_unicode(&(data[i]), size-i);

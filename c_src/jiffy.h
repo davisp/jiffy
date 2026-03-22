@@ -74,7 +74,7 @@ int int_from_hex(const unsigned char* p);
 int int_to_hex(int val, unsigned char* p);
 int utf8_len(int c);
 int utf8_esc_len(int c);
-int utf8_validate(unsigned char* data, size_t size);
+size_t utf8_validate(unsigned char* data, size_t size);
 int utf8_to_unicode(unsigned char* buf, size_t size);
 int unicode_to_utf8(int c, unsigned char* buf);
 int unicode_from_pair(int hi, int lo);
