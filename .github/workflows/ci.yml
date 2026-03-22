@@ -25,10 +25,40 @@ jobs:
       image: erlang:${{matrix.otp_version}}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: ${{matrix.rebar}} make check
       run: |
         make REBAR=${{matrix.rebar}} check
+
+  gcc-14:
+    name: gcc-14
+    runs-on: ubuntu-latest
+    container:
+      image: erlang:28
+    steps:
+      - uses: actions/checkout@v6
+      - name: install gcc-14
+        run: |
+          apt update
+          apt install -y --no-install-recommends --no-install-suggests gcc-14 g++-14
+      - name: make check
+        run: |
+          CC=gcc-14 CXX=g++-14 CFLAGS="-Wextra -Wno-unused-parameter" make check
+
+  clang-19:
+    name: clang-19
+    runs-on: ubuntu-latest
+    container:
+      image: erlang:28
+    steps:
+      - uses: actions/checkout@v6
+      - name: install clang 20
+        run: |
+          apt update
+          apt install -y --no-install-recommends --no-install-suggests clang-19
+      - name: make check
+        run: |
+          CC=clang-19 CXX=clang++-19 CFLAGS="-Wextra -Wno-unused-parameter" make check
 
   macos:
     name: macos
@@ -37,10 +67,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15, macos-latest]
+        os: [macos-14, macos-15, macos-26, macos-26-intel, macos-latest]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install erlang
       run: |
         brew install erlang
@@ -65,7 +95,7 @@ jobs:
       run: |
           git config --global core.autocrlf false
           git config --global core.eol lf
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install rebar3
       run: |
         choco install rebar3
