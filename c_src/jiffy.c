@@ -82,12 +82,15 @@ unload(ErlNifEnv* env, void* priv)
     return;
 }
 
+// {name, arity, fptr, dirty_flag}
+// dirty flag: 0 (default) | ERL_NIF_DIRTY_JOB_{IO|CPU}_BOUND
+//
 static ErlNifFunc funcs[] =
 {
-    {"nif_decode_init", 2, decode_init},
-    {"nif_decode_iter", 5, decode_iter},
-    {"nif_encode_init", 2, encode_init},
-    {"nif_encode_iter", 3, encode_iter}
+    {"nif_decode_init", 2, decode_init, 0},
+    {"nif_decode_iter", 5, decode_iter, 0},
+    {"nif_encode_init", 2, encode_init, 0},
+    {"nif_encode_iter", 3, encode_iter, 0}
 };
 
 ERL_NIF_INIT(jiffy, funcs, &load, &reload, &upgrade, &unload);

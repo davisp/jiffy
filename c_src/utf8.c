@@ -111,11 +111,12 @@ utf8_esc_len(int c)
     }
 }
 
-int
+size_t
 utf8_validate(unsigned char* data, size_t size)
 {
-    int ulen = -1;
+    size_t ulen = 0;
     int ui;
+    size_t i;
 
     if((data[0] & 0x80) == 0x00) {
         ulen = 1;
@@ -126,13 +127,13 @@ utf8_validate(unsigned char* data, size_t size)
     } else if((data[0] & 0xF8) == 0xF0) {
         ulen = 4;
     }
-    if(ulen < 0 || ulen > size) {
-        return -1;
+    if(ulen == 0 || ulen > size) {
+        return 0;
     }
 
     // Check each continuation byte.
-    for(ui = 1; ui < ulen; ui++) {
-        if((data[ui] & 0xC0) != 0x80) return -1;
+    for(i = 1; i < ulen; i++) {
+        if((data[i] & 0xC0) != 0x80) return 0;
     }
 
     // Wikipedia says I have to check that a UTF-8 encoding
@@ -149,13 +150,13 @@ utf8_validate(unsigned char* data, size_t size)
     // ulen == 1 passes by definition
     if(ulen == 2) {
         if((data[0] & 0x1E) == 0)
-            return -1;
+            return 0;
     } else if(ulen == 3) {
         if((data[0] & 0x0F) + (data[1] & 0x20) == 0)
-            return -1;
+            return 0;
     } else if(ulen == 4) {
         if((data[0] & 0x07) + (data[1] & 0x30) == 0)
-            return -1;
+            return 0;
     }
 
     // Lastly we need to check some miscellaneous ranges for
@@ -163,11 +164,11 @@ utf8_validate(unsigned char* data, size_t size)
     if(ulen >= 3) {
         ui = utf8_to_unicode(data, ulen);
         if(ui < 0) {
-            return -1;
+            return 0;
         } else if(ui >= 0xD800 && ui <= 0xDFFF) {
-            return -1;
+            return 0;
         } else if(ui > 0x10FFFF) {
-            return -1;
+            return 0;
         }
     }
 
@@ -269,4 +270,3 @@ unicode_uescape(int val, unsigned char* p)
     }
     return -1;
 }
-

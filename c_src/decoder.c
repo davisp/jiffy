@@ -58,8 +58,8 @@ typedef struct {
     ERL_NIF_TERM    null_term;
 
     unsigned char*  p;
-    int             i;
-    int             len;
+    size_t          i;
+    size_t          len;
 
     char*           st_data;
     int             st_size;
@@ -193,8 +193,8 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     int has_escape = 0;
     int num_escapes = 0;
     int st;
-    int ulen;
-    int ui;
+    size_t ulen;
+    size_t ui;
     int hi;
     int lo;
     char* chrbuf;
@@ -278,7 +278,7 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
             d->i++;
         } else {
             ulen = utf8_validate(&(d->p[d->i]), d->len - d->i);
-            if(ulen < 0) {
+            if(ulen == 0) {
                 return 0;
             }
             d->i += ulen;
