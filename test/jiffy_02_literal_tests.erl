@@ -33,6 +33,12 @@ nil_test_() ->
         {"Encode", ?_assertEqual(<<"null">>, enc(nil, [use_nil]))}
     ]}.
 
+undefined_test_() ->
+    {"undefined", [
+        {"Decode", ?_assertEqual(undefined, dec(<<"null">>, [{null_term, undefined}]))},
+        {"Encode", ?_assertEqual(<<"null">>, enc(undefined, [use_undefined]))}
+    ]}.
+
 null_term_test_() ->
     T = [
         {undefined, [{null_term, undefined}]},
