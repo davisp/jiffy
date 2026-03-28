@@ -34,7 +34,7 @@ jobs:
   # they are on OTP 25 so we can use erlang up to version 27 technically.
   #
   eqc-mini-25:
-    name: eqc-mini
+    name: eqc-mini-25
     runs-on: ubuntu-latest
     container:
       image: erlang:25
@@ -44,28 +44,16 @@ jobs:
         run: |
           make REBAR=rebar3 check-with-eqc
 
-  eqc-mini-26:
-    name: eqc-mini
+  eqc-mini-27:
+    name: eqc-mini-27
     runs-on: ubuntu-latest
     container:
-      image: erlang:26
+      image: erlang:27
     steps:
       - uses: actions/checkout@v6
       - name: rebar3 make check-with-eqc
         run: |
           make REBAR=rebar3 check-with-eqc
-
-  # This currently fails. Most likely related to 0.0
-  # eqc-mini-27:
-  #   name: eqc-mini
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: erlang:27
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #     - name: rebar3 make check-with-eqc
-  #       run: |
-  #         make REBAR=rebar3 check-with-eqc
 
   gcc-14:
     name: gcc-14
