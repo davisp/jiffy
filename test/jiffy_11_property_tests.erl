@@ -130,6 +130,14 @@ any(S) ->
 any_value() ->
     oneof(any_value_types()).
 
+% As of OTP 27 0.0 =/= -0.0 so we cannot use exact matching on round trips any
+% longer. Therefore we test the 0.0 and -0.0 round-trip explicilty somewhere
+% else but here we exclude it. We don't want to use == for term matching
+% either, because then we'd be losing a check that ints stay as ints and floats
+% as floats.
+%
+real_non_neg_0() ->
+    ?SUCHTHAT(F, real(), F =/= -0.0).
 
 any_value_types() ->
     [
@@ -196,7 +204,7 @@ json_false() ->
 
 
 json_number() ->
-    oneof([largeint(), int(), real()]).
+    oneof([largeint(), int(), real_non_neg_0()]).
 
 
 json_string() ->

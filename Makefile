@@ -10,6 +10,7 @@ clean:
 	rm -rf .eunit
 	rm -f test/*.beam
 	rm -rf eqc
+	rm -rf _build
 
 
 distclean: clean
