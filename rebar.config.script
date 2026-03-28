@@ -1,10 +1,20 @@
 % This file is part of Jiffy released under the MIT license.
 % See the LICENSE file for more information.
 %
+
 % Only run the EQC checks when EQC is present.
-
+%
+% We have a helper tests/install_eqc_mini.sh script to install it ./eqc, so we
+% look for it there first, and add that to the code path. Users may have also
+% installed it directly into their OTP distribution, which should be fine,
+% code:which(eqc) should find that as well.
+%
+LocalEQC = filename:join([filename:dirname(SCRIPT), "eqc", "ebin"]),
+case filelib:is_dir(LocalEQC) of
+    true -> code:add_patha(LocalEQC);
+    false -> ok
+end,
 HaveEQC = code:which(eqc) =/= non_existing,
-
 ErlOpts = if not HaveEQC -> []; true ->
     [{d, 'HAVE_EQC'}]
 end,

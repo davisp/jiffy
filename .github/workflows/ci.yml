@@ -30,6 +30,43 @@ jobs:
       run: |
         make REBAR=${{matrix.rebar}} check
 
+  # Keep this no more than 2 releases away from EQC-mini beam files. Currently
+  # they are on OTP 25 so we can use erlang up to version 27 technically.
+  #
+  eqc-mini-25:
+    name: eqc-mini
+    runs-on: ubuntu-latest
+    container:
+      image: erlang:25
+    steps:
+      - uses: actions/checkout@v6
+      - name: rebar3 make check-with-eqc
+        run: |
+          make REBAR=rebar3 check-with-eqc
+
+  eqc-mini-26:
+    name: eqc-mini
+    runs-on: ubuntu-latest
+    container:
+      image: erlang:26
+    steps:
+      - uses: actions/checkout@v6
+      - name: rebar3 make check-with-eqc
+        run: |
+          make REBAR=rebar3 check-with-eqc
+
+  # This currently fails. Most likely related to 0.0
+  # eqc-mini-27:
+  #   name: eqc-mini
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: erlang:27
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     - name: rebar3 make check-with-eqc
+  #       run: |
+  #         make REBAR=rebar3 check-with-eqc
+
   gcc-14:
     name: gcc-14
     runs-on: ubuntu-latest
@@ -52,7 +89,7 @@ jobs:
       image: erlang:28
     steps:
       - uses: actions/checkout@v6
-      - name: install clang 20
+      - name: install clang
         run: |
           apt update
           apt install -y --no-install-recommends --no-install-suggests clang-19
