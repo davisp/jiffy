@@ -52,6 +52,8 @@ The options for decode are:
   will ensure that the parsed object only contains a single entry
   containing the last value seen. This mirrors the parsing beahvior
   of virtually every other JSON parser.
+* `attempt_atom` - Attempts to convert keys to existing atoms. Will
+  return keys as binaries if the atom does not exists.
 * `copy_strings` - Normally, when strings are decoded, they are
   created as sub-binaries of the input data. With some workloads, this
   leads to an undesirable bloating of memory: Strings in the decode
@@ -91,8 +93,8 @@ The options for encode are:
 Data Format
 -----------
 
-    Erlang                          JSON            Erlang
-    ==========================================================================
+    Erlang                          JSON            Erlang                           Notes
+    ======================================================================================
 
     null                       -> null           -> null
     true                       -> true           -> true
@@ -107,11 +109,17 @@ Data Format
     {[]}                       -> {}             -> {[]}
     {[{foo, bar}]}             -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
     {[{<<"foo">>, <<"bar">>}]} -> {"foo": "bar"} -> {[{<<"foo">>, <<"bar">>}]}
-    #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{<<"foo">> => <<"bar">>}
+    #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{<<"foo">> => <<"bar">>}          (1)
+    {[{<<"foo">>, <<"bar">>}]} -> {"foo": "bar"} -> {[{foo, <<"bar">>}]}               (2)
+    #{<<"foo">> => <<"bar">>}  -> {"foo": "bar"} -> #{foo => <<"bar">>}             (1, 2)
 
-N.B. The last entry in this table is only valid for VM's that support
-the `maps` data type (i.e., 17.0 and newer) and client code must pass
-the `return_maps` option to `jiffy:decode/2`.
+Note 1: This entry is only valid for VM's that support the `maps` data type
+        (i.e., 17.0 and newer) and client code must pass the `return_maps`
+        option to `jiffy:decode/2`.
+
+Note 2: This entry is only valid if the atom existed before and the client code must
+        pass the `attempt_atom` option to `jiffy:decode/2`.
+
 
 Improvements over EEP0018
 -------------------------
