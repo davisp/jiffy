@@ -9,6 +9,7 @@ clean:
 	rm -rf logs
 	rm -rf .eunit
 	rm -f test/*.beam
+	rm -rf eqc
 
 
 distclean: clean
@@ -25,6 +26,10 @@ eunit:
 
 check: build eunit
 
+check-with-eqc: install_eqc build eunit
+
+install_eqc:
+	./test/install_eqc_mini.sh
 
 release:
 	rebar3 hex publish

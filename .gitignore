@@ -15,3 +15,6 @@ erln8.config
 hexer.config
 rebar.lock
 TEST-*.xml
+/eqc/
+.eqc-info
+current_counterexample.eqc
