@@ -130,7 +130,17 @@ cases(error) ->
         <<"\"\\uD834foo\\uDD1E\"">>,
         <<"\"\\u", 200, 200, 200, 200, "\"">>,
         % CouchDB-345
-        <<34,78,69,73,77,69,78,32,70,216,82,82,32,70,65,69,78,33,34>>
+        <<34,78,69,73,77,69,78,32,70,216,82,82,32,70,65,69,78,33,34>>,
+        % Lone high surrogate followed by non-backslash
+        <<"\"\\uD834a\"">>,
+        % Lone high surrogate followed by backslash but not 'u'
+        <<"\"\\uD834\\n\"">>,
+        % Lone high surrogate followed by \u but not a valid low surrogate
+        <<"\"\\uD834\\u0041\"">>,
+        % Truncated \uXX (not enough hex digits)
+        <<"\"\\u00\"">>,
+        % Invalid hex digit in \u escape
+        <<"\"\\uZZZZ\"">>
     ];
 
 cases(utf8) ->
