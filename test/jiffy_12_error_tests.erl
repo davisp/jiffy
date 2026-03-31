@@ -82,6 +82,13 @@ enc_invalid_object_member_key_test_() ->
     ]}.
 
 
+encode_bad_option_test() ->
+    ?assertError(badarg, jiffy:encode(1, [not_a_valid_option])).
+
+
+decode_bad_option_test() ->
+    ?assertError(badarg, jiffy:decode(<<"1">>, [not_a_valid_option])).
+
 
 enc_error(Type, Obj, Case) ->
     ?_assertMatch({'EXIT', {{Type, Obj}, _}}, (catch jiffy:encode(Case))).
