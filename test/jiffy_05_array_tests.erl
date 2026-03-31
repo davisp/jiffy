@@ -26,6 +26,14 @@ nested(0) -> <<"bottom">>;
 nested(N) -> [nested(N - 1)].
 
 
+encode_deep_pretty_test() ->
+    %% Here we're trying to go deeper than NUM_SHIFTS=8 in enc_shift
+    Deep = lists:foldl(fun(_, Acc) -> [Acc] end, 1, lists:seq(1, 12)),
+    Encoded = iolist_to_binary(jiffy:encode(Deep, [pretty])),
+    ?assert(is_binary(Encoded)),
+    ?assertEqual(Deep, jiffy:decode(Encoded)).
+
+
 gen(ok, {J, E}) ->
     gen(ok, {J, E, J});
 gen(ok, {J1, E, J2}) ->
