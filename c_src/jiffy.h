@@ -9,12 +9,6 @@
 #define DEFAULT_BYTES_PER_REDUCTION 20
 #define DEFAULT_ERLANG_REDUCTION_COUNT 2000
 
-#define CONSUME_TIMESLICE_PRESENT \
-        ((ERL_NIF_MAJOR_VERSION >= 2 && ERL_NIF_MINOR_VERSION >= 4))
-
-#define SCHEDULE_NIF_PRESENT \
-        ((ERL_NIF_MAJOR_VERSION >= 2 && ERL_NIF_MINOR_VERSION >= 7))
-
 typedef struct {
     ERL_NIF_TERM    atom_ok;
     ERL_NIF_TERM    atom_error;
@@ -49,10 +43,6 @@ typedef struct {
 } jiffy_st;
 
 ERL_NIF_TERM make_atom(ErlNifEnv* env, const char* name);
-ERL_NIF_TERM make_ok(jiffy_st* st, ErlNifEnv* env, ERL_NIF_TERM data);
-ERL_NIF_TERM make_error(jiffy_st* st, ErlNifEnv* env, const char* error);
-ERL_NIF_TERM make_obj_error(jiffy_st* st, ErlNifEnv* env, const char* error,
-        ERL_NIF_TERM obj);
 int get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi);
 int get_bytes_per_red(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpr);
 int get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term);
