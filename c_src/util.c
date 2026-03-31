@@ -14,26 +14,6 @@ make_atom(ErlNifEnv* env, const char* name)
     return enif_make_atom(env, name);
 }
 
-ERL_NIF_TERM
-make_ok(jiffy_st* st, ErlNifEnv* env, ERL_NIF_TERM value)
-{
-    return enif_make_tuple2(env, st->atom_ok, value);
-}
-
-ERL_NIF_TERM
-make_error(jiffy_st* st, ErlNifEnv* env, const char* error)
-{
-    return enif_make_tuple2(env, st->atom_error, make_atom(env, error));
-}
-
-ERL_NIF_TERM
-make_obj_error(jiffy_st* st, ErlNifEnv* env,
-        const char* error, ERL_NIF_TERM obj)
-{
-    ERL_NIF_TERM reason = enif_make_tuple2(env, make_atom(env, error), obj);
-    return enif_make_tuple2(env, st->atom_error, reason);
-}
-
 int
 get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
 {
@@ -130,7 +110,6 @@ should_yield(size_t used, size_t bytes_per_red)
 void
 bump_used_reds(ErlNifEnv* env, size_t used, size_t bytes_per_red)
 {
-#if CONSUME_TIMESLICE_PRESENT
     size_t reds_used;
     size_t pct_used;
 
@@ -144,9 +123,4 @@ bump_used_reds(ErlNifEnv* env, size_t used, size_t bytes_per_red)
 
         enif_consume_timeslice(env, pct_used);
     }
-#endif
-
-    (void) env;
-    (void) used;
-    (void) bytes_per_red;
 }

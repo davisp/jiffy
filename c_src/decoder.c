@@ -10,9 +10,6 @@
 #include "erl_nif.h"
 #include "jiffy.h"
 
-#define U(c) ((unsigned char) (c))
-#define ERROR(i, msg) make_error(st, env, msg)
-
 #define STACK_SIZE_INC 64
 #define NUM_BUF_LEN 32
 
@@ -66,16 +63,16 @@ typedef struct {
     int             st_top;
 } Decoder;
 
+// Returns an allocated resource or crashes the VM. No need to
+// check return pointer for NULL
 Decoder*
 dec_new(ErlNifEnv* env)
 {
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    // If enif_alloc_resource cannot allocate it crashes the VM
     Decoder* d = enif_alloc_resource(st->res_dec, sizeof(Decoder));
+    assert(d != NULL);
     int i;
-
-    if(d == NULL) {
-        return NULL;
-    }
 
     d->atoms = st;
 
@@ -654,10 +651,9 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
+    // If allocation fails VM will crash.
     d = dec_new(env);
-    if(d == NULL) {
-        return make_error(st, env, "internal_error");
-    }
+    assert(d != NULL);
 
     tmp_argv[0] = argv[0];
     tmp_argv[1] = enif_make_resource(env, d);
@@ -746,7 +742,6 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
             bump_used_reds(env, bytes_processed, d->bytes_per_red);
 
-#if SCHEDULE_NIF_PRESENT
             return enif_schedule_nif(
                     env,
                     "nif_decode_iter",
@@ -755,13 +750,6 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     5,
                     tmp_argv
                 );
-#else
-            return enif_make_tuple2(
-                    env,
-                    st->atom_iter,
-                    enif_make_tuple_from_array(env, tmp_argv, 5)
-                );
-#endif
         }
 
         switch(dec_curr(d)) {

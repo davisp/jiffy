@@ -66,7 +66,7 @@ static char* shifts[NUM_SHIFTS] = {
 };
 
 
-Encoder*
+static Encoder*
 enc_new(ErlNifEnv* env)
 {
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
@@ -99,7 +99,7 @@ enc_new(ErlNifEnv* env)
     return e;
 }
 
-int
+static int
 enc_init(Encoder* e, ErlNifEnv* env)
 {
     e->env = env;
@@ -116,20 +116,34 @@ enc_destroy(ErlNifEnv* env, void* obj)
     }
 }
 
-ERL_NIF_TERM
+static ERL_NIF_TERM
+make_error(jiffy_st* st, ErlNifEnv* env, const char* error)
+{
+    return enif_make_tuple2(env, st->atom_error, make_atom(env, error));
+}
+
+static ERL_NIF_TERM
 enc_error(Encoder* e, const char* msg)
 {
     //assert(0 && msg);
     return make_error(e->atoms, e->env, msg);
 }
 
-ERL_NIF_TERM
+static ERL_NIF_TERM
+make_obj_error(jiffy_st* st, ErlNifEnv* env,
+        const char* error, ERL_NIF_TERM obj)
+{
+    ERL_NIF_TERM reason = enif_make_tuple2(env, make_atom(env, error), obj);
+    return enif_make_tuple2(env, st->atom_error, reason);
+}
+
+static ERL_NIF_TERM
 enc_obj_error(Encoder* e, const char* msg, ERL_NIF_TERM obj)
 {
     return make_obj_error(e->atoms, e->env, msg, obj);
 }
 
-int
+static int
 enc_flush(Encoder* e)
 {
     ERL_NIF_TERM bin;
@@ -411,7 +425,7 @@ enc_object_key(ErlNifEnv *env, Encoder* e, ERL_NIF_TERM val)
 #define P11 100000000000L
 #define P12 1000000000000L
 
-int
+static inline int
 digits10(ErlNifUInt64 v)
 {
     if (v < P01) return 1;
@@ -435,7 +449,7 @@ digits10(ErlNifUInt64 v)
     return 12 + digits10(v / P12);
 }
 
-unsigned int
+static inline unsigned int
 u64ToAsciiTable(unsigned char *dst, ErlNifUInt64 value)
 {
     static const char digits[201] =
@@ -464,7 +478,7 @@ u64ToAsciiTable(unsigned char *dst, ErlNifUInt64 value)
     return length;
 }
 
-unsigned
+static inline unsigned
 i64ToAsciiTable(unsigned char *dst, ErlNifSInt64 value)
 {
     if (value < 0) {
@@ -595,7 +609,7 @@ enc_comma(Encoder* e)
     return 1;
 }
 
-int
+static int
 enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
 {
     ErlNifMapIterator iter;
@@ -743,7 +757,6 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             termstack_destroy(&stack);
             bump_used_reds(env, bytes_processed, e->bytes_per_red);
 
-#if SCHEDULE_NIF_PRESENT
             return enif_schedule_nif(
                     env,
                     "nif_encode_iter",
@@ -752,13 +765,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     3,
                     tmp_argv
                 );
-#else
-            return enif_make_tuple2(
-                    env,
-                    st->atom_iter,
-                    enif_make_tuple_from_array(env, tmp_argv, 3)
-                );
-#endif
+
         }
 
         curr = termstack_pop(&stack);
