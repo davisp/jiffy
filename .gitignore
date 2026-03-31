@@ -16,5 +16,10 @@ hexer.config
 rebar.lock
 TEST-*.xml
 /eqc/
+coverage.info
+coverage-jiffy.info
+coverage-html/
 .eqc-info
 current_counterexample.eqc
+*.gcda
+*.gcno

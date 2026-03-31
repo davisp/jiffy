@@ -55,6 +55,19 @@ jobs:
         run: |
           make REBAR=rebar3 check-with-eqc
 
+  lcov-coverage:
+    name: lcov-coverage
+    runs-on: ubuntu-latest
+    container:
+      image: erlang:28
+    steps:
+      - uses: actions/checkout@v6
+      - name: install lcov
+        run: |
+          apt update
+          apt install -y --no-install-recommends --no-install-suggests lcov
+          make REBAR=rebar3 coverage
+
   gcc-14:
     name: gcc-14
     runs-on: ubuntu-latest
@@ -113,7 +126,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022]
+        os: [windows-2022, windows-2025]
 
     steps:
     - name: prevent git from messing up our json test files
