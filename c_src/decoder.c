@@ -272,7 +272,18 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
                     return 0;
             }
         } else if(d->p[d->i] < 0x80) {
-            d->i++;
+            // Scan ahead plain ASCII as an optimization
+            const unsigned char* restrict p = d->p;
+            size_t idx = d->i + 1;
+            const size_t len = d->len;
+            while(idx < len
+                    && p[idx] >= 0x20
+                    && p[idx] < 0x80
+                    && p[idx] != '\"'
+                    && p[idx] != '\\') {
+                idx++;
+            }
+            d->i = idx;
         } else {
             ulen = utf8_validate(&(d->p[d->i]), d->len - d->i);
             if(ulen == 0) {
