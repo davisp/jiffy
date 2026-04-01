@@ -13,10 +13,6 @@
 #define STACK_SIZE_INC 64
 #define NUM_BUF_LEN 32
 
-#if WINDOWS || WIN32
-#define snprintf  _snprintf
-#endif
-
 enum {
     st_value=0,
     st_object,
@@ -273,7 +269,7 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
             }
         } else if(d->p[d->i] < 0x80) {
             // Scan ahead plain ASCII as an optimization
-            const unsigned char* restrict p = d->p;
+            const unsigned char* JIFFY_RESTRICT p = d->p;
             size_t idx = d->i + 1;
             const size_t len = d->len;
             while(idx < len
