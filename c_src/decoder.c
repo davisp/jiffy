@@ -390,7 +390,10 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
     // to the compiler p won't alias any other pointers so it can optimize
     // access to it. Also avoid writing back do d->i on every increment,
     // instead increment a local variable (hopefully in a register) then update
-    // d->i once at the end.
+    // d->i once at the end. Also, when parsing looping states (mantissa, frac,
+    // edigit) scan-ahead quickly looking for strings of digits only. The wins
+    // will not be as big as we have for strings as most numbers are not that
+    // long, but it shouldn't hurt either.
     const unsigned char* JIFFY_RESTRICT p = d->p;
     const size_t len = d->len;
     const size_t start = d->i;
@@ -468,7 +471,9 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '7':
                     case '8':
                     case '9':
-                        idx++;
+                        while(idx < len && p[idx] >= '0' && p[idx] <= '9') {
+                            idx++;
+                        }
                         break;
                     default:
                         goto parse;
@@ -529,7 +534,9 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '7':
                     case '8':
                     case '9':
-                        idx++;
+                        while(idx < len && p[idx] >= '0' && p[idx] <= '9') {
+                            idx++;
+                        }
                         break;
                     default:
                         goto parse;
@@ -571,7 +578,9 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '7':
                     case '8':
                     case '9':
-                        idx++;
+                        while(idx < len && p[idx] >= '0' && p[idx] <= '9') {
+                            idx++;
+                        }
                         break;
                     default:
                         goto parse;
