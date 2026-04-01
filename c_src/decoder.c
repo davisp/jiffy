@@ -381,23 +381,32 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
     ERL_NIF_TERM num_type = d->atoms->atom_error;
     char state = nst_init;
     char nbuf[NUM_BUF_LEN];
-    int st = d->i;
     int has_frac = 0;
     int has_exp = 0;
     double dval;
     long lval;
 
-    while(d->i < d->len) {
+    // Use the same trick as did for dec_string. The restrict qualifier hints
+    // to the compiler p won't alias any other pointers so it can optimize
+    // access to it. Also avoid writing back do d->i on every increment,
+    // instead increment a local variable (hopefully in a register) then update
+    // d->i once at the end.
+    const unsigned char* JIFFY_RESTRICT p = d->p;
+    const size_t len = d->len;
+    const size_t start = d->i;
+    size_t idx = start;
+
+    while(idx < len) {
         switch(state) {
             case nst_init:
-                switch(d->p[d->i]) {
+                switch(p[idx]) {
                     case '-':
                         state = nst_sign;
-                        d->i++;
+                        idx++;
                         break;
                     case '0':
                         state = nst_frac0;
-                        d->i++;
+                        idx++;
                         break;
                     case '1':
                     case '2':
@@ -409,18 +418,19 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '8':
                     case '9':
                         state = nst_mantissa;
-                        d->i++;
+                        idx++;
                         break;
                     default:
+                        d->i = idx;
                         return 0;
                 }
                 break;
 
             case nst_sign:
-                switch(d->p[d->i]) {
+                switch(p[idx]) {
                     case '0':
                         state = nst_frac0;
-                        d->i++;
+                        idx++;
                         break;
                     case '1':
                     case '2':
@@ -432,23 +442,24 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '8':
                     case '9':
                         state = nst_mantissa;
-                        d->i++;
+                        idx++;
                         break;
                     default:
+                        d->i = idx;
                         return 0;
                 }
                 break;
 
             case nst_mantissa:
-                switch(d->p[d->i]) {
+                switch(p[idx]) {
                     case '.':
                         state = nst_frac1;
-                        d->i++;
+                        idx++;
                         break;
                     case 'e':
                     case 'E':
                         state = nst_esign;
-                        d->i++;
+                        idx++;
                         break;
                     case '0':
                     case '1':
@@ -460,7 +471,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '7':
                     case '8':
                     case '9':
-                        d->i++;
+                        idx++;
                         break;
                     default:
                         goto parse;
@@ -468,15 +479,15 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                 break;
 
             case nst_frac0:
-                switch(d->p[d->i]) {
+                switch(p[idx]) {
                     case '.':
                         state = nst_frac1;
-                        d->i++;
+                        idx++;
                         break;
                     case 'e':
                     case 'E':
                         state = nst_esign;
-                        d->i++;
+                        idx++;
                         break;
                     default:
                         goto parse;
@@ -485,7 +496,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
 
             case nst_frac1:
                 has_frac = 1;
-                switch(d->p[d->i]) {
+                switch(p[idx]) {
                     case '0':
                     case '1':
                     case '2':
@@ -497,7 +508,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '8':
                     case '9':
                         state = nst_frac;
-                        d->i++;
+                        idx++;
                         break;
                     default:
                         goto parse;
@@ -505,11 +516,11 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                 break;
 
             case nst_frac:
-                switch(d->p[d->i]) {
+                switch(p[idx]) {
                     case 'e':
                     case 'E':
                         state = nst_esign;
-                        d->i++;
+                        idx++;
                         break;
                     case '0':
                     case '1':
@@ -521,7 +532,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '7':
                     case '8':
                     case '9':
-                        d->i++;
+                        idx++;
                         break;
                     default:
                         goto parse;
@@ -530,7 +541,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
 
             case nst_esign:
                 has_exp = 1;
-                switch(d->p[d->i]) {
+                switch(p[idx]) {
                     case '-':
                     case '+':
                     case '0':
@@ -544,15 +555,16 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '8':
                     case '9':
                         state = nst_edigit;
-                        d->i++;
+                        idx++;
                         break;
                     default:
+                        d->i = idx;
                         return 0;
                 }
                 break;
 
             case nst_edigit:
-                switch(d->p[d->i]) {
+                switch(p[idx]) {
                     case '0':
                     case '1':
                     case '2':
@@ -563,7 +575,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                     case '7':
                     case '8':
                     case '9':
-                        d->i++;
+                        idx++;
                         break;
                     default:
                         goto parse;
@@ -571,11 +583,13 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                 break;
 
             default:
+                d->i = idx;
                 return 0;
         }
     }
 
 parse:
+    d->i = idx;
 
     switch(state) {
         case nst_init:
@@ -589,9 +603,9 @@ parse:
 
     errno = 0;
 
-    if(d->i - st < NUM_BUF_LEN) {
+    if(d->i - start < NUM_BUF_LEN) {
         memset(nbuf, 0, NUM_BUF_LEN);
-        memcpy(nbuf, &(d->p[st]), d->i - st);
+        memcpy(nbuf, &p[start], d->i - start);
 
         if(has_frac || has_exp) {
             dval = strtod(nbuf, NULL);
@@ -617,7 +631,7 @@ parse:
     }
 
     d->is_partial = 1;
-    *value = enif_make_sub_binary(d->env, d->arg, st, d->i - st);
+    *value = enif_make_sub_binary(d->env, d->arg, start, d->i - start);
     *value = enif_make_tuple2(d->env, num_type, *value);
     return 1;
 }
