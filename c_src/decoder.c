@@ -395,7 +395,6 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
     const size_t len = d->len;
     const size_t start = d->i;
     size_t idx = start;
-
     while(idx < len) {
         switch(state) {
             case nst_init:
@@ -421,8 +420,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                         idx++;
                         break;
                     default:
-                        d->i = idx;
-                        return 0;
+                        assert(0 && "this state should be unreachable"); // LCOV_EXCL_LINE
                 }
                 break;
 
