@@ -9,6 +9,17 @@
 #define DEFAULT_BYTES_PER_REDUCTION 20
 #define DEFAULT_ERLANG_REDUCTION_COUNT 2000
 
+// Check for C99
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
+  #define JIFFY_RESTRICT restrict
+#else
+  #define JIFFY_RESTRICT
+#endif
+
+#if WINDOWS || WIN32
+  #define inline __inline
+#endif
+
 typedef struct {
     ERL_NIF_TERM    atom_ok;
     ERL_NIF_TERM    atom_error;
