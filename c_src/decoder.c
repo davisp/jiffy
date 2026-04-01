@@ -443,8 +443,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                         idx++;
                         break;
                     default:
-                        d->i = idx;
-                        return 0;
+                      goto error;
                 }
                 break;
 
@@ -556,8 +555,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                         idx++;
                         break;
                     default:
-                        d->i = idx;
-                        return 0;
+                        goto error;
                 }
                 break;
 
@@ -581,8 +579,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                 break;
 
             default:
-                d->i = idx;
-                return 0;
+                goto error;
         }
     }
 
@@ -632,6 +629,10 @@ parse:
     *value = enif_make_sub_binary(d->env, d->arg, start, d->i - start);
     *value = enif_make_tuple2(d->env, num_type, *value);
     return 1;
+
+error:
+    d->i = idx;
+    return 0;
 }
 
 static ERL_NIF_TERM
