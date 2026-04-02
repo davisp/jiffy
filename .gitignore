@@ -16,6 +16,7 @@ hexer.config
 rebar.lock
 TEST-*.xml
 /eqc/
+/bench/
 coverage.info
 coverage-jiffy.info
 coverage-html/
