@@ -1,8 +1,15 @@
 // This file is part of Jiffy released under the MIT license.
 // See the LICENSE file for more information.
 
-#include <set>
 #include <string>
+
+#if defined(__cplusplus) && (__cplusplus >= 201103L)
+  #include <unordered_set>
+  typedef std::unordered_set<std::string> string_set;
+#else
+  #include <set>
+  typedef std::set<std::string> string_set;
+#endif
 
 #include <assert.h>
 
@@ -21,7 +28,7 @@ make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     ERL_NIF_TERM key;
     ERL_NIF_TERM val;
 
-    std::set<std::string> seen;
+    string_set seen;
 
     ERL_NIF_TERM old_val;
 
