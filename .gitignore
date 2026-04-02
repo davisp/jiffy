@@ -24,3 +24,4 @@ coverage-html/
 current_counterexample.eqc
 *.gcda
 *.gcno
+.cache
