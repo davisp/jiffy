@@ -667,6 +667,21 @@ make_array(ErlNifEnv* env, ERL_NIF_TERM list)
     return ret;
 }
 
+// Scan ahead and look for whitespace. This is used when we saw at least one
+// whitespace character and then expect to find more.
+static inline size_t
+skip_whitespace(const unsigned char* JIFFY_RESTRICT p, size_t len, size_t i)
+{
+    while(i < len && (
+            p[i] == ' ' ||
+            p[i] == '\n' ||
+            p[i] == '\r' ||
+            p[i] == '\t')) {
+        i++;
+    }
+    return i;
+}
+
 ERL_NIF_TERM
 decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
@@ -757,6 +772,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     start = d->i;
 
     const size_t yt = yield_threshold(d->bytes_per_red);
+    const unsigned char* JIFFY_RESTRICT p = d->p;
+    const size_t len = d->len;
 
     while(d->i < bin.size) {
         bytes_processed = d->i - start;
@@ -790,7 +807,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     case '\n':
                     case '\r':
                     case '\t':
-                        d->i++;
+                        d->i = skip_whitespace(p, len, d->i + 1);
                         break;
                     case 'n':
                         if(d->i + 3 >= d->len) {
@@ -905,7 +922,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     case '\n':
                     case '\r':
                     case '\t':
-                        d->i++;
+                        d->i = skip_whitespace(p, len, d->i + 1);
                         break;
                     case '\"':
                         if(!dec_string(d, &val)) {
@@ -949,7 +966,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     case '\n':
                     case '\r':
                     case '\t':
-                        d->i++;
+                        d->i = skip_whitespace(p, len, d->i + 1);
                         break;
                     case ':':
                         dec_pop_assert(d, st_colon);
@@ -968,7 +985,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     case '\n':
                     case '\r':
                     case '\t':
-                        d->i++;
+                        d->i = skip_whitespace(p, len, d->i + 1);
                         break;
                     case ',':
                         dec_pop_assert(d, st_comma);
@@ -1041,7 +1058,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     case '\n':
                     case '\r':
                     case '\t':
-                        d->i++;
+                        d->i = skip_whitespace(p, len, d->i + 1);
                         break;
                     default:
                         goto decode_done;
