@@ -756,10 +756,12 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     start = d->i;
 
+    const size_t yt = yield_threshold(d->bytes_per_red);
+
     while(d->i < bin.size) {
         bytes_processed = d->i - start;
 
-        if(should_yield(bytes_processed, d->bytes_per_red)) {
+        if(bytes_processed >= yt) {
             assert(enif_is_list(env, objs));
             assert(enif_is_list(env, curr));
 
