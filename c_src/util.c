@@ -101,12 +101,6 @@ get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term)
     return 1;
 }
 
-int
-should_yield(size_t used, size_t bytes_per_red)
-{
-    return (used / bytes_per_red) >= DEFAULT_ERLANG_REDUCTION_COUNT;
-}
-
 void
 bump_used_reds(ErlNifEnv* env, size_t used, size_t bytes_per_red)
 {

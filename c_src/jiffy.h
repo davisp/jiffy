@@ -7,7 +7,10 @@
 #include "erl_nif.h"
 
 #define DEFAULT_BYTES_PER_REDUCTION 20
-#define DEFAULT_ERLANG_REDUCTION_COUNT 2000
+
+// This used to be 2000 and in 19.2 was bumped to 4000
+// #define CONTEXT_REDS in erts/emulator/beam/erl_vm.h
+#define DEFAULT_ERLANG_REDUCTION_COUNT 4000
 
 // Check for C99
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
@@ -57,7 +60,9 @@ ERL_NIF_TERM make_atom(ErlNifEnv* env, const char* name);
 int get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi);
 int get_bytes_per_red(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpr);
 int get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term);
-int should_yield(size_t used, size_t bytes_per_red);
+static inline size_t yield_threshold(size_t bytes_per_red) {
+    return bytes_per_red * DEFAULT_ERLANG_REDUCTION_COUNT;
+}
 void bump_used_reds(ErlNifEnv* env, size_t used, size_t bytes_per_red);
 
 ERL_NIF_TERM decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);

@@ -825,10 +825,12 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     start = e->iosize + e->i;
 
+    const size_t yt = yield_threshold(e->bytes_per_red);
+
     while(!termstack_is_empty(&stack)) {
         bytes_processed = (e->iosize + e->i) - start;
 
-        if(should_yield(bytes_processed, e->bytes_per_red)) {
+        if(bytes_processed >= yt) {
 
             assert(enif_is_list(env, e->iolist));
 
