@@ -360,6 +360,7 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
     unsigned char data[512];
 
     size_t size;
+    size_t start;
     size_t i;
 
     if(!enif_get_atom(e->env, val, (char*)data, 512, ERL_NIF_LATIN1)) {
@@ -384,8 +385,25 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
         if(enc_special_character(e, data[i])) {
             i++;
         } else if(data[i] < 0x80) {
-            e->p[e->i++] = data[i];
+            // Scan ahead for plain ASCII chars which don't need escaping.
+            // Since optionally users could escape forward slashes, too, we
+            // stop on them as well
+            start = i;
             i++;
+            while(i < size
+                    && data[i] >= 0x20
+                    && data[i] < 0x80
+                    && data[i] != '\"'
+                    && data[i] != '\\'
+                    && data[i] != '/') {
+                i++;
+            }
+            size_t run = i - start;
+            if(!enc_ensure(e, run)) {
+                return 0;
+            }
+            memcpy(&(e->p[e->i]), &data[start], run);
+            e->i += run;
         } else if(data[i] >= 0x80) {
             /* The atom encoding is latin1, so we don't need validation
              * as all latin1 characters are valid Unicode codepoints. */
@@ -415,11 +433,12 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
     static const int MAX_ESCAPE_LEN = 12;
     ErlNifBinary bin;
 
-    unsigned char* data;
+    unsigned char* JIFFY_RESTRICT data;
     size_t size;
     int esc_len;
     size_t ulen;
     int uval;
+    size_t start;
     size_t i;
 
     if(!enif_inspect_binary(e->env, val, &bin)) {
@@ -445,7 +464,25 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
         if(enc_special_character(e, data[i])) {
             i++;
         } else if(data[i] < 0x80) {
-            e->p[e->i++] = data[i++];
+            // Scan ahead for plain ASCII char and memcpy them. Stop at quotes,
+            // backslashes, and forward slashes, since users can optionally
+            // choose to escape them too.
+            start = i;
+            i++;
+            while(i < size
+                    && data[i] >= 0x20
+                    && data[i] < 0x80
+                    && data[i] != '\"'
+                    && data[i] != '\\'
+                    && data[i] != '/') {
+                i++;
+            }
+            size_t run = i - start;
+            if(!enc_ensure(e, run)) {
+                return 0;
+            }
+            memcpy(&(e->p[e->i]), &data[start], run);
+            e->i += run;
         } else if(data[i] >= 0x80) {
             ulen = utf8_validate(&(data[i]), size - i);
 
