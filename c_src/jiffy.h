@@ -85,6 +85,5 @@ int utf8_to_unicode(unsigned char* buf, size_t size);
 int unicode_to_utf8(int c, unsigned char* buf);
 int unicode_from_pair(int hi, int lo);
 int unicode_uescape(int c, unsigned char* buf);
-int double_to_shortest(unsigned char *buf, size_t size, size_t* len, double val);
 
 #endif // Included JIFFY_H

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "jiffy.h"
+#include "ryu/ryu.h"
 
 #define BIN_INC_SIZE 2048
 
@@ -624,20 +625,14 @@ enc_long(Encoder* e, ErlNifSInt64 val)
 static inline int
 enc_double(Encoder* e, double val)
 {
-    unsigned char* start;
-    size_t len;
-
     if(!enc_ensure(e, 32)) {
         return 0;
     }
 
-    start = &(e->p[e->i]);
+    // Normalize -0.0 to 0.0 for JSON output
+    if(val == 0.0) val = 0.0;
 
-    if(!double_to_shortest(start, e->buffer.size, &len, val)) {
-        return 0;
-    }
-
-    e->i += len;
+    e->i += d2s_buffered_n(val, (char*)&(e->p[e->i]));
     e->count++;
     return 1;
 }
