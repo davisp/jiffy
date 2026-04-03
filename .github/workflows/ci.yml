@@ -134,9 +134,10 @@ jobs:
           git config --global core.autocrlf false
           git config --global core.eol lf
     - uses: actions/checkout@v6
-    - name: install rebar3
-      run: |
-        choco install rebar3
+    - uses: erlef/setup-beam@v1
+      with:
+        otp-version: '27'
+        rebar3-version: '3.23'
     - name: make check
       run: |
         $path = vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -nologo -nocolor -property installationPath
