@@ -67,3 +67,57 @@ cases(error) ->
         <<"{\"key\": 123 true">>,
         <<"{\"key\": 123,}">>
     ].
+
+
+% We put terms for large objects (> 32 keys) on the heap vs on the stack. So we
+% have to ensure we test large object as well not just smaller ones to exercise
+% that path.
+%
+large_object_maps_test_() ->
+    Opts = [return_maps],
+    [
+        {"20 duplicate keys (10 as 0, 10 as 1)",
+            fun() ->
+                KVs = [{I rem 2, I} || I <- lists:seq(1, 20)],
+                {Json, Expected} = large_obj_kvs(KVs),
+                round_trip(Json, Expected, Opts)
+            end},
+        {"25 keys",
+            fun() ->
+                {Json, Expected} = large_obj(25),
+                round_trip(Json, Expected, Opts)
+            end},
+        {"100 keys",
+            fun() ->
+                {Json, Expected} = large_obj(100),
+                round_trip(Json, Expected, Opts)
+            end},
+        {"1000 keys",
+            fun() ->
+                {Json, Expected} = large_obj(1000),
+                round_trip(Json, Expected, Opts)
+            end},
+        {"100 duplicate keys (50 as 0, 50 as 1)",
+            fun() ->
+                KVs = [{I rem 2, I} || I <- lists:seq(1, 100)],
+                {Json, Expected} = large_obj_kvs(KVs),
+                round_trip(Json, Expected, Opts)
+            end}
+    ].
+
+round_trip(Json, Expected, Opts) ->
+    Decoded = dec(Json, Opts),
+    ?assertEqual(Expected, Decoded),
+    Json1 = enc(Decoded),
+    Decoded1 = dec(Json1, Opts),
+    ?assertEqual(Expected, Decoded1).
+
+large_obj(N) when is_integer(N) ->
+    large_obj_kvs([{I, I} || I <- lists:seq(0, N - 1)]).
+
+large_obj_kvs(KVs) when is_list(KVs) ->
+    KVs1 = [{"k" ++ integer_to_list(K), V} || {K, V} <- KVs],
+    Chunks = [io_lib:format("\"~s\":~B", [K, V]) || {K, V} <- KVs1],
+    Json = iolist_to_binary(["{", lists:join(",", Chunks), "}"]),
+    Expected = maps:from_list([{list_to_binary(K), V} || {K, V} <- KVs1]),
+    {Json, Expected}.
