@@ -5,6 +5,43 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+% Duplicate keys with `return_maps`. We settled on
+% last value wins semantics in such cases so test that
+% we preserve that
+%
+duplicate_keys_maps_test_() ->
+    Opts = [return_maps],
+    Cases = [
+        % Simple duplicate
+        {
+            <<"{\"a\":1,\"a\":2}">>,
+            #{<<"a">> => 2}
+        },
+        % Duplicate with other keys
+        {
+            <<"{\"a\":1,\"b\":2,\"a\":3}">>,
+            #{<<"a">> => 3, <<"b">> => 2}
+        },
+        % Triple duplicate
+        {
+            <<"{\"x\":1,\"x\":2,\"x\":3}">>,
+            #{<<"x">> => 3}
+        },
+        % Duplicate in nested object
+        {
+            <<"{\"outer\":{\"k\":1,\"k\":2}}">>,
+            #{<<"outer">> => #{<<"k">> => 2}}
+        },
+        % No duplicates
+        {
+            <<"{\"a\":1,\"b\":2,\"c\":3}">>,
+            #{<<"a">> => 1, <<"b">> => 2, <<"c">> => 3}
+        }
+    ],
+    {"Test duplicate keys with maps", lists:map(fun({Json, Result}) ->
+        ?_assertEqual(Result, jiffy:decode(Json, Opts))
+    end, Cases)}.
+
 dedupe_keys_test_() ->
     Opts = [dedupe_keys],
     Cases = [
