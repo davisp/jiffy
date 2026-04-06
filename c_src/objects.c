@@ -12,7 +12,7 @@
 // detecting when we can skip deduplicating based on the small map
 // size limit.
 #define JIFFY_MAP_SMALL_MAP_LIMIT 32
-
+#define JIFFY_SMALL_PROPLIST_SIZE 32
 // Limit up to when we'll allocate the hash table on the stack.
 // Must be a power of 2, since we're using a bitmask. Also, we want
 // to stay well below 4KB on the stack. That can be checked wit
@@ -170,9 +170,24 @@ static int
 make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     int dedupe_keys)
 {
-    ERL_NIF_TERM ret;
     ERL_NIF_TERM key;
     ERL_NIF_TERM val;
+
+    unsigned int list_len = 0;
+    int rv = enif_get_list_length(env, pairs, &list_len);
+    assert(rv && "pairs must be a list");
+    assert((list_len % 2) == 0 && "Unbalanced object pairs.");
+    unsigned int count = list_len / 2;
+
+    if(count == 0) {
+        *out = enif_make_tuple1(env, enif_make_list(env, 0));
+        return 1;
+    }
+
+    ERL_NIF_TERM small_arr[JIFFY_SMALL_PROPLIST_SIZE];
+    ERL_NIF_TERM* arr = (count <= JIFFY_SMALL_PROPLIST_SIZE)
+        ? small_arr
+        : (ERL_NIF_TERM*) enif_alloc(count * sizeof(ERL_NIF_TERM));
 
     ht_slot stack_table[HT_STACK_SLOTS];
     ht_slot* table = NULL;
@@ -180,11 +195,7 @@ make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     ErlNifUInt64 salt = 0;
 
     if(dedupe_keys) {
-        unsigned int list_len = 0;
-        int rv = enif_get_list_length(env, pairs, &list_len);
-        assert(rv && "pairs must be a list");
-        unsigned int count = list_len / 2;
-        unsigned int ht_size = ht_size_power_of_2(count > 0 ? count : 1);
+        unsigned int ht_size = ht_size_power_of_2(count);
         table = (ht_size <= HT_STACK_SLOTS)
             ? stack_table
             : (ht_slot*) enif_alloc(ht_size * sizeof(ht_slot));
@@ -193,19 +204,23 @@ make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
         salt = (ErlNifUInt64) enif_monotonic_time(ERL_NIF_NSEC);
     }
 
-    ret = enif_make_list(env, 0);
+    // Fill array backwards since list is reversed from parsing
+    unsigned int unique = 0;
+    unsigned int i = count;
     while(enif_get_list_cell(env, pairs, &val, &pairs)) {
         if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
             assert(0 && "Unbalanced object pairs.");
         }
         if(dedupe_keys) {
             if(ht_insert(env, table, mask, key, salt)) {
-                val = enif_make_tuple2(env, key, val);
-                ret = enif_make_list_cell(env, val, ret);
+                --i;
+                arr[i] = enif_make_tuple2(env, key, val);
+                unique++;
             }
         } else {
-            val = enif_make_tuple2(env, key, val);
-            ret = enif_make_list_cell(env, val, ret);
+            --i;
+            arr[i] = enif_make_tuple2(env, key, val);
+            unique++;
         }
     }
 
@@ -213,7 +228,13 @@ make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
         enif_free(table);
     }
 
-    *out = enif_make_tuple1(env, ret);
+    ERL_NIF_TERM list = enif_make_list_from_array(env, arr + count - unique, unique);
+
+    if(arr != small_arr) {
+        enif_free(arr);
+    }
+
+    *out = enif_make_tuple1(env, list);
     return 1;
 }
 
