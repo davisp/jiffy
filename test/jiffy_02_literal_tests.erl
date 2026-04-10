@@ -43,3 +43,13 @@ null_term_test_() ->
     ],
     {"null_term",
         [?_assertEqual(R, dec(<<"null">>, O)) || {R, O} <- T]}.
+
+truncated_literal_test_() ->
+    [?_assertError(_, dec(V)) || V <- [
+        <<"tru">>,
+        <<"fals">>,
+        <<"nul">>,
+        <<"t">>,
+        <<"f">>,
+        <<"n">>
+    ]].

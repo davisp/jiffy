@@ -13,6 +13,12 @@ latin1_atom_test_() ->
     Expected = <<"{\"", 195, 164, "\":\"bar\"}">>,
     ?_assertEqual(Expected, jiffy:encode({[{Key, <<"bar">>}]})).
 
+atom_key_test_() ->
+    [
+        ?_assertEqual(<<"{\"foo\":1}">>, enc({[{foo, 1}]})),
+        ?_assertEqual(<<"{\"bar\":2}">>, enc({[{bar, 2}]}))
+    ].
+
 
 string_success_test_() ->
     [gen(ok, Case) || Case <- cases(ok)].

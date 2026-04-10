@@ -95,3 +95,6 @@ dedupe_keys_test_() ->
         Json = jiffy:encode(Data),
         ?_assertEqual(Result, jiffy:decode(Json, Opts))
     end, Cases)}.
+
+dedupe_keys_empty_test() ->
+    ?assertEqual({[]}, jiffy:decode(<<"{}">>, [dedupe_keys])).

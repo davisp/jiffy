@@ -64,12 +64,6 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
 }
 
 static int
-reload(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
-{
-    return 0;
-}
-
-static int
 upgrade(ErlNifEnv* env, void** priv, void** old_priv, ERL_NIF_TERM info)
 {
     return load(env, priv, info);
@@ -93,4 +87,4 @@ static ErlNifFunc funcs[] =
     {"nif_encode_iter", 3, encode_iter, 0}
 };
 
-ERL_NIF_INIT(jiffy, funcs, &load, &reload, &upgrade, &unload);
+ERL_NIF_INIT(jiffy, funcs, &load, NULL, &upgrade, &unload);
