@@ -340,9 +340,10 @@ enc_special_character(Encoder* e, int val) {
             e->p[e->i++] = 't';
             return 1;
         case '/':
-            if(e->escape_forward_slashes) {
-                e->p[e->i++] = '\\';
+            if(!e->escape_forward_slashes) {
+                return 0;
             }
+            e->p[e->i++] = '\\';
             e->p[e->i++] = '/';
             return 1;
         default:
@@ -392,13 +393,23 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
             // stop on them as well
             start = i;
             i++;
-            while(i < size
-                    && data[i] >= 0x20
-                    && data[i] < 0x80
-                    && data[i] != '\"'
-                    && data[i] != '\\'
-                    && data[i] != '/') {
-                i++;
+            if(e->escape_forward_slashes) {
+                while(i < size
+                        && data[i] >= 0x20
+                        && data[i] < 0x80
+                        && data[i] != '\"'
+                        && data[i] != '\\'
+                        && data[i] != '/') {
+                    i++;
+                }
+            } else {
+                while(i < size
+                        && data[i] >= 0x20
+                        && data[i] < 0x80
+                        && data[i] != '\"'
+                        && data[i] != '\\') {
+                    i++;
+                }
             }
             size_t run = i - start;
             if(!enc_ensure(e, run)) {
@@ -471,13 +482,23 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
             // choose to escape them too.
             start = i;
             i++;
-            while(i < size
-                    && data[i] >= 0x20
-                    && data[i] < 0x80
-                    && data[i] != '\"'
-                    && data[i] != '\\'
-                    && data[i] != '/') {
-                i++;
+            if(e->escape_forward_slashes) {
+                while(i < size
+                        && data[i] >= 0x20
+                        && data[i] < 0x80
+                        && data[i] != '\"'
+                        && data[i] != '\\'
+                        && data[i] != '/') {
+                    i++;
+                }
+            } else {
+                while(i < size
+                        && data[i] >= 0x20
+                        && data[i] < 0x80
+                        && data[i] != '\"'
+                        && data[i] != '\\') {
+                    i++;
+                }
             }
             size_t run = i - start;
             if(!enc_ensure(e, run)) {
