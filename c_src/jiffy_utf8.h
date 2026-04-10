@@ -1,7 +1,10 @@
 // This file is part of Jiffy released under the MIT license.
 // See the LICENSE file for more information.
-#include "jiffy.h"
-#include <stdio.h>
+
+#ifndef JIFFY_UTF8_H
+#define JIFFY_UTF8_H
+
+#include <string.h>
 
 static const unsigned char hexvals[256] = {
     255, 255, 255, 255, 255, 255, 255, 255,
@@ -46,7 +49,7 @@ static const char hexdigits[16] = {
     'C', 'D', 'E', 'F'
 };
 
-int
+static inline int
 int_from_hex(const unsigned char* p)
 {
     unsigned char* h = (unsigned char*) p;
@@ -65,7 +68,7 @@ int_from_hex(const unsigned char* p)
     return ret;
 }
 
-int
+static inline int
 int_to_hex(int val, unsigned char* p)
 {
     if(val < 0 || val > 65535)
@@ -79,7 +82,7 @@ int_to_hex(int val, unsigned char* p)
     return 1;
 }
 
-int
+static inline int
 utf8_len(int c)
 {
     if(c < 128) {
@@ -99,7 +102,7 @@ utf8_len(int c)
     }
 }
 
-int
+static inline int
 utf8_esc_len(int c)
 {
     if(c < 0x10000) {
@@ -111,7 +114,38 @@ utf8_esc_len(int c)
     }
 }
 
-size_t
+static inline int
+utf8_to_unicode(unsigned char* buf, size_t size)
+{
+    int ret;
+    if((buf[0] & 0x80) == 0x00) {
+        // 0xxxxxxx
+        ret = buf[0];
+    } else if((buf[0] & 0xE0) == 0xC0 && size >= 2) {
+        // 110xxxxy 10yyyyyy
+        ret = ((buf[0] & 0x1F) << 6)
+            | ((buf[1] & 0x3F));
+    } else if((buf[0] & 0xF0) == 0xE0 && size >= 3) {
+        // 1110xxxx 10xyyyyy 10yyyyyy
+        ret = ((buf[0] & 0x0F) << 12)
+            | ((buf[1] & 0x3F) << 6)
+            | ((buf[2] & 0x3F));
+        if(ret >= 0xD800 && ret <= 0xDFFF) {
+            ret = -1;
+        }
+    } else if((buf[0] & 0xF8) == 0xF0 && size >= 4) {
+        // 11110xxx 10xxyyyy 10yyyyyy 10yyyyyy
+        ret = ((buf[0] & 0x07) << 18)
+            | ((buf[1] & 0x3F) << 12)
+            | ((buf[2] & 0x3F) << 6)
+            | ((buf[3] & 0x3F));
+    } else {
+        ret = -1;
+    }
+    return ret;
+}
+
+static inline size_t
 utf8_validate(unsigned char* data, size_t size)
 {
     size_t ulen = 0;
@@ -175,38 +209,7 @@ utf8_validate(unsigned char* data, size_t size)
     return ulen;
 }
 
-int
-utf8_to_unicode(unsigned char* buf, size_t size)
-{
-    int ret;
-    if((buf[0] & 0x80) == 0x00) {
-        // 0xxxxxxx
-        ret = buf[0];
-    } else if((buf[0] & 0xE0) == 0xC0 && size >= 2) {
-        // 110xxxxy 10yyyyyy
-        ret = ((buf[0] & 0x1F) << 6)
-            | ((buf[1] & 0x3F));
-    } else if((buf[0] & 0xF0) == 0xE0 && size >= 3) {
-        // 1110xxxx 10xyyyyy 10yyyyyy
-        ret = ((buf[0] & 0x0F) << 12)
-            | ((buf[1] & 0x3F) << 6)
-            | ((buf[2] & 0x3F));
-        if(ret >= 0xD800 && ret <= 0xDFFF) {
-            ret = -1;
-        }
-    } else if((buf[0] & 0xF8) == 0xF0 && size >= 4) {
-        // 11110xxx 10xxyyyy 10yyyyyy 10yyyyyy
-        ret = ((buf[0] & 0x07) << 18)
-            | ((buf[1] & 0x3F) << 12)
-            | ((buf[2] & 0x3F) << 6)
-            | ((buf[3] & 0x3F));
-    } else {
-        ret = -1;
-    }
-    return ret;
-}
-
-int
+static inline int
 unicode_to_utf8(int c, unsigned char* buf)
 {
     if(c < 0x80) {
@@ -235,7 +238,7 @@ unicode_to_utf8(int c, unsigned char* buf)
     return -1;
 }
 
-int
+static inline int
 unicode_from_pair(int hi, int lo)
 {
     if(hi < 0xD800 || hi >= 0xDC00) return -1;
@@ -243,7 +246,7 @@ unicode_from_pair(int hi, int lo)
     return ((hi & 0x3FF) << 10) + (lo & 0x3FF) + 0x10000;
 }
 
-int
+static inline int
 unicode_uescape(int val, unsigned char* p)
 {
     int n;
@@ -270,3 +273,5 @@ unicode_uescape(int val, unsigned char* p)
     }
     return -1;
 }
+
+#endif // JIFFY_UTF8_H

@@ -63,7 +63,19 @@ int get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term);
 static inline size_t yield_threshold(size_t bytes_per_red) {
     return bytes_per_red * DEFAULT_ERLANG_REDUCTION_COUNT;
 }
-void bump_used_reds(ErlNifEnv* env, size_t used, size_t bytes_per_red);
+
+static inline void
+bump_used_reds(ErlNifEnv* env, size_t used, size_t bytes_per_red)
+{
+    size_t reds_used = used / bytes_per_red;
+    size_t pct_used = 100 * reds_used / DEFAULT_ERLANG_REDUCTION_COUNT;
+    if(pct_used > 0) {
+        if(pct_used > 100) {
+            pct_used = 100;
+        }
+        enif_consume_timeslice(env, pct_used);
+    }
+}
 
 ERL_NIF_TERM decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
@@ -75,15 +87,5 @@ void enc_destroy(ErlNifEnv* env, void* obj);
 
 int make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
         int ret_map, int dedupe_keys);
-
-int int_from_hex(const unsigned char* p);
-int int_to_hex(int val, unsigned char* p);
-int utf8_len(int c);
-int utf8_esc_len(int c);
-size_t utf8_validate(unsigned char* data, size_t size);
-int utf8_to_unicode(unsigned char* buf, size_t size);
-int unicode_to_utf8(int c, unsigned char* buf);
-int unicode_from_pair(int hi, int lo);
-int unicode_uescape(int c, unsigned char* buf);
 
 #endif // Included JIFFY_H

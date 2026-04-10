@@ -100,21 +100,3 @@ get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term)
 
     return 1;
 }
-
-void
-bump_used_reds(ErlNifEnv* env, size_t used, size_t bytes_per_red)
-{
-    size_t reds_used;
-    size_t pct_used;
-
-    reds_used = used / bytes_per_red;
-    pct_used = 100 * reds_used / DEFAULT_ERLANG_REDUCTION_COUNT;
-
-    if(pct_used > 0) {
-        if(pct_used > 100) {
-            pct_used = 100;
-        }
-
-        enif_consume_timeslice(env, pct_used);
-    }
-}
