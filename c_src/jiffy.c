@@ -1,7 +1,15 @@
 // This file is part of Jiffy released under the MIT license.
 // See the LICENSE file for more information.
+//
+// Note: we're doing a "unity build" pattern here: all sources are compiled as
+// a single translation unit so the compiler can optimize across file
+// boundaries without lto
 
-#include "jiffy.h"
+#include "decoder.c"
+#include "encoder.c"
+#include "objects.c"
+#include "util.c"
+#include "ryu/d2s.c"
 
 static int
 load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
