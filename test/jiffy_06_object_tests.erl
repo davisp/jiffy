@@ -73,9 +73,17 @@ cases(error) ->
 % have to ensure we test large object as well not just smaller ones to exercise
 % that path.
 %
+empty_object_maps_test_() ->
+    ?_assertEqual(#{}, dec(<<"{}">>, [return_maps])).
+
 large_object_maps_test_() ->
     Opts = [return_maps],
     [
+        {"200 keys",
+            fun() ->
+                {Json, Expected} = large_obj(200),
+                round_trip(Json, Expected, Opts)
+            end},
         {"20 duplicate keys (10 as 0, 10 as 1)",
             fun() ->
                 KVs = [{I rem 2, I} || I <- lists:seq(1, 20)],
