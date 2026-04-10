@@ -9,6 +9,7 @@
 
 #include "erl_nif.h"
 #include "jiffy.h"
+#include "jiffy_utf8.h"
 
 #define STACK_SIZE_INC 64
 #define NUM_BUF_LEN 32

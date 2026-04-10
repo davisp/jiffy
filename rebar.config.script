@@ -27,27 +27,6 @@ Config1 = case lists:keyfind(erl_opts, 1, CONFIG) of
         CONFIG ++ [{erl_opts, ErlOpts}]
 end,
 
-Config2 = case os:type() of
-    {unix, _} ->
-        CC = case os:getenv("CC") of
-            false -> "cc";
-            Else -> Else
-        end,
-        FLTO_CHECK = "echo 'int main(int argc, char *argv[]) {return 0;}' | "
-                ++ CC ++ " -c -x c -o /dev/null -flto -",
-        case os:cmd(FLTO_CHECK) of
-            [] ->
-                {port_env, PortEnv} = lists:keyfind(port_env, 1, Config1),
-                NewFlag = {".*", "FLTO_FLAG", "-flto"},
-                NewPortEnv = lists:keyreplace("FLTO_FLAG", 2, PortEnv, NewFlag),
-                lists:keyreplace(port_env, 1, Config1, {port_env, NewPortEnv});
-            _ ->
-                Config1
-        end;
-    _ ->
-        Config1
-end,
-
 IsRebar2 = case lists:keyfind(rebar, 1, application:loaded_applications()) of
     {rebar, _Desc, Vsn} ->
         case string:split(Vsn, ".") of
@@ -60,9 +39,9 @@ end,
 
 case IsRebar2 of
     true ->
-        Config2;
+        Config1;
     false ->
-        Config2 ++ [
+        Config1 ++ [
             {plugins, [{pc, "~> 1.15"}]},
             case os:type() of
                 {win32, _} -> {artifacts, ["priv/jiffy.dll"]};

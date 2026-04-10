@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "jiffy.h"
+#include "jiffy_utf8.h"
 #include "ryu/ryu.h"
 
 #define BIN_INC_SIZE 2048
