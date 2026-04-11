@@ -5,8 +5,6 @@
 -export([decode/1, decode/2, encode/1, encode/2]).
 -define(NOT_LOADED, not_loaded(?LINE)).
 
--compile([no_native]).
-
 -on_load(init/0).
 
 
@@ -101,15 +99,11 @@ encode(Data, Options) ->
 
 
 finish_decode({bignum, Value}) ->
-    list_to_integer(binary_to_list(Value));
+    binary_to_integer(Value);
 finish_decode({bignum_e, Value}) ->
-    {IVal, EVal} = case string:to_integer(binary_to_list(Value)) of
-        {I, [$e | ExpStr]} ->
-            {E, []} = string:to_integer(ExpStr),
-            {I, E};
-        {I, [$E | ExpStr]} ->
-            {E, []} = string:to_integer(ExpStr),
-            {I, E}
+    {IVal, EVal} = case binary:split(Value, [<<$e>>, <<$E>>]) of
+        [IStr, EStr] ->
+            {binary_to_integer(IStr), binary_to_integer(EStr)}
     end,
     try
         IVal * math:pow(10, EVal)
@@ -119,7 +113,7 @@ finish_decode({bignum_e, Value}) ->
     end;
 finish_decode({bigdbl, Value}) ->
     try
-        list_to_float(binary_to_list(Value))
+        binary_to_float(Value)
     catch
         error:badarg ->
             error({range, Value})
