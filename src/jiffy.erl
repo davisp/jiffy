@@ -153,8 +153,7 @@ finish_encode([], Acc) ->
 finish_encode([<<_/binary>>=B | Rest], Acc) ->
     finish_encode(Rest, [B | Acc]);
 finish_encode([Val | Rest], Acc) when is_integer(Val) ->
-    Bin = list_to_binary(integer_to_list(Val)),
-    finish_encode(Rest, [Bin | Acc]);
+    finish_encode(Rest, [integer_to_binary(Val) | Acc]);
 finish_encode([InvalidEjson | _], _) ->
     error({invalid_ejson, InvalidEjson});
 finish_encode(_, _) ->
