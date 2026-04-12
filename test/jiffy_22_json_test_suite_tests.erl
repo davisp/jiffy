@@ -60,32 +60,17 @@ gen_whatever({Name, Json}) ->
     end}.
 
 
-% Jiffy is linient here and we deviate from strict RFC 8259:
-%  - accept truncated exponents e.g. 0.3e+ is 0.3 for us so
-%    add an exception for it
-%
-known_deviations() ->
-    [
-        "n_number_0.3e+",
-        "n_number_0_capital_E+",
-        "n_number_0e+",
-        "n_number_1.0e+",
-        "n_number_1.0e-"
-    ].
-
-
 classify(Files) ->
     classify(Files, [], [], []).
 
 classify([], Y, N, I) ->
     {lists:reverse(Y), lists:reverse(N), lists:reverse(I)};
 classify([{Name, _Json} = F | Rest], Y, N, I) ->
-    case {Name, lists:member(Name, known_deviations())} of
-        {_, true}    -> classify(Rest, Y, N, [F | I]);
-        {"y_" ++ _, _} -> classify(Rest, [F | Y], N, I);
-        {"n_" ++ _, _} -> classify(Rest, Y, [F | N], I);
-        {"i_" ++ _, _} -> classify(Rest, Y, N, [F | I]);
-        _              -> classify(Rest, Y, N, I)
+    case Name of
+        "y_" ++ _ -> classify(Rest, [F | Y], N, I);
+        "n_" ++ _ -> classify(Rest, Y, [F | N], I);
+        "i_" ++ _ -> classify(Rest, Y, N, [F | I]);
+        _         -> classify(Rest, Y, N, I)
     end.
 
 
