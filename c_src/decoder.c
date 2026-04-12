@@ -33,6 +33,7 @@ enum {
     nst_frac1,
     nst_frac,
     nst_esign,
+    nst_echeck,
     nst_edigit
 } JsonNumState;
 
@@ -549,6 +550,9 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                 switch(p[idx]) {
                     case '-':
                     case '+':
+                        state = nst_echeck;
+                        idx++;
+                        break;
                     case '0':
                     case '1':
                     case '2':
@@ -564,6 +568,28 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                         break;
                     default:
                         goto error;
+                }
+                break;
+
+             case nst_echeck:
+                switch(p[idx]) {
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                    case '8':
+                    case '9':
+                        state = nst_edigit;
+                        while(idx < len && p[idx] >= '0' && p[idx] <= '9') {
+                            idx++;
+                        }
+                        break;
+                    default:
+                        goto parse;
                 }
                 break;
 
@@ -601,6 +627,7 @@ parse:
         case nst_sign:
         case nst_frac1:
         case nst_esign:
+        case nst_echeck:
             return 0;
         default:
             break;
