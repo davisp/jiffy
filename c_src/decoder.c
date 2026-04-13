@@ -635,9 +635,11 @@ parse:
 
     errno = 0;
 
-    if(d->i - start < NUM_BUF_LEN) {
-        memset(nbuf, 0, NUM_BUF_LEN);
-        memcpy(nbuf, &p[start], d->i - start);
+    size_t num_len = d->i - start;
+
+    if(num_len < NUM_BUF_LEN) {
+        memcpy(nbuf, &p[start], num_len);
+        nbuf[num_len] = '\0';
 
         if(has_frac || has_exp) {
             dval = strtod(nbuf, NULL);
@@ -663,7 +665,7 @@ parse:
     }
 
     d->is_partial = 1;
-    *value = enif_make_sub_binary(d->env, d->arg, start, d->i - start);
+    *value = enif_make_sub_binary(d->env, d->arg, start, num_len);
     *value = enif_make_tuple2(d->env, num_type, *value);
     return 1;
 
