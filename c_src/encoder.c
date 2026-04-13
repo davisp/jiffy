@@ -84,14 +84,20 @@ termstack_restore(ErlNifEnv* env, ERL_NIF_TERM from, TermStack* stack)
     int arity;
 
     if(enif_get_tuple(env, from, &arity, &elements)) {
+        assert(arity > 0 && "Erlang bug: enif_get_tuple returned a negative arity");
+
         stack->top = arity;
 
         if(arity <= SMALL_TERMSTACK_SIZE) {
             stack->elements = &stack->__default_elements[0];
             stack->size = SMALL_TERMSTACK_SIZE;
         } else {
-            stack->size = arity * 2;
-            stack->elements = enif_alloc(stack->size * sizeof(ERL_NIF_TERM));
+            size_t size = SMALL_TERMSTACK_SIZE;
+            while(size < stack->top) {
+                size *= 2;
+            }
+            stack->size = size;
+            stack->elements = enif_alloc(size * sizeof(ERL_NIF_TERM));
 
             if(!stack->elements) {
                 return 0;
