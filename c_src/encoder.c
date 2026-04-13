@@ -123,7 +123,7 @@ termstack_push(TermStack* stack, ERL_NIF_TERM term)
 
         if (stack->elements == &stack->__default_elements[0]) {
             ERL_NIF_TERM* elems = enif_alloc(num_bytes);
-            memcpy(elems, stack->elements, num_bytes);
+            memcpy(elems, stack->elements, SMALL_TERMSTACK_SIZE * sizeof(ERL_NIF_TERM));
             stack->elements = elems;
         } else {
             stack->elements = enif_realloc(stack->elements, num_bytes);
