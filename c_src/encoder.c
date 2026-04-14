@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "jiffy.h"
+#include "jiffy_simd.h"
 #include "jiffy_utf8.h"
 #include "ryu/ryu.h"
 
@@ -408,13 +409,7 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
                     i++;
                 }
             } else {
-                while(i < size
-                        && data[i] >= 0x20
-                        && data[i] < 0x80
-                        && data[i] != '\"'
-                        && data[i] != '\\') {
-                    i++;
-                }
+                i = jiffy_scan_string_body(data, size, i);
             }
             size_t run = i - start;
             if(!enc_ensure(e, run)) {
@@ -497,13 +492,7 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
                     i++;
                 }
             } else {
-                while(i < size
-                        && data[i] >= 0x20
-                        && data[i] < 0x80
-                        && data[i] != '\"'
-                        && data[i] != '\\') {
-                    i++;
-                }
+                i = jiffy_scan_string_body(data, size, i);
             }
             size_t run = i - start;
             if(!enc_ensure(e, run)) {

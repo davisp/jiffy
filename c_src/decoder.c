@@ -8,6 +8,7 @@
 #include "erl_nif.h"
 #include "ffc.h"
 #include "jiffy.h"
+#include "jiffy_simd.h"
 #include "jiffy_utf8.h"
 
 #define STACK_SIZE_INC 64
@@ -269,18 +270,9 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
                     return 0;
             }
         } else if(d->p[d->i] < 0x80) {
-            // Scan ahead plain ASCII as an optimization
-            const unsigned char* JIFFY_RESTRICT p = d->p;
-            size_t idx = d->i + 1;
-            const size_t len = d->len;
-            while(idx < len
-                    && p[idx] >= 0x20
-                    && p[idx] < 0x80
-                    && p[idx] != '\"'
-                    && p[idx] != '\\') {
-                idx++;
-            }
-            d->i = idx;
+            // Scan ahead plain ASCII as an optimization. The first
+            // byte has already been checked, so start at i+1.
+            d->i = jiffy_scan_string_body(d->p, d->len, d->i + 1);
         } else {
             ulen = utf8_validate(&(d->p[d->i]), d->len - d->i);
             if(ulen == 0) {
