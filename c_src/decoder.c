@@ -2,16 +2,15 @@
 // See the LICENSE file for more information.
 
 #include <assert.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "erl_nif.h"
+#include "ffc.h"
 #include "jiffy.h"
 #include "jiffy_utf8.h"
 
 #define STACK_SIZE_INC 64
-#define NUM_BUF_LEN 32
 #define JIFFY_SMALL_ARRAY_SIZE 64
 
 enum {
@@ -382,11 +381,10 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
 {
     ERL_NIF_TERM num_type = d->atoms->atom_error;
     char state = nst_init;
-    char nbuf[NUM_BUF_LEN];
     int has_frac = 0;
     int has_exp = 0;
     double dval;
-    long lval;
+    int64_t lval;
 
     // Use the same trick as did for dec_string. The restrict qualifier hints
     // to the compiler p won't alias any other pointers so it can optimize
@@ -633,26 +631,27 @@ parse:
             break;
     }
 
-    errno = 0;
+    // Use ffc.h to parse numbers. It parses direclty from the stream no need
+    // to allocate a separate buffer as with strtod and strtol. The state
+    // machine already validated the syntax, so parse-level errors shouldn't
+    // occur here, only FFC_OUTCOME_OUT_OF_RANGE. If the range erro happens we
+    // fall back to Erlang with handle big numbers.
+    const char* nstart = (const char*)&p[start];
+    const char* nend = (const char*)&p[d->i];
+    const size_t num_len = d->i - start;
 
-    size_t num_len = d->i - start;
-
-    if(num_len < NUM_BUF_LEN) {
-        memcpy(nbuf, &p[start], num_len);
-        nbuf[num_len] = '\0';
-
-        if(has_frac || has_exp) {
-            dval = strtod(nbuf, NULL);
-            if(errno != ERANGE) {
-                *value = enif_make_double(d->env, dval);
-                return 1;
-            }
-        } else {
-            lval = strtol(nbuf, NULL, 10);
-            if(errno != ERANGE) {
-                *value = enif_make_int64(d->env, lval);
-                return 1;
-            }
+    if(has_frac || has_exp) {
+        ffc_parse_options opts = {FFC_PRESET_JSON, '.'};
+        ffc_result res = ffc_from_chars_double_options(nstart, nend, &dval, opts);
+        if(res.outcome == FFC_OUTCOME_OK) {
+            *value = enif_make_double(d->env, dval);
+            return 1;
+        }
+    } else {
+        ffc_result res = ffc_parse_i64(num_len, nstart, 10, &lval);
+        if(res.outcome == FFC_OUTCOME_OK) {
+            *value = enif_make_int64(d->env, lval);
+            return 1;
         }
     }
 

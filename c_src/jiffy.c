@@ -5,6 +5,10 @@
 // a single translation unit so the compiler can optimize across file
 // boundaries without lto
 
+// Pull in ffc.h implementation once for the whole unity build.
+#define FFC_IMPL
+#include "ffc.h"
+
 #include "decoder.c"
 #include "encoder.c"
 #include "objects.c"
