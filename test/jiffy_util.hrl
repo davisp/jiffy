@@ -4,12 +4,18 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
+iol2b(X) ->
+    iolist_to_binary(X).
+
+i2b(X) ->
+    integer_to_binary(X).
+
 msg(Fmt, Args) ->
     M1 = io_lib:format(Fmt, Args),
     M2 = re:replace(M1, <<"\r">>, <<"\\\\r">>, [global]),
     M3 = re:replace(M2, <<"\n">>, <<"\\\\n">>, [global]),
     M4 = re:replace(M3, <<"\t">>, <<"\\\\t">>, [global]),
-    iolist_to_binary(M4).
+    iol2b(M4).
 
 
 hex(Bin) when is_binary(Bin) ->
@@ -27,12 +33,11 @@ dec(V, Opts) ->
 
 
 enc(V) ->
-    iolist_to_binary(jiffy:encode(V)).
+    iol2b(jiffy:encode(V)).
 
 
 enc(V, Opts) ->
-    iolist_to_binary(jiffy:encode(V, Opts)).
-
+    iol2b(jiffy:encode(V, Opts)).
 
 %% rebar runs eunit with PWD as .eunit/
 %% rebar3 runs eunit with PWD as ./

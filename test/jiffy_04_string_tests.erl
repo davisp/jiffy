@@ -146,7 +146,13 @@ cases(error) ->
         % Truncated \uXX (not enough hex digits)
         <<"\"\\u00\"">>,
         % Invalid hex digit in \u escape
-        <<"\"\\uZZZZ\"">>
+        <<"\"\\uZZZZ\"">>,
+        % Same story as \uD834\n but with more trailers to pass the length
+        % guard and reach the '\u' check for the low surrogate. We're down in
+        % the weeds, as it were.
+        <<"\"\\uD834\\nabcdef\"">>,
+        % \uD834\u<bad hex> low surrogate hex error
+        <<"\"\\uD834\\uZZZZ\"">>
     ];
 
 cases(utf8) ->
@@ -205,5 +211,18 @@ cases(bad_utf8_key) ->
 
 cases(escaped_slashes) ->
     [
-        {<<"\"\\/\"">>, <<"/">>}
+        {<<"\"\\/\"">>, <<"/">>},
+        {<<"\"foo\\/bar\\/baz\"">>, <<"foo/bar/baz">>}
+    ].
+
+
+atom_escaped_slashes_test_() ->
+    [
+        ?_assertEqual(<<"\"a\\/b\"">>,
+            enc('a/b', [escape_forward_slashes])),
+        ?_assertEqual(<<"\"a/b\"">>, enc('a/b')),
+        ?_assertEqual(<<"{\"a\\/b\":1}">>,
+            enc({[{'a/b', 1}]}, [escape_forward_slashes])),
+        ?_assertEqual(<<"\"foo\\/bar\\/baz\\/potato\"">>,
+            enc('foo/bar/baz/potato', [escape_forward_slashes]))
     ].
