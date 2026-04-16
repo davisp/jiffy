@@ -4,6 +4,7 @@
 -module(jiffy_16_dedupe_keys_tests).
 
 -include_lib("eunit/include/eunit.hrl").
+-include("jiffy_util.hrl").
 
 % Duplicate keys with `return_maps`. We settled on
 % last value wins semantics in such cases so test that
@@ -98,3 +99,25 @@ dedupe_keys_test_() ->
 
 dedupe_keys_empty_test() ->
     ?assertEqual({[]}, jiffy:decode(<<"{}">>, [dedupe_keys])).
+
+% Exercise the heap-allocated dedupe hash table path when count > 64 and hit
+% more than HT_STACK_SLOTS. We're padding those coverage stats here, really.
+dedupe_keys_large_test_() ->
+    N = 100,
+    KV = fun(I) -> [<<"\"">>, i2b(I), <<"\":">>, i2b(I)] end,
+    Body = iol2b(lists:join(",", [KV(I) || I <- lists:seq(1, N)])),
+    Dupes = iol2b(lists:join(",", [KV(I) || I <- lists:seq(1, N)])),
+    JUnique = <<"{", Body/binary, "}">>,
+    JDupes = <<"{", Body/binary, ",", Dupes/binary, "}">>,
+    [
+        {"Unique large object",
+            fun() ->
+                {Pairs} = jiffy:decode(JUnique, [dedupe_keys]),
+                ?assertEqual(N, length(Pairs))
+            end},
+        {"All keys duplicated once",
+            fun() ->
+                {Pairs} = jiffy:decode(JDupes, [dedupe_keys]),
+                ?assertEqual(N, length(Pairs))
+            end}
+    ].

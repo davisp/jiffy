@@ -82,12 +82,26 @@ enc_invalid_object_member_key_test_() ->
     ]}.
 
 
-encode_bad_option_test() ->
-    ?assertError(badarg, jiffy:encode(1, [not_a_valid_option])).
+decode_bad_option_test_() ->
+    [?_assertError(badarg, jiffy:decode(<<"1">>, [O])) || O <- [
+        not_a_valid_option,
+        <<"foo">>,
+        {foo, bar, baz},
+        {bytes_per_iter, not_an_int},
+        {bytes_per_red, not_an_int},
+        {some_other_opt, value},
+        {null_term, 123}
+    ]].
 
 
-decode_bad_option_test() ->
-    ?assertError(badarg, jiffy:decode(<<"1">>, [not_a_valid_option])).
+encode_bad_option_test_() ->
+    [?_assertError(badarg, jiffy:encode(1, [O])) || O <- [
+        not_a_valid_option,
+        <<"foo">>,
+        {foo, bar, baz},
+        {bytes_per_iter, not_an_int},
+        {bytes_per_red, not_an_int}
+    ]].
 
 
 enc_error(Type, Obj, Case) ->

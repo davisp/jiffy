@@ -38,8 +38,12 @@ get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
         return 0;
     }
 
-    // Calculate the number of bytes per reduction
+    // Calculate the number of bytes per reduction. Clamp to 1 so we
+    // avoid a divide-by-zero in bump_used_reds.
     *bpi = (size_t) (bytes / DEFAULT_ERLANG_REDUCTION_COUNT);
+    if(*bpi == 0) {
+        *bpi = 1;
+    }
 
     return 1;
 }
@@ -68,7 +72,11 @@ get_bytes_per_red(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi)
         return 0;
     }
 
+    // Same get_bytes_per_iter, clamp to 1 to avoid a divide by 0
     *bpi = (size_t) bytes;
+    if(*bpi == 0) {
+        *bpi = 1;
+    }
 
     return 1;
 }
