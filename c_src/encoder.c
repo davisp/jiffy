@@ -261,12 +261,12 @@ enc_ensure(Encoder* e, size_t req)
 {
     size_t new_size = BIN_INC_SIZE;
 
-    if(e->have_buffer) {
-        if(req < (e->buffer.size - e->i)) {
+    if(JIFFY_LIKELY(e->have_buffer)) {
+        if(JIFFY_LIKELY(req < (e->buffer.size - e->i))) {
             return 1;
         }
 
-        if(!enc_flush(e)) {
+        if(JIFFY_UNLIKELY(!enc_flush(e))) {
             return 0;
         }
 
@@ -390,9 +390,9 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
             return 0;
         }
 
-        if(enc_special_character(e, data[i])) {
+        if(JIFFY_UNLIKELY(enc_special_character(e, data[i]))) {
             i++;
-        } else if(data[i] < 0x80) {
+        } else if(JIFFY_LIKELY(data[i] < 0x80)) {
             // Scan ahead for plain ASCII chars which don't need escaping.
             // Since optionally users could escape forward slashes, too, we
             // stop on them as well
@@ -511,12 +511,12 @@ enc_string(Encoder* e, ERL_NIF_TERM val)
             }
             memcpy(&(e->p[e->i]), &data[start], run);
             e->i += run;
-        } else if(data[i] >= 0x80) {
+        } else if(JIFFY_UNLIKELY(data[i] >= 0x80)) {
             ulen = utf8_validate(&(data[i]), size - i);
 
-            if (ulen == 0) {
+            if (JIFFY_UNLIKELY(ulen == 0)) {
                 return 0;
-            } else if (e->uescape) {
+            } else if (JIFFY_UNLIKELY(e->uescape)) {
                 uval = utf8_to_unicode(&(data[i]), size-i);
                 if(uval < 0) {
                     return 0;
