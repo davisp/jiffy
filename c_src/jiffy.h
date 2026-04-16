@@ -6,7 +6,7 @@
 
 #include "erl_nif.h"
 
-#define DEFAULT_BYTES_PER_REDUCTION 20
+#define DEFAULT_BYTES_PER_REDUCTION 10
 
 // This used to be 2000 and in 19.2 was bumped to 4000
 // #define CONTEXT_REDS in erts/emulator/beam/erl_vm.h
