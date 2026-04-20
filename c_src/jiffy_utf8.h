@@ -145,68 +145,95 @@ utf8_to_unicode(unsigned char* buf, size_t size)
     return ret;
 }
 
-static inline size_t
-utf8_validate(unsigned char* data, size_t size)
-{
-    size_t ulen = 0;
-    int ui;
-    size_t i;
+// Lead-byte length table
+//   0     : invalid lead byte, len 2 overlongs, > U+10FFFF [F5..FF]
+//   1     : ASCII
+//   2,3,4 : lead byte of that sequence
+//
+// Note: we mark some overlongs here right away (2 char ones and greater than
+// F4). Below we'll only need continuation byte checks and two boundary checks
+// (b0 and b1) for overlong 3 and 4, surrogate 3 and over-long 4.
+//
+// The idea is originally from https://arxiv.org/pdf/2010.03090 "Validating
+// UTF-8 In Less Than One Instruction Per Byte" with an accompanying blog
+// https://lemire.me/blog/2020/10/20/ridiculously-fast-unicode-utf-8-validation
+//
+static const unsigned char utf8_seq_len[256] = {
+    /* 0x00 */ 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    /* 0x10 */ 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    /* 0x20 */ 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    /* 0x30 */ 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    /* 0x40 */ 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    /* 0x50 */ 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    /* 0x60 */ 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    /* 0x70 */ 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    /* 0x80 */ 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+    /* 0x90 */ 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+    /* 0xA0 */ 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+    /* 0xB0 */ 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+    /* 0xC0 */ 0,0,2,2,2,2,2,2, 2,2,2,2,2,2,2,2,
+    /* 0xD0 */ 2,2,2,2,2,2,2,2, 2,2,2,2,2,2,2,2,
+    /* 0xE0 */ 3,3,3,3,3,3,3,3, 3,3,3,3,3,3,3,3,
+    /* 0xF0 */ 4,4,4,4,4,0,0,0, 0,0,0,0,0,0,0,0
+    /*         0 1 2 3 4 5 6 7  8 9 A B C D E F */
+};
 
-    if((data[0] & 0x80) == 0x00) {
-        ulen = 1;
-    } else if((data[0] & 0xE0) == 0xC0) {
-        ulen = 2;
-    } else if((data[0] & 0xF0) == 0xE0) {
-        ulen = 3;
-    } else if((data[0] & 0xF8) == 0xF0) {
-        ulen = 4;
+static inline size_t
+utf8_validate(const unsigned char* JIFFY_RESTRICT data, size_t size)
+{
+    unsigned int b0 = data[0];
+    unsigned int len = utf8_seq_len[b0];
+    if(len == 0 || len > size) {
+        return 0;
     }
-    if(ulen == 0 || ulen > size) {
+    if(len == 1) {
+        // We should never get here from dec_string since we pre-filter bytes < 0x80.
+        return 1; // LCOV_EXCL_LINE
+    }
+
+    // This is the tricky bit: pack the 1 to 3 continuation bytes into an
+    // unsigned int then do masked compares on all at the same time. I saw this
+    // the first time in yyjson library.
+    unsigned int cont = (unsigned int)data[1];
+    if(len >= 3) {
+        cont |= (unsigned int)data[2] << 8;
+    }
+    if(len == 4) {
+        cont |= (unsigned int)data[3] << 16;
+    }
+    static const unsigned int CONT_MASK[5]   = {0, 0, 0x0000C0, 0x00C0C0, 0xC0C0C0};
+    static const unsigned int CONT_EXPECT[5] = {0, 0, 0x000080, 0x008080, 0x808080};
+    if((cont & CONT_MASK[len]) != CONT_EXPECT[len]) {
         return 0;
     }
 
-    // Check each continuation byte.
-    for(i = 1; i < ulen; i++) {
-        if((data[i] & 0xC0) != 0x80) return 0;
+    if(len == 2) {
+        return 2;
     }
 
-    // Wikipedia says I have to check that a UTF-8 encoding
-    // uses as few bits as possible. This means that we
-    // can't do things like encode 't' in three bytes.
-    // To check this all we need to ensure is that for each
-    // of the following bit patterns that there is at least
-    // one 1 bit in any of the x's
-    //  1: 0yyyyyyy
-    //  2: 110xxxxy 10yyyyyy
-    //  3: 1110xxxx 10xyyyyy 10yyyyyy
-    //  4: 11110xxx 10xxyyyy 10yyyyyy 10yyyyyy
-
-    // ulen == 1 passes by definition
-    if(ulen == 2) {
-        if((data[0] & 0x1E) == 0)
-            return 0;
-    } else if(ulen == 3) {
-        if((data[0] & 0x0F) + (data[1] & 0x20) == 0)
-            return 0;
-    } else if(ulen == 4) {
-        if((data[0] & 0x07) + (data[1] & 0x30) == 0)
-            return 0;
-    }
-
-    // Lastly we need to check some miscellaneous ranges for
-    // some of the larger code point values.
-    if(ulen >= 3) {
-        ui = utf8_to_unicode(data, ulen);
-        if(ui < 0) {
-            return 0;
-        } else if(ui >= 0xD800 && ui <= 0xDFFF) {
-            return 0;
-        } else if(ui > 0x10FFFF) {
+    // Boundary checks based on b0 and b1. The length table has already
+    // filtered overlong 2-byte leads and leads > F4. (See table note)
+    unsigned int b1 = cont & 0xFF;
+    if(len == 3) {
+        // E0 80..9F is overlong 3-byte
+        if((b0 == 0xE0) & (b1 < 0xA0)) {
             return 0;
         }
+        // ED A0..BF is a surrogate.
+        if((b0 == 0xED) & (b1 >= 0xA0)) {
+            return 0;
+        }
+        return 3;
     }
-
-    return ulen;
+    // F0 80..8F overlong 4-byte
+    if((b0 == 0xF0) & (b1 < 0x90)) {
+        return 0;
+    }
+    // F4 90..BF these are invalid
+    if((b0 == 0xF4) & (b1 >= 0x90)) {
+        return 0;
+    }
+    return 4;
 }
 
 static inline int
