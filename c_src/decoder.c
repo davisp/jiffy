@@ -373,8 +373,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
 {
     ERL_NIF_TERM num_type = d->atoms->atom_error;
     char state = nst_init;
-    int has_frac = 0;
-    int has_exp = 0;
+    int is_real = 0;
     double dval;
     int64_t lval;
 
@@ -489,7 +488,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                 break;
 
             case nst_frac1:
-                has_frac = 1;
+                is_real = 1;
                 switch(p[idx]) {
                     case '0':
                     case '1':
@@ -536,7 +535,7 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
                 break;
 
             case nst_esign:
-                has_exp = 1;
+                is_real = 1;
                 switch(p[idx]) {
                     case '-':
                     case '+':
@@ -632,7 +631,7 @@ parse:
     const char* nend = (const char*)&p[d->i];
     const size_t num_len = d->i - start;
 
-    if(has_frac || has_exp) {
+    if(is_real) {
         ffc_parse_options opts = {FFC_PRESET_JSON, '.'};
         ffc_result res = ffc_from_chars_double_options(nstart, nend, &dval, opts);
         if(res.outcome == FFC_OUTCOME_OK) {
@@ -647,13 +646,8 @@ parse:
         }
     }
 
-    if(!has_frac && !has_exp) {
-        num_type = d->atoms->atom_bignum;
-    } else if(!has_frac && has_exp) {
-        num_type = d->atoms->atom_bignum_e;
-    } else {
-        num_type = d->atoms->atom_bigdbl;
-    }
+    // Let Erlang handle out-of-range cases
+    num_type = is_real ? d->atoms->atom_bigdbl : d->atoms->atom_bignum;
 
     d->is_partial = 1;
     *value = enif_make_sub_binary(d->env, d->arg, start, num_len);
