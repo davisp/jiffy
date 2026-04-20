@@ -100,23 +100,31 @@ encode(Data, Options) ->
 
 finish_decode({bignum, Value}) ->
     binary_to_integer(Value);
-finish_decode({bignum_e, Value}) ->
-    {IVal, EVal} = case binary:split(Value, [<<$e>>, <<$E>>]) of
-        [IStr, EStr] ->
-            {binary_to_integer(IStr), binary_to_integer(EStr)}
-    end,
-    try
-        IVal * math:pow(10, EVal)
-    catch
-        error:badarith ->
-            error({range, EVal})
-    end;
 finish_decode({bigdbl, Value}) ->
-    try
-        binary_to_float(Value)
-    catch
-        error:badarg ->
-            error({range, Value})
+    % Got something like a 1e400, 1.5e500, or 999...999.5. Split on e/E and if
+    % we do have an explicit exponent use math:pow/2 to create the float since
+    % Erlang/OTP's binary_to_float can't handle something like 1e10, it needs
+    % the first number (the mantissa) to have '.' in it (it has to be 1.0e10).
+    case binary:split(Value, [<<$e>>, <<$E>>]) of
+        [IStr, EStr] ->
+            EVal = binary_to_integer(EStr),
+            IVal = case binary:match(IStr, <<$.>>) of
+                nomatch -> binary_to_integer(IStr);
+                _ -> binary_to_float(IStr)
+            end,
+            try
+                IVal * math:pow(10, EVal)
+            catch
+                error:badarith ->
+                    error({range, Value})
+            end;
+        [_] ->
+            try
+                binary_to_float(Value)
+            catch
+                error:badarg ->
+                    error({range, Value})
+            end
     end;
 finish_decode({Pairs}) when is_list(Pairs) ->
     finish_decode_obj(Pairs, []);
