@@ -11,7 +11,51 @@
 latin1_atom_test_() ->
     Key = list_to_atom([228]), %% `ä`
     Expected = <<"{\"", 195, 164, "\":\"bar\"}">>,
-    ?_assertEqual(Expected, jiffy:encode({[{Key, <<"bar">>}]})).
+    ?_assertEqual(Expected, enc({[{Key, <<"bar">>}]})).
+
+% These are slightly sneaky and contain a NUL
+latin1_nul_atom_test_() ->
+    Bad = binary_to_atom(<<0, 1, 255, 255, 255, 255>>, latin1),
+    [
+        ?_assertEqual(<<"\"\\u0000\\u0001ÿÿÿÿ\""/utf8>>, enc(Bad)),
+        ?_assertEqual(<<"\"\\u0000\\u0001\\u00FF\\u00FF\\u00FF\\u00FF\"">>,
+                      enc(Bad, [uescape]))
+    ].
+
+% From issue https://github.com/davisp/jiffy/issues/231
+% ERL_NIF_UTF8 was added in NIF 2.17 (OTP 26) though
+-if(?OTP_RELEASE >= 26).
+utf8_atom_test_() ->
+    % 2-byte UTF8
+    Satas = binary_to_atom(<<"ŝatas"/utf8>>, utf8),
+    % 3-byte UTF8 (Google translated this as "Hello")
+    Hello = binary_to_atom(<<"你好"/utf8>>, utf8),
+    % 4-byte UTF8 (Rocket)
+    Rocket = binary_to_atom(<<"🚀"/utf8>>, utf8),
+    [
+        ?_assertEqual(<<"\"", "ŝatas"/utf8, "\"">>, enc(Satas)),
+        ?_assertEqual(<<"\"", "你好"/utf8, "\"">>, enc(Hello)),
+        ?_assertEqual(<<"\"", "🚀"/utf8, "\"">>, enc(Rocket)),
+        ?_assertEqual(<<"\"\\u015Datas\"">>, enc(Satas, [uescape])),
+        ?_assertEqual(<<"\"\\u4F60\\u597D\"">>, enc(Hello, [uescape])),
+        ?_assertEqual(<<"\"\\uD83D\\uDE80\"">>,  enc(Rocket, [uescape])),
+        ?_assertEqual(<<"{\"", "ŝatas"/utf8, "\":\"v\"}">>, enc(#{Satas => <<"v">>})),
+        ?_assertEqual(atom_to_binary(Satas, utf8), dec(enc(Satas))),
+        ?_assertEqual(atom_to_binary(Hello, utf8), dec(enc(Hello))),
+        ?_assertEqual(atom_to_binary(Rocket, utf8), dec(enc(Rocket)))
+    ].
+-else.
+utf8_atom_test_() ->
+    % ERL_NIF_UTF8 isn't available so these atoms can't be extracted.
+    Satas = binary_to_atom(<<"ŝatas"/utf8>>, utf8),
+    Hello = binary_to_atom(<<"你好"/utf8>>, utf8),
+    Rocket = binary_to_atom(<<"🚀"/utf8>>, utf8),
+    [
+        ?_assertError({invalid_string, _}, enc(Satas)),
+        ?_assertError({invalid_string, _}, enc(Hello)),
+        ?_assertError({invalid_string, _}, enc(Rocket))
+    ].
+-endif.
 
 atom_key_test_() ->
     [

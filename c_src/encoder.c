@@ -362,30 +362,32 @@ enc_special_character(Encoder* e, int val) {
     }
 }
 
-static int
-enc_atom(Encoder* e, ERL_NIF_TERM val)
+// ERL_NIF_UTF8 was added in NIF 2.17 (OTP 26). We detect it to know
+// if we can pass it to enif_get_atom()
+#if ERL_NIF_MAJOR_VERSION > 2 \
+        || (ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION >= 17)
+#define JIFFY_ENIF_HAS_UTF8 1
+#endif
+
+static inline int
+enc_quoted(Encoder* e,
+           const unsigned char* JIFFY_RESTRICT data,
+           size_t size,
+           int latin1_only)
 {
     static const int MAX_ESCAPE_LEN = 12;
-    unsigned char data[512];
-
-    size_t size;
+    size_t i = 0;
     size_t start;
-    size_t i;
+    size_t ulen;
+    int uval;
+    int esc_len;
 
-    if(!enif_get_atom(e->env, val, (char*)data, 512, ERL_NIF_LATIN1)) {
-        return 0;
-    }
-
-    size = strlen((const char*)data);
-
-    /* Reserve space for the first quotation mark and most of the output. */
     if(!enc_ensure(e, size + MAX_ESCAPE_LEN + 1)) {
         return 0;
     }
 
     e->p[e->i++] = '\"';
 
-    i = 0;
     while(i < size) {
         if(!enc_ensure(e, MAX_ESCAPE_LEN)) {
             return 0;
@@ -394,9 +396,7 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
         if(JIFFY_UNLIKELY(enc_special_character(e, data[i]))) {
             i++;
         } else if(JIFFY_LIKELY(data[i] < 0x80)) {
-            // Scan ahead for plain ASCII chars which don't need escaping.
-            // Since optionally users could escape forward slashes, too, we
-            // stop on them as well
+            // Scan ahead for plain ASCII chars that don't need escaping.
             start = i;
             i++;
             if(e->escape_forward_slashes) {
@@ -417,16 +417,34 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
             }
             memcpy(&(e->p[e->i]), &data[start], run);
             e->i += run;
-        } else if(data[i] >= 0x80) {
-            /* The atom encoding is latin1, so we don't need validation
-             * as all latin1 characters are valid Unicode codepoints. */
-            if (!e->uescape) {
-                e->i += unicode_to_utf8(data[i], &e->p[e->i]);
+        } else if(latin1_only) {
+            if(JIFFY_UNLIKELY(e->uescape)) {
+                e->i += unicode_uescape((int)data[i], &(e->p[e->i]));
             } else {
-                e->i += unicode_uescape(data[i], &e->p[e->i]);
+                e->i += unicode_to_utf8((int)data[i], &(e->p[e->i]));
             }
-
             i++;
+        } else {
+            // UTF-8 2/3/4-byte sequence: validate, then copy as is or
+            // or uencode as \uXXXX
+            ulen = utf8_validate((unsigned char*)&(data[i]), size - i);
+            if(JIFFY_UNLIKELY(ulen == 0)) {
+                return 0;
+            } else if(JIFFY_UNLIKELY(e->uescape)) {
+                uval = utf8_to_unicode((unsigned char*)&(data[i]), size - i);
+                if(uval < 0) {
+                    return 0;
+                }
+                esc_len = unicode_uescape(uval, &(e->p[e->i]));
+                if(esc_len < 0) {
+                    return 0;
+                }
+                e->i += esc_len;
+            } else {
+                memcpy(&e->p[e->i], &data[i], ulen);
+                e->i += ulen;
+            }
+            i += ulen;
         }
     }
 
@@ -441,99 +459,37 @@ enc_atom(Encoder* e, ERL_NIF_TERM val)
 }
 
 static int
+enc_atom(Encoder* e, ERL_NIF_TERM val)
+{
+    // 255 code points * max 4 UTF-8 bytes + NUL fits in 1024.
+    unsigned char data[1024];
+    int n;
+
+#ifdef JIFFY_ENIF_HAS_UTF8
+    n = enif_get_atom(e->env, val, (char*)data, sizeof(data), ERL_NIF_UTF8);
+    if(n <= 0) {
+        return 0;
+    }
+    return enc_quoted(e, data, (size_t)n - 1, 0);
+#else
+    n = enif_get_atom(e->env, val, (char*)data, sizeof(data), ERL_NIF_LATIN1);
+    if(n <= 0) {
+        return 0;
+    }
+    return enc_quoted(e, data, (size_t)n - 1, 1);
+#endif
+}
+
+static int
 enc_string(Encoder* e, ERL_NIF_TERM val)
 {
-    static const int MAX_ESCAPE_LEN = 12;
     ErlNifBinary bin;
-
-    unsigned char* JIFFY_RESTRICT data;
-    size_t size;
-    int esc_len;
-    size_t ulen;
-    int uval;
-    size_t start;
-    size_t i;
 
     if(!enif_inspect_binary(e->env, val, &bin)) {
         return 0;
     }
 
-    data = bin.data;
-    size = bin.size;
-
-    /* Reserve space for the first quotation mark and most of the output. */
-    if(!enc_ensure(e, size + MAX_ESCAPE_LEN + 1)) {
-        return 0;
-    }
-
-    e->p[e->i++] = '\"';
-
-    i = 0;
-    while(i < size) {
-        if(!enc_ensure(e, MAX_ESCAPE_LEN)) {
-            return 0;
-        }
-
-        if(enc_special_character(e, data[i])) {
-            i++;
-        } else if(data[i] < 0x80) {
-            // Scan ahead for plain ASCII char and memcpy them. Stop at quotes,
-            // backslashes, and forward slashes, since users can optionally
-            // choose to escape them too.
-            start = i;
-            i++;
-            if(e->escape_forward_slashes) {
-                while(i < size
-                        && data[i] >= 0x20
-                        && data[i] < 0x80
-                        && data[i] != '\"'
-                        && data[i] != '\\'
-                        && data[i] != '/') {
-                    i++;
-                }
-            } else {
-                i = jiffy_scan_string_body(data, size, i);
-            }
-            size_t run = i - start;
-            if(!enc_ensure(e, run)) {
-                return 0;
-            }
-            memcpy(&(e->p[e->i]), &data[start], run);
-            e->i += run;
-        } else if(JIFFY_UNLIKELY(data[i] >= 0x80)) {
-            ulen = utf8_validate(&(data[i]), size - i);
-
-            if (JIFFY_UNLIKELY(ulen == 0)) {
-                return 0;
-            } else if (JIFFY_UNLIKELY(e->uescape)) {
-                uval = utf8_to_unicode(&(data[i]), size-i);
-                if(uval < 0) {
-                    return 0;
-                }
-
-                esc_len = unicode_uescape(uval, &(e->p[e->i]));
-                if(esc_len < 0) {
-                    return 0;
-                }
-
-                e->i += esc_len;
-            } else {
-                memcpy(&e->p[e->i], &data[i], ulen);
-                e->i += ulen;
-            }
-
-            i += ulen;
-        }
-    }
-
-    if(!enc_ensure(e, 1)) {
-        return 0;
-    }
-
-    e->p[e->i++] = '\"';
-    e->count++;
-
-    return 1;
+    return enc_quoted(e, bin.data, bin.size, 0);
 }
 
 static inline int
