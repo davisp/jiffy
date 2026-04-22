@@ -25,18 +25,6 @@ enum {
     st_invalid
 } JsonState;
 
-enum {
-    nst_init=0,
-    nst_sign,
-    nst_mantissa,
-    nst_frac0,
-    nst_frac1,
-    nst_frac,
-    nst_esign,
-    nst_echeck,
-    nst_edigit
-} JsonNumState;
-
 typedef struct {
     ErlNifEnv*      env;
     jiffy_st*       atoms;
@@ -371,292 +359,43 @@ parse:
 static int
 dec_number(Decoder* d, ERL_NIF_TERM* value)
 {
-    ERL_NIF_TERM num_type = d->atoms->atom_error;
-    char state = nst_init;
-    int is_real = 0;
-    double dval;
-    int64_t lval;
-
-    // Use the same trick as did for dec_string. The restrict qualifier hints
-    // to the compiler p won't alias any other pointers so it can optimize
-    // access to it. Also avoid writing back do d->i on every increment,
-    // instead increment a local variable (hopefully in a register) then update
-    // d->i once at the end. Also, when parsing looping states (mantissa, frac,
-    // edigit) scan-ahead quickly looking for strings of digits only. The wins
-    // will not be as big as we have for strings as most numbers are not that
-    // long, but it shouldn't hurt either.
+    // ffc validates, parses, and picks int-vs-double in a single call
     const unsigned char* JIFFY_RESTRICT p = d->p;
-    const size_t len = d->len;
     const size_t start = d->i;
-    size_t idx = start;
-    while(idx < len) {
-        switch(state) {
-            case nst_init:
-                switch(p[idx]) {
-                    case '-':
-                        state = nst_sign;
-                        idx++;
-                        break;
-                    case '0':
-                        state = nst_frac0;
-                        idx++;
-                        break;
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4':
-                    case '5':
-                    case '6':
-                    case '7':
-                    case '8':
-                    case '9':
-                        state = nst_mantissa;
-                        idx++;
-                        break;
-                    default:
-                        assert(0 && "this state should be unreachable"); // LCOV_EXCL_LINE
-                }
-                break;
-
-            case nst_sign:
-                switch(p[idx]) {
-                    case '0':
-                        state = nst_frac0;
-                        idx++;
-                        break;
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4':
-                    case '5':
-                    case '6':
-                    case '7':
-                    case '8':
-                    case '9':
-                        state = nst_mantissa;
-                        idx++;
-                        break;
-                    default:
-                      goto error;
-                }
-                break;
-
-            case nst_mantissa:
-                switch(p[idx]) {
-                    case '.':
-                        state = nst_frac1;
-                        idx++;
-                        break;
-                    case 'e':
-                    case 'E':
-                        state = nst_esign;
-                        idx++;
-                        break;
-                    case '0':
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4':
-                    case '5':
-                    case '6':
-                    case '7':
-                    case '8':
-                    case '9':
-                        while(idx < len && p[idx] >= '0' && p[idx] <= '9') {
-                            idx++;
-                        }
-                        break;
-                    default:
-                        goto parse;
-                }
-                break;
-
-            case nst_frac0:
-                switch(p[idx]) {
-                    case '.':
-                        state = nst_frac1;
-                        idx++;
-                        break;
-                    case 'e':
-                    case 'E':
-                        state = nst_esign;
-                        idx++;
-                        break;
-                    default:
-                        goto parse;
-                }
-                break;
-
-            case nst_frac1:
-                is_real = 1;
-                switch(p[idx]) {
-                    case '0':
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4':
-                    case '5':
-                    case '6':
-                    case '7':
-                    case '8':
-                    case '9':
-                        state = nst_frac;
-                        idx++;
-                        break;
-                    default:
-                        goto parse;
-                }
-                break;
-
-            case nst_frac:
-                switch(p[idx]) {
-                    case 'e':
-                    case 'E':
-                        state = nst_esign;
-                        idx++;
-                        break;
-                    case '0':
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4':
-                    case '5':
-                    case '6':
-                    case '7':
-                    case '8':
-                    case '9':
-                        while(idx < len && p[idx] >= '0' && p[idx] <= '9') {
-                            idx++;
-                        }
-                        break;
-                    default:
-                        goto parse;
-                }
-                break;
-
-            case nst_esign:
-                is_real = 1;
-                switch(p[idx]) {
-                    case '-':
-                    case '+':
-                        state = nst_echeck;
-                        idx++;
-                        break;
-                    case '0':
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4':
-                    case '5':
-                    case '6':
-                    case '7':
-                    case '8':
-                    case '9':
-                        state = nst_edigit;
-                        idx++;
-                        break;
-                    default:
-                        goto error;
-                }
-                break;
-
-             case nst_echeck:
-                switch(p[idx]) {
-                    case '0':
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4':
-                    case '5':
-                    case '6':
-                    case '7':
-                    case '8':
-                    case '9':
-                        state = nst_edigit;
-                        while(idx < len && p[idx] >= '0' && p[idx] <= '9') {
-                            idx++;
-                        }
-                        break;
-                    default:
-                        goto parse;
-                }
-                break;
-
-            case nst_edigit:
-                switch(p[idx]) {
-                    case '0':
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4':
-                    case '5':
-                    case '6':
-                    case '7':
-                    case '8':
-                    case '9':
-                        while(idx < len && p[idx] >= '0' && p[idx] <= '9') {
-                            idx++;
-                        }
-                        break;
-                    default:
-                        goto parse;
-                }
-                break;
-
-            default:
-                goto error;
-        }
-    }
-
-parse:
-    d->i = idx;
-
-    switch(state) {
-        case nst_init:
-        case nst_sign:
-        case nst_frac1:
-        case nst_esign:
-        case nst_echeck:
-            return 0;
-        default:
-            break;
-    }
-
-    // Use ffc.h to parse numbers. It parses direclty from the stream no need
-    // to allocate a separate buffer as with strtod and strtol. The state
-    // machine already validated the syntax, so parse-level errors shouldn't
-    // occur here, only FFC_OUTCOME_OUT_OF_RANGE. If the range erro happens we
-    // fall back to Erlang with handle big numbers.
     const char* nstart = (const char*)&p[start];
-    const char* nend = (const char*)&p[d->i];
-    const size_t num_len = d->i - start;
+    const char* nend_max = (const char*)&p[d->len];
 
-    if(is_real) {
-        ffc_parse_options opts = {FFC_PRESET_JSON, '.'};
-        ffc_result res = ffc_from_chars_double_options(nstart, nend, &dval, opts);
-        if(res.outcome == FFC_OUTCOME_OK) {
-            *value = enif_make_double(d->env, dval);
-            return 1;
-        }
-    } else {
-        ffc_result res = ffc_parse_i64(num_len, nstart, 10, &lval);
-        if(res.outcome == FFC_OUTCOME_OK) {
-            *value = enif_make_int64(d->env, lval);
-            return 1;
-        }
+    ffc_json_number jn;
+    ffc_result r = ffc_parse_json_number(nstart, nend_max, &jn);
+
+    // After parsing r.ptr point to where parsing stops:
+    //   OK - first byte past the number
+    //   OUT_OF_RANGE - first byte past the number (same span, just doesn't fit)
+    //   INVALID - the offending byte
+    d->i = start + (size_t)(r.ptr - nstart);
+
+    if(r.outcome == FFC_OUTCOME_INVALID_INPUT) {
+        return 0;
     }
 
-    // Let Erlang handle out-of-range cases
-    num_type = is_real ? d->atoms->atom_bigdbl : d->atoms->atom_bignum;
+    if(r.outcome == FFC_OUTCOME_OK) {
+        if(jn.kind == FFC_JSON_NUM_KIND_INT64) {
+            *value = enif_make_int64(d->env, jn.value.i64);
+        } else {
+            *value = enif_make_double(d->env, jn.value.f64);
+        }
+        return 1;
+    }
+
+    ERL_NIF_TERM num_type = (jn.kind == FFC_JSON_NUM_KIND_INT64)
+        ? d->atoms->atom_bignum
+        : d->atoms->atom_bigdbl;
 
     d->is_partial = 1;
+    const size_t num_len = (size_t)(r.ptr - nstart);
     *value = enif_make_sub_binary(d->env, d->arg, start, num_len);
     *value = enif_make_tuple2(d->env, num_type, *value);
     return 1;
-
-error:
-    d->i = idx;
-    return 0;
 }
 
 static ERL_NIF_TERM

@@ -253,6 +253,32 @@ uint64_t ffc_parse_u64_simple(size_t len, const char *input, int base, ffc_outco
 int32_t  ffc_parse_i32_simple(size_t len, const char *input, int base, ffc_outcome *outcome);
 uint32_t ffc_parse_u32_simple(size_t len, const char *input, int base, ffc_outcome *outcome);
 
+/**
+ * Parse a JSON number from the range [start, end) and return an int64_t or a double
+ *
+ * If the outcome is FCC_OUTCOME_OK
+ *  If kind == FFC_JSON_NUM_KIND_INT64, value will be an int64
+ *  If kind == FCC_JSON_NUM_DOUBLE, value will be a double
+ *
+ * The returned ffc_result's ptr points at the byte where parsing stopped
+ */
+
+typedef uint32_t ffc_json_number_kind;
+enum ffc_json_number_kind_bits {
+  FFC_JSON_NUM_KIND_INT64  = 0,
+  FFC_JSON_NUM_KIND_DOUBLE = 1,
+};
+
+typedef struct ffc_json_number {
+  ffc_json_number_kind kind;
+  union {
+    int64_t i64;
+    double  f64;
+  } value;
+} ffc_json_number;
+
+ffc_result ffc_parse_json_number(const char *start, const char *end, ffc_json_number *out);
+
 #endif // FFC_API
 
 #ifdef FFC_IMPL
@@ -1271,13 +1297,16 @@ ffc_parsed ffc_parse_number_string(
       ++p;
     }
     if ((p == pend) || !ffc_is_integer(*p)) {
-      if (!(uint64_t)(fmt & FFC_FORMAT_FLAG_FIXED)) {
+      if (basic_json_fmt || !(uint64_t)(fmt & FFC_FORMAT_FLAG_FIXED)) {
         // The exponential part is invalid for scientific notation, so it must
         // be a trailing token for fixed notation. However, fixed notation is
-        // disabled, so report a scientific notation error.
+        // disabled, so report a scientific notation error. JSON mode is strict
+        // for the scientific form (exp = e [ minus / plus ] 1*DIGIT in RFC
+        // 8259) so we also report the error, even though FIXED is part of
+        // FFC_PRESET_JSON.
         return ffc_report_parse_error(p, FFC_PARSE_OUTCOME_MISSING_EXPONENTIAL_PART);
       }
-      // Otherwise, we will be ignoring the 'e'.
+      // Otherwise (fixed-tolerant, non-JSON), we will be ignoring the 'e'.
       p = location_of_e;
     } else {
       while ((p != pend) && ffc_is_integer(*p)) {
@@ -3200,7 +3229,56 @@ uint32_t ffc_parse_u32_simple(size_t len, const char *input, int base, ffc_outco
   return out;
 }
 
-#undef FFC_DOUBLE_SMALLEST_POWER_OF_10        
+ffc_result ffc_parse_json_number(const char *start, const char *end,
+                                 ffc_json_number *out) {
+  ffc_result answer;
+
+  if (start == end) {
+    answer.ptr = (char *)start;
+    answer.outcome = FFC_OUTCOME_INVALID_INPUT;
+    return answer;
+  }
+
+  ffc_parse_options opts;
+  opts.format = FFC_PRESET_JSON;
+  opts.decimal_point = '.';
+
+  ffc_parsed pns = ffc_parse_number_string(start, end, opts, true);
+
+  if (!pns.valid) {
+    answer.ptr = (char *)pns.lastmatch;
+    answer.outcome = FFC_OUTCOME_INVALID_INPUT;
+    return answer;
+  }
+
+  // INT64 or DOUBLE?
+  // For an integer bytes consumed past the sign should be just digits
+  // If we see '.' then `fractional_part_start` is not NULL
+  // If we see e/E then consumed span is > int_part_len (e + $digit)
+  // If both above are true then we have a DOUBLE
+  size_t consumed = (size_t)(pns.lastmatch - start) - (pns.negative ? 1 : 0);
+  bool is_integer = (pns.fraction_part_start == NULL) && (consumed == pns.int_part_len);
+
+  ffc_result r;
+  if (is_integer) {
+    ffc_int_value v = {0};
+    r = ffc_parse_int_string(start, end, &v, FFC_INT_KIND_S64, opts, 10);
+    out->kind = FFC_JSON_NUM_KIND_INT64;
+    if (r.outcome == FFC_OUTCOME_OK) {
+      out->value.i64 = v.s64;
+    }
+  } else {
+    ffc_value v = {0};
+    r = ffc_from_chars_advanced(pns, &v, FFC_VALUE_KIND_DOUBLE);
+    out->kind = FFC_JSON_NUM_KIND_DOUBLE;
+    if (r.outcome == FFC_OUTCOME_OK) {
+      out->value.f64 = v.d;
+    }
+  }
+  return r;
+}
+
+#undef FFC_DOUBLE_SMALLEST_POWER_OF_10
 #undef FFC_DOUBLE_LARGEST_POWER_OF_10         
 #undef FFC_DOUBLE_SIGN_INDEX                  
 #undef FFC_DOUBLE_INFINITE_POWER              
