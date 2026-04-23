@@ -50,12 +50,37 @@ jiffy_block_has_stop(const unsigned char* JIFFY_RESTRICT p)
 }
 
 static inline size_t
-jiffy_scan_string_body(const unsigned char* JIFFY_RESTRICT p, size_t len, size_t i)
+jiffy_scan_ascii_string_body(const unsigned char* JIFFY_RESTRICT p, size_t len, size_t i)
 {
     while (i + JIFFY_SIMD_BLOCK_SIZE <= len && !jiffy_block_has_stop(p + i)) {
         i += JIFFY_SIMD_BLOCK_SIZE;
     }
     while (i < len && p[i] >= 0x20 && p[i] < 0x80 && p[i] != '"' && p[i] != '\\') {
+        i++;
+    }
+    return i;
+}
+
+// Variant of the scan which lets UTF-8 multi-byte sequences pass through. This
+// so we can scan a whole block and then validate it as a block later.
+static inline unsigned int
+jiffy_block_has_utf8_stop(const unsigned char* JIFFY_RESTRICT p)
+{
+    unsigned int bad = 0;
+    for (int i = 0; i < JIFFY_SIMD_BLOCK_SIZE; i++) {
+        unsigned char c = p[i];
+        bad |= (unsigned)(c < 0x20) | (unsigned)(c == '"') | (unsigned)(c == '\\');
+    }
+    return bad;
+}
+
+static inline size_t
+jiffy_scan_utf8_string_body(const unsigned char* JIFFY_RESTRICT p, size_t len, size_t i)
+{
+    while (i + JIFFY_SIMD_BLOCK_SIZE <= len && !jiffy_block_has_utf8_stop(p + i)) {
+        i += JIFFY_SIMD_BLOCK_SIZE;
+    }
+    while (i < len && p[i] >= 0x20 && p[i] != '"' && p[i] != '\\') {
         i++;
     }
     return i;

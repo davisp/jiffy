@@ -236,6 +236,26 @@ utf8_validate(const unsigned char* JIFFY_RESTRICT data, size_t size)
     return 4;
 }
 
+// Validate a whole range UTF-8 codepoints
+static inline int
+utf8_validate_range(const unsigned char* data, size_t size)
+{
+    size_t i = 0;
+    while(i < size) {
+        if(data[i] < 0x80) {
+            i++;
+            // ASCII skip-through
+            continue;
+        }
+        size_t ulen = utf8_validate((unsigned char*)&data[i], size - i);
+        if(ulen == 0) {
+            return 0;
+        }
+        i += ulen;
+    }
+    return 1;
+}
+
 static inline int
 unicode_to_utf8(int c, unsigned char* buf)
 {

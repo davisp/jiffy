@@ -409,7 +409,7 @@ enc_quoted(Encoder* e,
                     i++;
                 }
             } else {
-                i = jiffy_scan_string_body(data, size, i);
+                i = jiffy_scan_ascii_string_body(data, size, i);
             }
             size_t run = i - start;
             if(!enc_ensure(e, run)) {
@@ -424,27 +424,46 @@ enc_quoted(Encoder* e,
                 e->i += unicode_to_utf8((int)data[i], &(e->p[e->i]));
             }
             i++;
-        } else {
-            // UTF-8 2/3/4-byte sequence: validate, then copy as is or
-            // or uencode as \uXXXX
+        } else if(JIFFY_UNLIKELY(e->uescape)) {
             ulen = utf8_validate((unsigned char*)&(data[i]), size - i);
             if(JIFFY_UNLIKELY(ulen == 0)) {
                 return 0;
-            } else if(JIFFY_UNLIKELY(e->uescape)) {
-                uval = utf8_to_unicode((unsigned char*)&(data[i]), size - i);
-                if(uval < 0) {
-                    return 0;
-                }
-                esc_len = unicode_uescape(uval, &(e->p[e->i]));
-                if(esc_len < 0) {
-                    return 0;
-                }
-                e->i += esc_len;
-            } else {
-                memcpy(&e->p[e->i], &data[i], ulen);
-                e->i += ulen;
             }
+            uval = utf8_to_unicode((unsigned char*)&(data[i]), size - i);
+            if(uval < 0) {
+                return 0;
+            }
+            esc_len = unicode_uescape(uval, &(e->p[e->i]));
+            if(esc_len < 0) {
+                return 0;
+            }
+            e->i += esc_len;
             i += ulen;
+        } else {
+            // Non-ASCII UTF-8 . Scan through the run first and then validate
+            // the whole thing, kinda how we do it for ASCII only.
+            start = i;
+            i++;
+            if(e->escape_forward_slashes) {
+                while(i < size
+                        && data[i] >= 0x20
+                        && data[i] != '\"'
+                        && data[i] != '\\'
+                        && data[i] != '/') {
+                    i++;
+                }
+            } else {
+                i = jiffy_scan_utf8_string_body(data, size, i);
+            }
+            size_t run = i - start;
+            if(JIFFY_UNLIKELY(!utf8_validate_range(&data[start], run))) {
+                return 0;
+            }
+            if(JIFFY_UNLIKELY(!enc_ensure(e, run))) {
+                return 0;
+            }
+            memcpy(&(e->p[e->i]), &data[start], run);
+            e->i += run;
         }
     }
 

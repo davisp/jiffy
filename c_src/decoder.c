@@ -260,7 +260,7 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
         } else if(d->p[d->i] < 0x80) {
             // Scan ahead plain ASCII as an optimization. The first
             // byte has already been checked, so start at i+1.
-            d->i = jiffy_scan_string_body(d->p, d->len, d->i + 1);
+            d->i = jiffy_scan_ascii_string_body(d->p, d->len, d->i + 1);
         } else {
             ulen = utf8_validate(&(d->p[d->i]), d->len - d->i);
             if(ulen == 0) {
