@@ -44,7 +44,6 @@ typedef struct {
     ERL_NIF_TERM    atom_uescape;
     ERL_NIF_TERM    atom_pretty;
     ERL_NIF_TERM    atom_force_utf8;
-    ERL_NIF_TERM    atom_iter;
     ERL_NIF_TERM    atom_bytes_per_iter;
     ERL_NIF_TERM    atom_bytes_per_red;
     ERL_NIF_TERM    atom_return_maps;
