@@ -34,7 +34,6 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_uescape = make_atom(env, "uescape");
     st->atom_pretty = make_atom(env, "pretty");
     st->atom_force_utf8 = make_atom(env, "force_utf8");
-    st->atom_iter = make_atom(env, "iter");
     st->atom_bytes_per_iter = make_atom(env, "bytes_per_iter");
     st->atom_bytes_per_red = make_atom(env, "bytes_per_red");
     st->atom_return_maps = make_atom(env, "return_maps");
@@ -89,13 +88,10 @@ unload(ErlNifEnv* env, void* priv)
 
 // {name, arity, fptr, dirty_flag}
 // dirty flag: 0 (default) | ERL_NIF_DIRTY_JOB_{IO|CPU}_BOUND
-//
 static ErlNifFunc funcs[] =
 {
     {"nif_decode_init", 2, decode_init, 0},
-    {"nif_decode_iter", 5, decode_iter, 0},
-    {"nif_encode_init", 2, encode_init, 0},
-    {"nif_encode_iter", 3, encode_iter, 0}
+    {"nif_encode_init", 2, encode_init, 0}
 };
 
 ERL_NIF_INIT(jiffy, funcs, &load, NULL, &upgrade, &unload);

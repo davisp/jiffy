@@ -63,8 +63,6 @@ decode(Data, Opts) when is_binary(Data), is_list(Opts) ->
             error(Error);
         {partial, EJson} ->
             finish_decode(EJson);
-        {iter, {_, Decoder, Val, Objs, Curr}} ->
-            decode_loop(Data, Decoder, Val, Objs, Curr);
         EJson ->
             EJson
     end;
@@ -91,8 +89,6 @@ encode(Data, Options) ->
             error(Error);
         {partial, IOData} ->
             finish_encode(IOData, []);
-        {iter, {Encoder, Stack, IOBuf}} ->
-            encode_loop(Data, Options, Encoder, Stack, IOBuf);
         [Bin] when is_binary(Bin) ->
             Bin;
         RevIOData when is_list(RevIOData) ->
@@ -186,52 +182,11 @@ init() ->
     erlang:load_nif(filename:join(PrivDir, "jiffy"), 0).
 
 
-decode_loop(Data, Decoder, Val, Objs, Curr) ->
-    case nif_decode_iter(Data, Decoder, Val, Objs, Curr) of
-        {error, Error} ->
-            error(Error);
-        {partial, EJson} ->
-            finish_decode(EJson);
-        {iter, {_, NewDecoder, NewVal, NewObjs, NewCurr}} ->
-            decode_loop(Data, NewDecoder, NewVal, NewObjs, NewCurr);
-        EJson ->
-            EJson
-    end.
-
-
-encode_loop(Data, Options, Encoder, Stack, IOBuf) ->
-    ForceUTF8 = lists:member(force_utf8, Options),
-    case nif_encode_iter(Encoder, Stack, IOBuf) of
-        {error, {invalid_string, _}} when ForceUTF8 == true ->
-            FixedData = jiffy_utf8:fix(Data),
-            encode(FixedData, Options -- [force_utf8]);
-        {error, {invalid_object_member_key, _}} when ForceUTF8 == true ->
-            FixedData = jiffy_utf8:fix(Data),
-            encode(FixedData, Options -- [force_utf8]);
-        {error, Error} ->
-            error(Error);
-        {partial, IOData} ->
-            finish_encode(IOData, []);
-        {iter, {NewEncoder, NewStack, NewIOBuf}} ->
-            encode_loop(Data, Options, NewEncoder, NewStack, NewIOBuf);
-        [Bin] when is_binary(Bin) ->
-            Bin;
-        RevIOData when is_list(RevIOData) ->
-            lists:reverse(RevIOData)
-    end.
-
-
 not_loaded(Line) ->
     erlang:nif_error({not_loaded, [{module, ?MODULE}, {line, Line}]}).
 
 nif_decode_init(_Data, _Opts) ->
     ?NOT_LOADED.
 
-nif_decode_iter(_Data, _Decoder, _, _, _) ->
-    ?NOT_LOADED.
-
 nif_encode_init(_Data, _Options) ->
-    ?NOT_LOADED.
-
-nif_encode_iter(_Encoder, _Stack, _IoList) ->
     ?NOT_LOADED.
