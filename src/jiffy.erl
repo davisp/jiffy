@@ -23,6 +23,8 @@
 -type json_object() :: {[{json_string(),json_value()}]}
                         | #{json_string() => json_value()}.
 
+-type json_preencoded() :: {json, iodata()}.
+
 -type jiffy_decode_result() :: json_value()
                         | {has_trailer, json_value(), binary()}.
 
@@ -70,12 +72,12 @@ decode(Data, Opts) when is_list(Data) ->
     decode(iolist_to_binary(Data), Opts).
 
 
--spec encode(json_value()) -> iodata().
+-spec encode(json_value() | json_preencoded()) -> iodata().
 encode(Data) ->
     encode(Data, []).
 
 
--spec encode(json_value(), encode_options()) -> iodata().
+-spec encode(json_value() | json_preencoded(), encode_options()) -> iodata().
 encode(Data, Options) ->
     ForceUTF8 = lists:member(force_utf8, Options),
     case nif_encode_init(Data, Options) of
@@ -162,6 +164,10 @@ finish_encode([<<_/binary>>=B | Rest], Acc) ->
     finish_encode(Rest, [B | Acc]);
 finish_encode([Val | Rest], Acc) when is_integer(Val) ->
     finish_encode(Rest, [integer_to_binary(Val) | Acc]);
+finish_encode([{json, Json} | Rest], Acc) ->
+    %% Pre-encoded JSON spliced into the output as-is. This came from
+    %% enc_unknown.
+    finish_encode(Rest, [Json | Acc]);
 finish_encode([InvalidEjson | _], _) ->
     error({invalid_ejson, InvalidEjson});
 finish_encode(_, _) ->

@@ -961,8 +961,12 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             }
         } else if(enif_get_tuple(env, curr, &arity, &tuple)) {
             if(arity != 1) {
-                ret = enc_obj_error(e, "invalid_ejson", curr);
-                goto done;
+                // Handle unknown or pre-encoded JSON in finish_encode/2
+                if(!enc_unknown(e, curr)) {
+                    ret = enc_error(e, "internal_error");
+                    goto done;
+                }
+                continue;
             }
             if(!enif_is_list(env, tuple[0])) {
                 ret = enc_obj_error(e, "invalid_object", curr);

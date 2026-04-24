@@ -88,6 +88,20 @@ The options for encode are:
 * `{bytes_per_red, N}` - Refer to the decode options
 * `{bytes_per_iter, N}` - Refer to the decode options
 
+Pre-encoded JSON
+----------------
+
+A `{json, IoData}` tuple can appear anywhere a JSON value is expected (except
+as an object key). The `IoData` is spliced into the output as is. Jiffy does
+not parse, validate, copy, or pretty-print it.
+
+    1> jiffy:encode([1, {json, <<"{\"cached\":true}">>}, 3]).
+    <<"[1,{\"cached\":true},3]">>
+    2> jiffy:encode({[{<<"a">>, {json, [<<"[1,">>, "2,3]"]}}]}).
+    <<"{\"a\":[1,2,3]}">>
+
+The caller is responsible for ensuring it is well-formed JSON.
+
 Data Format
 -----------
 
