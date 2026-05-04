@@ -1,10 +1,10 @@
 Jiffy - JSON NIFs for Erlang
 ============================
 
-A JSON parser as a NIF. This is a complete rewrite of the work I did
-in EEP0018 that was based on Yajl. This new version is a hand crafted
-state machine that does its best to be as quick and efficient as
-possible while not placing any constraints on the parsed JSON.
+Jiffy is a JSON NIF library that focuses on correctness over performance. It’s
+not the fastest JSON library for Erlang in standard benchmarks, but it
+endeavors to be as fast as possible while affecting total system performance as
+little as possible.
 
 ![Build Status](https://github.com/davisp/jiffy/actions/workflows/ci.yml/badge.svg)
 
@@ -15,7 +15,7 @@ Jiffy is a simple API. The only thing that might catch you off guard
 is that the return type of `jiffy:encode/1` is an iolist even though
 it returns a binary most of the time.
 
-A quick note on unicode. Jiffy only understands UTF-8 in binaries. End
+A quick note on Unicode. Jiffy only understands UTF-8 in binaries. End
 of story.
 
 Errors are raised as error exceptions.
@@ -50,7 +50,7 @@ The options for decode are:
   decode multiple terms in a single binary.
 * `dedupe_keys` - If a key is repeated in a JSON object this flag
   will ensure that the parsed object only contains a single entry
-  containing the last value seen. This mirrors the parsing beahvior
+  containing the last value seen. This mirrors the parsing behavior
   of virtually every other JSON parser.
 * `copy_strings` - Normally, when strings are decoded, they are
   created as sub-binaries of the input data. With some workloads, this
@@ -59,11 +59,11 @@ The options for decode are:
   this option will instead allocate new binaries for each string, so
   the original JSON document can be garbage collected even though
   the decode result is still in use.
-* `{bytes_per_red, N}` where N &gt;= 0 - This controls the number of
+* `{bytes_per_red, N}` where N >= 0 - This controls the number of
   bytes that Jiffy will process as an equivalent to a reduction. Each
   20 reductions we consume 1% of our allocated time slice for the current
   process. When the Erlang VM indicates we need to return from the NIF.
-* `{bytes_per_iter, N}` where N &gt;= 0 - Backwards compatible option
+* `{bytes_per_iter, N}` where N >= 0 - Backwards compatible option
   that is converted into the `bytes_per_red` value.
 
 `jiffy:encode/1,2`
@@ -131,10 +131,52 @@ N.B. The last three entries in this table are only valid for VM's that support
 the `maps` data type (i.e., 17.0 and newer) and client code must pass
 the `return_maps` option to `jiffy:decode/2`.
 
-Improvements over EEP0018
--------------------------
 
-Jiffy should be in all ways an improvement over EEP0018. It no longer
-imposes limits on the nesting depth. It is capable of encoding and
-decoding large numbers and it does quite a bit more validation of UTF-8 in strings.
+Scheduler Usage
+----
 
+Jiffy specifically avoids using shared resources like the dirty CPU schedulers,
+since those are used for large heap garbage collection, crypto functions, large
+binary matching, etc. Instead, it works with Erlang's regular VM schedulers and
+yields appropriately after consuming a fraction of available reductions.
+Yielding behavior can be explicitly controlled via the ` {bytes_per_red, N}`
+option.
+
+To get an idea of how this works, use the `bench_scheduling.sh` benchmark from
+https://github.com/nickva/bench. It check concurrent encoding and decoding
+scaled by the number of schedulers. An example run comparing against other JSON
+libraries may look like:
+
+```
+./bench_scheduling.sh
+...
+scheduler responsiveness check
+  input:       citm-catalog.json duration: 2000
+  schedulers:  12 online
+  impls:       json, jiffy, simdjsone, jsone, jsx
+
+[json]
+  1x encdec       n=84 p50=135.0ms p95=182.9ms p99=191.9ms max=196.7ms
+  12x encdec      n=86 p50=129.7ms p95=189.9ms p99=203.0ms max=206.2ms
+  24x encdec      n=87 p50=263.0ms p95=461.2ms p99=506.1ms max=527.1ms
+
+[jiffy]
+  1x encdec       n=309 p50=38.3ms p95=51.9ms p99=57.4ms max=66.5ms
+  12x encdec      n=300 p50=41.2ms p95=52.5ms p99=59.7ms max=66.2ms
+  24x encdec      n=306 p50=80.2ms p95=111.8ms p99=118.8ms max=140.1ms
+
+[simdjsone]
+  1x encdec       n=20 p50=690.1ms p95=784.6ms p99=784.6ms max=784.8ms
+  12x encdec      n=16 p50=790.9ms p95=887.5ms p99=887.5ms max=899.9ms
+  24x encdec      n=24 p50=1448.4ms p95=1876.7ms p99=1879.5ms max=1882.7ms
+
+[jsone]
+  1x encdec       n=60 p50=213.1ms p95=261.8ms p99=263.9ms max=264.8ms
+  12x encdec      n=60 p50=204.9ms p95=329.8ms p99=345.0ms max=350.9ms
+  24x encdec      n=52 p50=440.1ms p95=700.3ms p99=773.3ms max=817.3ms
+
+[jsx]
+  1x encdec       n=24 p50=398.8ms p95=539.0ms p99=544.1ms max=548.3ms
+  12x encdec      n=24 p50=391.5ms p95=684.9ms p99=687.0ms max=689.6ms
+  24x encdec      n=24 p50=1181.3ms p95=1479.0ms p99=1558.1ms max=1654.7ms
+```
