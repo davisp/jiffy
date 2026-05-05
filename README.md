@@ -1,4 +1,4 @@
-Jiffy - JSON NIFs for Erlang
+Jiffy - JSON NIF for Erlang
 ============================
 
 Jiffy is a JSON NIF library that focuses on correctness over performance. It’s
