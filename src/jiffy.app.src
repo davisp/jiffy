@@ -4,7 +4,7 @@
     {registered, []},
     {applications, [kernel, stdlib, xmerl]},
     {maintainers, ["Paul J. Davis"]},
-    {licenses, ["MIT", "BSD"]},
+    {licenses, ["MIT", "BSD-3-Clause"]},
     {links, [{"GitHub", "https://github.com/davisp/jiffy"}]},
     {files, [
         "LICENSE",
