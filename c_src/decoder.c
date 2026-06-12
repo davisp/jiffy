@@ -66,6 +66,7 @@ typedef struct {
     int             st_top;
 } Decoder;
 
+// Returns an allocated resource or NULL on allocation failure
 Decoder*
 dec_new(ErlNifEnv* env)
 {
@@ -77,23 +78,21 @@ dec_new(ErlNifEnv* env)
         return NULL;
     }
 
+    // Zero everything and only set non-0 fields
+    memset(d, 0, sizeof(*d));
+
     d->atoms = st;
-
     d->bytes_per_red = DEFAULT_BYTES_PER_REDUCTION;
-    d->is_partial = 0;
-    d->return_maps = 0;
-    d->return_trailer = 0;
-    d->dedupe_keys = 0;
-    d->copy_strings = 0;
     d->null_term = d->atoms->atom_null;
-
-    d->p = NULL;
     d->len = -1;
-    d->i = 0;
 
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC);
+    if(d->st_data == NULL) {
+        enif_release_resource(d);
+        return NULL;
+    }
+
     d->st_size = STACK_SIZE_INC;
-    d->st_top = 0;
 
     for(i = 0; i < d->st_size; i++) {
         d->st_data[i] = st_invalid;
