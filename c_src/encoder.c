@@ -162,19 +162,13 @@ enc_new(ErlNifEnv* env)
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
     Encoder* e = enif_alloc_resource(st->res_enc, sizeof(Encoder));
 
+    // Zero everything so enc_destroy() never sees an uninitialized
+    // have_buffer if we bail out before the encoder is fully built
+    memset(e, 0, sizeof(*e));
+
     e->atoms = st;
     e->bytes_per_red = DEFAULT_BYTES_PER_REDUCTION;
-    e->uescape = 0;
-    e->pretty = 0;
-    e->use_nil = 0;
-    e->escape_forward_slashes = 0;
-    e->shiftcnt = 0;
-    e->count = 0;
-
-    e->iosize = 0;
     e->iolist = enif_make_list(env, 0);
-
-    e->partial_output = 0;
 
     if(!enif_alloc_binary(BIN_INC_SIZE, &e->buffer)) {
         enif_release_resource(e);
@@ -182,9 +176,7 @@ enc_new(ErlNifEnv* env)
     }
 
     e->have_buffer = 1;
-
     e->p = e->buffer.data;
-    e->i = 0;
 
     return e;
 }
