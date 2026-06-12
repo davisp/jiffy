@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        otp_version: [20,23,26,27,28]
+        otp_version: [20,23,26,27,28,29]
         os: [ubuntu-latest]
         rebar: [rebar, rebar3]
 
@@ -65,10 +65,15 @@ jobs:
       run: |
           git config --global core.autocrlf false
           git config --global core.eol lf
-    - uses: actions/checkout@v4
-    - name: install rebar3
-      run: |
-        choco install rebar3
+    - uses: actions/checkout@v6
+    - uses: erlef/setup-beam@v1
+      # New runner images report win25-vs2026 and
+      # setup-beam cannot map (yet), so override for now
+      env:
+        ImageOS: ${{ matrix.os == 'windows-2025' && 'win25' || 'win22' }}
+      with:
+        otp-version: '27'
+        rebar3-version: '3.23'
     - name: make check
       run: |
         $path = vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -nologo -nocolor -property installationPath
