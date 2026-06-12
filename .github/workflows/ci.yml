@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        otp_version: [21,23,26,27,28]
+        otp_version: [21,23,26,27,28,29]
         os: [ubuntu-latest]
         rebar: [rebar, rebar3]
 
@@ -135,6 +135,10 @@ jobs:
           git config --global core.eol lf
     - uses: actions/checkout@v6
     - uses: erlef/setup-beam@v1
+      # New runner images report win25-vs2026 and
+      # setup-beam cannot map (yet), so override for now
+      env:
+        ImageOS: ${{ matrix.os == 'windows-2025' && 'win25' || 'win22' }}
       with:
         otp-version: '27'
         rebar3-version: '3.23'
