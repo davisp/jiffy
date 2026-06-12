@@ -49,8 +49,8 @@ typedef struct {
     int             st_top;
 } Decoder;
 
-// Returns an allocated resource or crashes the VM. No need to
-// check return pointer for NULL
+// Returns an allocated resource or NULL if the term stack
+// cannot be allocated
 static Decoder*
 dec_new(ErlNifEnv* env)
 {
@@ -60,23 +60,21 @@ dec_new(ErlNifEnv* env)
     assert(d != NULL);
     int i;
 
+    // Zero everything and only set non-0 fields
+    memset(d, 0, sizeof(*d));
+
     d->atoms = st;
-
     d->bytes_per_red = DEFAULT_BYTES_PER_REDUCTION;
-    d->is_partial = 0;
-    d->return_maps = 0;
-    d->return_trailer = 0;
-    d->dedupe_keys = 0;
-    d->copy_strings = 0;
     d->null_term = d->atoms->atom_null;
-
-    d->p = NULL;
     d->len = -1;
-    d->i = 0;
 
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC);
+    if(d->st_data == NULL) {
+        enif_release_resource(d);
+        return NULL;
+    }
+
     d->st_size = STACK_SIZE_INC;
-    d->st_top = 0;
 
     for(i = 0; i < d->st_size; i++) {
         d->st_data[i] = st_invalid;
@@ -468,9 +466,11 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    // If allocation fails VM will crash.
     d = dec_new(env);
-    assert(d != NULL);
+    if(d == NULL) {
+        return enif_make_tuple2(env, st->atom_error,
+                make_atom(env, "internal_error"));
+    }
 
     tmp_argv[0] = argv[0];
     tmp_argv[1] = enif_make_resource(env, d);
