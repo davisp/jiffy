@@ -85,6 +85,7 @@ enc_new(ErlNifEnv* env)
     e->iolist = enif_make_list(env, 0);
 
     e->partial_output = 0;
+    e->have_buffer = 0;
 
     if(!enif_alloc_binary(BIN_INC_SIZE, &e->buffer)) {
         enif_release_resource(e);
