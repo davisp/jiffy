@@ -114,8 +114,8 @@ extern "C" {
 #define FFC_API
 
 #define FFC_VERSION_YEAR  26
-#define FFC_VERSION_MONTH 03
-#define FFC_VERSION_BUILD 03
+#define FFC_VERSION_MONTH 04
+#define FFC_VERSION_BUILD 01
 #define FFC_VERSION ((FFC_VERSION_YEAR << 16) | (FFC_VERSION_MONTH << 8) | (FFC_VERSION_BUILD))
 #define FFC_VERSION_STRINGIFY_(x) #x
 #define FFC_VERSION_STRINGIFY(x) FFC_VERSION_STRINGIFY_(x)
@@ -1125,12 +1125,21 @@ ffc_internal ffc_inline void
 ffc_loop_parse_if_eight_digits(char const **p, char const *const pend,
                            uint64_t* i) {
   // optimizes better than parse_if_eight_digits_unrolled() for char.
-  while ((pend - *p >= 8) &&
-         ffc_is_made_of_eight_digits_fast(ffc_read8_to_u64(*p))) {
-    *i = (*i * 100000000) +
-        ffc_parse_eight_digits_unrolled_swar(ffc_read8_to_u64(*p)); 
+  while (pend - *p >= 8) {
+    uint64_t val = ffc_read8_to_u64(*p);
+    if (!ffc_is_made_of_eight_digits_fast(val)) { break; }
+    *i = (*i * 100000000) + ffc_parse_eight_digits_unrolled_swar(val);
         // in rare cases, this will overflow, but that's ok
     *p += 8;
+  }
+  // 4-digit follow-up: handles sub-8 remainders (e.g. 7-digit fractions)
+  // without falling all the way to byte-by-byte for the first 4 digits.
+  if (pend - *p >= 4) {
+    uint32_t val4 = ffc_read4_to_u32(*p);
+    if (ffc_is_made_of_four_digits_fast(val4)) {
+      *i = (*i * 10000) + ffc_parse_four_digits_unrolled(val4);
+      *p += 4;
+    }
   }
 }
 
