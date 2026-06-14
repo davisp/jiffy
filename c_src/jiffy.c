@@ -49,6 +49,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     // Markers used in encoding
     st->ref_object = make_atom(env, "$object_ref$");
     st->ref_array = make_atom(env, "$array_ref$");
+    st->ref_map = make_atom(env, "$map_ref$");
 
     st->res_dec = enif_open_resource_type(
             env,

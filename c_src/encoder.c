@@ -728,14 +728,18 @@ enc_comma(Encoder* e)
     return 1;
 }
 
+// Build an interleaved [k1, v1, k2, v2, ...] list from a map itertor. Then
+// encoder can stream the object out so we don't have to build a tuple and then
+// have to do an enif_get_tuple in the encode pass thus saving some allocations
+// and CPU resources.
+//
 static int
-enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
+enc_map_to_memberlist(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
 {
     ErlNifMapIterator iter;
     size_t size;
 
     ERL_NIF_TERM list;
-    ERL_NIF_TERM tuple;
     ERL_NIF_TERM key;
     ERL_NIF_TERM val;
 
@@ -746,7 +750,7 @@ enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
     list = enif_make_list(env, 0);
 
     if(size == 0) {
-        *out = enif_make_tuple1(env, list);
+        *out = list;
         return 1;
     }
 
@@ -759,13 +763,13 @@ enc_map_to_ejson(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
             enif_map_iterator_destroy(env, &iter);
             return 0;
         }
-        tuple = enif_make_tuple2(env, key, val);
-        list = enif_make_list_cell(env, tuple, list);
+        list = enif_make_list_cell(env, val, list);
+        list = enif_make_list_cell(env, key, list);
     } while(enif_map_iterator_next(env, &iter));
 
     enif_map_iterator_destroy(env, &iter);
 
-    *out = enif_make_tuple1(env, list);
+    *out = list;
     return 1;
 }
 
@@ -833,6 +837,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     ERL_NIF_TERM curr;
     ERL_NIF_TERM item;
+    ERL_NIF_TERM mkey;
+    ERL_NIF_TERM mval;
     const ERL_NIF_TERM* tuple;
     ERL_NIF_TERM tmp_argv[3];
     int arity;
@@ -944,6 +950,37 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 termstack_push(&stack, curr);
                 termstack_push(&stack, e->atoms->ref_array);
                 termstack_push(&stack, item);
+            } else if(enif_is_identical(curr, e->atoms->ref_map)) {
+                // Maps are encoded as [k1, v1, ...]
+                curr = termstack_pop(&stack);
+
+                if(!enif_get_list_cell(env, curr, &mkey, &curr)) {
+                    if(!enc_end_object(e)) {
+                        ret = enc_error(e, "internal_error");
+                        goto done;
+                    }
+                    continue;
+                }
+                if(!enif_get_list_cell(env, curr, &mval, &curr)) {
+                    ret = enc_error(e, "internal_error");
+                    goto done;
+                }
+                if(!enc_comma(e)) {
+                    ret = enc_error(e, "internal_error");
+                    goto done;
+                }
+                if(!enc_object_key(env, e, mkey)) {
+                    ret = enc_obj_error(e, "invalid_object_member_key", mkey);
+                    goto done;
+                }
+                if(!enc_colon(e)) {
+                    ret = enc_error(e, "internal_error");
+                    goto done;
+                }
+
+                termstack_push(&stack, curr);
+                termstack_push(&stack, e->atoms->ref_map);
+                termstack_push(&stack, mval);
             } else if(enif_is_identical(curr, e->atoms->atom_null)) {
                 if(!enc_literal(e, "null", 4)) {
                     ret = enc_error(e, "null");
@@ -1028,12 +1065,38 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             termstack_push(&stack, e->atoms->ref_object);
             termstack_push(&stack, tuple[1]);
         } else if(enif_is_map(env, curr)) {
-            if(!enc_map_to_ejson(env, curr, &curr)) {
+            // A map is encoded as a flat [k1, v1, ...] list
+            if(!enc_map_to_memberlist(env, curr, &curr)) {
+                ret = enc_error(e, "internal_error");
+                goto done;
+            }
+            if(!enc_start_object(e)) {
+                ret = enc_error(e, "internal_error");
+                goto done;
+            }
+            if(!enif_get_list_cell(env, curr, &mkey, &curr)) {
+                if(!enc_end_object(e)) {
+                    ret = enc_error(e, "internal_error");
+                    goto done;
+                }
+                continue;
+            }
+            if(!enif_get_list_cell(env, curr, &mval, &curr)) {
+                ret = enc_error(e, "internal_error");
+                goto done;
+            }
+            if(!enc_object_key(env, e, mkey)) {
+                ret = enc_obj_error(e, "invalid_object_member_key", mkey);
+                goto done;
+            }
+            if(!enc_colon(e)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
 
             termstack_push(&stack, curr);
+            termstack_push(&stack, e->atoms->ref_map);
+            termstack_push(&stack, mval);
         } else if(enif_is_list(env, curr)) {
             if(!enc_start_array(e)) {
                 ret = enc_error(e, "internal_error");

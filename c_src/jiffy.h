@@ -58,6 +58,7 @@ typedef struct {
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
+    ERL_NIF_TERM    ref_map;
 
     ErlNifResourceType* res_dec;
     ErlNifResourceType* res_enc;
