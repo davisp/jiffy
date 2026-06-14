@@ -11,6 +11,12 @@
 
 #define BIN_INC_SIZE 2048
 
+// When we flush output buffer to an iolist double the next chunk size so a
+// large doc is emitted in O(log n) segments. But we also limit it at 64KB
+// size. This should reduce total number of memory allocations (those can
+// become a bottleneck).
+#define MAX_CHUNK_SIZE (64 * 1024)
+
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 
 #define SMALL_TERMSTACK_SIZE 16
@@ -51,6 +57,7 @@ typedef struct {
 
     ErlNifBinary    buffer;
     int             have_buffer;
+    size_t          chunk_size;
 
     unsigned char*  p;
     size_t          i;
@@ -169,8 +176,9 @@ enc_new(ErlNifEnv* env)
     e->atoms = st;
     e->bytes_per_red = DEFAULT_BYTES_PER_REDUCTION;
     e->iolist = enif_make_list(env, 0);
+    e->chunk_size = BIN_INC_SIZE;
 
-    if(!enif_alloc_binary(BIN_INC_SIZE, &e->buffer)) {
+    if(!enif_alloc_binary(e->chunk_size, &e->buffer)) {
         enif_release_resource(e);
         return NULL;
     }
@@ -246,6 +254,11 @@ enc_flush(Encoder* e)
     e->iolist = enif_make_list_cell(e->env, bin, e->iolist);
     e->iosize += e->i;
 
+    // Grow the next chunk geometrically so large outputs flush O(log n) times.
+    if(e->chunk_size < MAX_CHUNK_SIZE) {
+        e->chunk_size <<= 1;
+    }
+
     return 1;
 }
 
@@ -268,7 +281,7 @@ enc_ensure(Encoder* e, size_t req)
         }
     }
 
-    for(new_size = BIN_INC_SIZE; new_size < req; new_size <<= 1);
+    for(new_size = e->chunk_size; new_size < req; new_size <<= 1);
 
     if(!enif_alloc_binary(new_size, &e->buffer)) {
         return 0;
