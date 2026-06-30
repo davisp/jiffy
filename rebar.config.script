@@ -2,31 +2,6 @@
 % See the LICENSE file for more information.
 %
 
-% Only run the EQC checks when EQC is present.
-%
-% We have a helper tests/install_eqc_mini.sh script to install it ./eqc, so we
-% look for it there first, and add that to the code path. Users may have also
-% installed it directly into their OTP distribution, which should be fine,
-% code:which(eqc) should find that as well.
-%
-LocalEQC = filename:join([filename:dirname(SCRIPT), "eqc", "ebin"]),
-case filelib:is_dir(LocalEQC) of
-    true -> code:add_patha(LocalEQC);
-    false -> ok
-end,
-HaveEQC = code:which(eqc) =/= non_existing,
-ErlOpts = if not HaveEQC -> []; true ->
-    [{d, 'HAVE_EQC'}]
-end,
-
-Config1 = case lists:keyfind(erl_opts, 1, CONFIG) of
-    {erl_opts, Opts} ->
-        NewOpts = {erl_opts, Opts ++ ErlOpts},
-        lists:keyreplace(erl_opts, 1, CONFIG, NewOpts);
-    false ->
-        CONFIG ++ [{erl_opts, ErlOpts}]
-end,
-
 IsRebar2 = case lists:keyfind(rebar, 1, application:loaded_applications()) of
     {rebar, _Desc, Vsn} ->
         case string:split(Vsn, ".") of
@@ -39,9 +14,9 @@ end,
 
 case IsRebar2 of
     true ->
-        Config1;
+        CONFIG;
     false ->
-        Config1 ++ [
+        CONFIG ++ [
             {plugins, [{pc, "~> 1.15"}]},
             case os:type() of
                 {win32, _} -> {artifacts, ["priv/jiffy.dll"]};

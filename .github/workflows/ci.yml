@@ -30,30 +30,20 @@ jobs:
       run: |
         make REBAR=${{matrix.rebar}} check
 
-  # Keep this no more than 2 releases away from EQC-mini beam files. Currently
-  # they are on OTP 25 so we can use erlang up to version 27 technically.
-  #
-  eqc-mini-25:
-    name: eqc-mini-25
+  prop-tests:
+    name: proper-${{matrix.otp_version}}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        otp_version: [27, 28]
     container:
-      image: erlang:25
+      image: erlang:${{matrix.otp_version}}
     steps:
       - uses: actions/checkout@v6
-      - name: rebar3 make check-with-eqc
+      - name: rebar3 make check-with-proper
         run: |
-          make REBAR=rebar3 check-with-eqc
-
-  eqc-mini-27:
-    name: eqc-mini-27
-    runs-on: ubuntu-latest
-    container:
-      image: erlang:27
-    steps:
-      - uses: actions/checkout@v6
-      - name: rebar3 make check-with-eqc
-        run: |
-          make REBAR=rebar3 check-with-eqc
+          make REBAR=rebar3 check-with-proper
 
   lcov-coverage:
     name: lcov-coverage

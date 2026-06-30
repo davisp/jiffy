@@ -3,32 +3,42 @@
 
 -module(jiffy_11_property_tests).
 
--ifdef(HAVE_EQC).
+% PropEr is optional used on CI only
+-ifdef(WITH_PROPER).
 
 
 -compile(export_all).
+-compile(nowarn_export_all).
 
 
--include_lib("eqc/include/eqc.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include("jiffy_prop.hrl").
 -include("jiffy_util.hrl").
 
 
+% Keep ?BIN_INC_SIZE in sync with BIN_INC_SIZE in c_src/encoder.c.
+-define(BIN_INC_SIZE, 2048).
+
+
 property_test_() ->
-    [
-        run(prop_enc_dec),
-        run(prop_enc_dec_pretty),
-        run(prop_dec_trailer),
-        run(prop_enc_no_crash),
-        run(prop_dec_no_crash_bin),
-        run(prop_dec_no_crash_any),
-        run(prop_map_enc_dec)
-    ].
+    ?JIFFY_QUICKCHECK(300, 1000).
+
+
+% Props
 
 prop_enc_dec() ->
-    ?FORALL(Data, json(), begin
-        Data == jiffy:decode(jiffy:encode(Data))
-    end).
+    ?FORALL(Data, json(),
+        begin
+            Data =:= jiffy:decode(jiffy:encode(Data))
+        end
+    ).
+
+
+prop_enc_dec_pretty() ->
+    ?FORALL(Data, json(),
+        begin
+            Data =:= jiffy:decode(jiffy:encode(Data, [pretty]))
+        end
+    ).
 
 
 prop_dec_trailer() ->
@@ -44,62 +54,110 @@ prop_dec_trailer() ->
     ).
 
 
-prop_enc_dec_pretty() ->
-    ?FORALL(Data, json(),
-        begin
-            Data == jiffy:decode(jiffy:encode(Data, [pretty]))
-        end
-    ).
-
-
 prop_map_enc_dec() ->
     ?FORALL(Data, json(),
         begin
             MapData = to_map_ejson(Data),
-            MapData == jiffy:decode(jiffy:encode(MapData), [return_maps])
+            MapData =:= jiffy:decode(jiffy:encode(MapData), [return_maps])
         end
     ).
 
 
 prop_enc_no_crash() ->
-    ?FORALL(Data, any(), begin catch jiffy:encode(Data), true end).
+    ?FORALL(Data, any_term(), begin catch jiffy:encode(Data), true end).
 
 
 prop_dec_no_crash_any() ->
-    ?FORALL(Data, any(), begin catch jiffy:decode(Data), true end).
+    ?FORALL(Data, any_term(), begin catch jiffy:decode(Data), true end).
 
 
 prop_dec_no_crash_bin() ->
     ?FORALL(Data, binary(), begin catch jiffy:decode(Data), true end).
 
 
-opts() ->
-    [
-        {numtests, [1000]}
-    ].
+% Go the extra mile to generate larger size strings to exercise values around
+% our buffer size limit of 2KB. We want a string also with lots of funky
+% escapes, especially shaped like  ...lots of escapes ++ lots of ascii...
+prop_enc_buffer_boundary() ->
+    ?FORALL({Bin, Opts}, {enc_stress_string(), enc_opts()},
+        begin
+            Bin =:= jiffy:decode(jiffy:encode(Bin, Opts))
+                andalso Bin =:= jiffy:decode(jiffy:encode(Bin, [force_utf8 | Opts]))
+         end
+).
 
 
-apply_opts(Prop) ->
-    apply_opts(Prop, opts()).
+% Slashes short-cut our fast-forwards to make sure we tests both with and
+% without escaping them.
+enc_opts() ->
+    elements([[], [escape_forward_slashes]]).
 
 
-apply_opts(Prop, []) ->
-    Prop;
-
-apply_opts(Prop, [{Name, Args} | Rest]) ->
-    NewProp = erlang:apply(eqc, Name, Args ++ [Prop]),
-    apply_opts(NewProp, Rest).
+enc_stress_string() ->
+    ?LET({Prefix, Run}, {enc_escape_prefix(), enc_ascii_run()},
+        iolist_to_binary([Prefix, Run])
+    ).
 
 
-log(F, A) ->
-    io:format(standard_error, F, A).
+enc_escape_prefix() ->
+    ?LET({N, C}, {enc_prefix_len(), enc_escape_char()},
+        binary:copy(<<C>>, N)
+    ).
 
 
-run(Name) ->
-    Prop = apply_opts(?MODULE:Name()),
-    {msg("~s", [Name]), [
-        {timeout, 300, ?_assert(eqc:quickcheck(Prop))}
-    ]}.
+% With escapes we end up as 1 + 2*N sizes. Choose N to hit more buffer boundaries (2KB)
+
+% that land it in the [2036, 2047] window of the initial 2048-byte buffer.
+enc_prefix_len() ->
+    frequency([
+        {5, choose(1018, 1023)}, % Close to the limit
+        {2, choose(1008, 1033)}, % A bit wider interval around the limit
+        {2, choose(0, 1200)},    % Small prefixes (this would be a default small int choice)
+        {1, choose(2030, 2080)}  % Check over buffer up to 2 buffers worth
+    ]).
+
+
+% Two byte escapes
+enc_escape_char() ->
+    elements([$\b, $\t, $\n, $\f, $\r, $", $\\]).
+
+
+% We also need strings made of non-escapes since want to test long runs
+% over-buffer of ASCII only character. An escape char will short-cut it.
+enc_ascii_run() ->
+    ?LET({Len, C}, {enc_run_len(), enc_run_char()},
+        binary:copy(<<C>>, Len)
+    ).
+
+
+enc_run_len() ->
+    frequency([
+        {3, choose(?BIN_INC_SIZE, 5000)},        % small overflow (needs ASan/valgrind)
+        {2, choose(8192, 70000)},                % crosses geometric chunk growth
+        {2, choose(1 bsl 20, 2 bsl 20)}          % multi-MB: crashes even a plain build
+    ]).
+
+
+% Suchthat filter for ascii only chars
+enc_run_char() ->
+    ?SUCHTHAT(C, choose($\s, $~), C =/= $" andalso C =/= $\\).
+
+
+% FORALL_TARGETED is fancy-pants target which uses simulated annealing to
+% hill-climb towards some desired maxumum or minimum. We're doing what we did
+% above, but just let the test automatically generate string lengths (Ns)
+% closer the the desired BIN_INC_SIZE, instead of doing it by hand with
+% frequency() + choose(). Let's keep both approaches for now just in case, it
+% doesn't hurt the have a belt and suspenders.
+prop_enc_boundary_targeted() ->
+    Run = binary:copy(<<"a">>, 4 * ?BIN_INC_SIZE),
+    ?FORALL_TARGETED(N, integer(0, 8 * ?BIN_INC_SIZE),
+        begin
+            ?MAXIMIZE((1 + 2 * N) rem ?BIN_INC_SIZE),
+            Bin = <<(binary:copy(<<$\b>>, N))/binary, Run/binary>>,
+            Bin =:= jiffy:decode(jiffy:encode(Bin))
+        end
+    ).
 
 
 to_map_ejson({Props}) ->
@@ -113,38 +171,30 @@ to_map_ejson(Val) ->
 
 % Random any term generation
 
-any() ->
-    ?SIZED(Size, any(Size)).
+any_term() ->
+    ?SIZED(Size, any_term(Size)).
 
 
-any(0) ->
+any_term(0) ->
     any_value();
 
-any(S) ->
+any_term(Size) ->
     oneof(any_value_types() ++ [
-        ?LAZY(any_list(S)),
-        ?LAZY(any_tuple(S))
+        ?LAZY(any_list(Size)),
+        ?LAZY(any_tuple(Size))
     ]).
 
 
 any_value() ->
     oneof(any_value_types()).
 
-% As of OTP 27 0.0 =/= -0.0 so we cannot use exact matching on round trips any
-% longer. Therefore we test the 0.0 and -0.0 round-trip explicilty somewhere
-% else but here we exclude it. We don't want to use == for term matching
-% either, because then we'd be losing a check that ints stay as ints and floats
-% as floats.
-%
-real_non_neg_0() ->
-    ?SUCHTHAT(F, real(), F =/= -0.0).
 
 any_value_types() ->
     [
-        largeint(),
-        int(),
-        real(),
-        atom(),
+        large_int(),
+        integer(),
+        float(),
+        atom_gen(),
         binary()
     ].
 
@@ -154,7 +204,7 @@ any_list(0) ->
 
 any_list(Size) ->
     ListSize = Size div 5,
-    vector(ListSize, any(Size div 2)).
+    vector(ListSize, any_term(Size div 2)).
 
 
 any_tuple(0) ->
@@ -172,18 +222,18 @@ json() ->
 
 json(0) ->
     oneof([
-        json_null(),
-        json_true(),
-        json_false(),
+        null,
+        true,
+        false,
         json_number(),
         json_string()
     ]);
 
 json(Size) ->
     frequency([
-        {1, json_null()},
-        {1, json_true()},
-        {1, json_false()},
+        {1, null},
+        {1, true},
+        {1, false},
         {1, json_number()},
         {1, json_string()},
         {5, ?LAZY(json_array(Size))},
@@ -191,24 +241,15 @@ json(Size) ->
     ]).
 
 
-json_null() ->
-    null.
-
-
-json_true() ->
-    true.
-
-
-json_false() ->
-    false.
-
-
+% As of OTP 27, 0.0 =/= -0.0, so exclude -0.0 here (covered explicitly
+% elsewhere) to keep exact round-trip matching (which also checks ints stay
+% ints).
 json_number() ->
-    oneof([largeint(), int(), real_non_neg_0()]).
+    oneof([large_int(), integer(), ?SUCHTHAT(F, float(), F =/= -0.0)]).
 
 
 json_string() ->
-    utf8().
+    json_utf8().
 
 
 json_array(0) ->
@@ -227,28 +268,42 @@ json_object(Size) ->
 
 
 combiner() ->
-    ?SIZED(
-        Size,
-        ?LET(
-            L,
-            vector((Size div 4) + 1, oneof([$\r, $\n, $\t, $\s])),
+    ?SIZED(Size,
+        ?LET(L, vector((Size div 4) + 1, oneof([$\r, $\n, $\t, $\s])),
             list_to_binary(L)
         )
     ).
 
+% PropEr unlike EQC doesn't seem to have a large int so we build one here
+large_int() ->
+    ?LET({I, Shift}, {integer(), choose(0, 96)}, I bsl Shift).
 
-atom() ->
-    ?LET(L, ?SIZED(Size, vector(Size rem 254, char())), list_to_atom(L)).
+
+% Atom names (LATIN1)
+atom_gen() ->
+    ?SIZED(Size,
+        ?LET(Cs, vector(Size rem 254, choose(0, 16#FF)), list_to_atom(Cs))
+    ).
 
 
+% Valid UTF-8 binaries
+json_utf8() ->
+    ?LET(Cps, list(unicode_char()),
+        unicode:characters_to_binary(Cps, unicode, utf8)
+    ).
 
-%% XXX: Add generators
-%
-% We should add generators that generate JSON binaries directly
-% so we can test things that aren't produced by the encoder.
-%
-% We should also have a version of the JSON generator that inserts
-% errors into the JSON that we can test for.
+
+unicode_char() ->
+    ?SUCHTHAT(C,
+        frequency([
+            {5, choose(16#20, 16#7E)},        % ASCII
+            {2, choose(16#00, 16#1F)},        % Control chars
+            {2, choose(16#80, 16#7FF)},       % 2-byte
+            {2, choose(16#800, 16#FFFF)},     % 3-byte
+            {1, choose(16#10000, 16#10FFFF)}  % 4-byte
+        ]),
+        C < 16#D800 orelse C > 16#DFFF
+    ).
 
 
 -endif.

@@ -276,8 +276,16 @@ enc_ensure(Encoder* e, size_t req)
             return 0;
         }
 
+        // If we have_buffer we don't want to short-cut return unless that
+        // buffer size is big enough. If it isn't, release it and allocate a
+        // newer one of the right size. Otherwise we could return a small
+        // buffer then risk a memory overrwrite on a memcpy.
         if(e->have_buffer) {
-            return 1;
+            if(req < (e->buffer.size - e->i)) {
+                return 1;
+            }
+            enif_release_binary(&e->buffer);
+            e->have_buffer = 0;
         }
     }
 
