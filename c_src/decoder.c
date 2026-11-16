@@ -45,8 +45,8 @@ typedef struct {
     size_t          len;
 
     char*           st_data;
-    int             st_size;
-    int             st_top;
+    size_t          st_size;
+    size_t          st_top;
 } Decoder;
 
 // Returns an allocated resource or NULL if the term stack
@@ -58,7 +58,7 @@ dec_new(ErlNifEnv* env)
     // If enif_alloc_resource cannot allocate it crashes the VM
     Decoder* d = enif_alloc_resource(st->res_dec, sizeof(Decoder));
     assert(d != NULL);
-    int i;
+    size_t i;
 
     // Zero everything and only set non-0 fields
     memset(d, 0, sizeof(*d));
@@ -109,7 +109,7 @@ dec_destroy(ErlNifEnv* env, void* obj)
 static ERL_NIF_TERM
 dec_error(Decoder* d, const char* atom)
 {
-    ERL_NIF_TERM pos = enif_make_int(d->env, d->i+1);
+    ERL_NIF_TERM pos = enif_make_uint64(d->env, d->i + 1);
     ERL_NIF_TERM msg = make_atom(d->env, atom);
     ERL_NIF_TERM ret = enif_make_tuple2(d->env, pos, msg);
     return enif_make_tuple2(d->env, d->atoms->atom_error, ret);
@@ -122,21 +122,27 @@ dec_curr(Decoder* d)
     return d->st_data[d->st_top - 1];
 }
 
-static inline int
+static inline size_t
 dec_top(Decoder* d)
 {
     return d->st_top;
 }
 
-static inline void
+// Returns 0 if the stack could not be grown
+static inline int
 dec_push(Decoder* d, char val)
 {
-    int new_sz;
-    int i;
+    size_t new_sz;
+    size_t i;
+    char* new_data;
 
     if(d->st_top == d->st_size) {
         new_sz = d->st_size + STACK_SIZE_INC;
-        d->st_data = (char*) enif_realloc(d->st_data, new_sz);
+        new_data = (char*) enif_realloc(d->st_data, new_sz);
+        if(new_data == NULL) {
+            return 0;
+        }
+        d->st_data = new_data;
         d->st_size = new_sz;
         for(i = d->st_top; i < d->st_size; i++) {
             d->st_data[i] = st_invalid;
@@ -145,6 +151,7 @@ dec_push(Decoder* d, char val)
 
     assert(d->st_top < d->st_size);
     d->st_data[d->st_top++] = val;
+    return 1;
 }
 
 static inline char
@@ -172,14 +179,14 @@ static int
 dec_string(Decoder* d, ERL_NIF_TERM* value)
 {
     int has_escape = 0;
-    int num_escapes = 0;
-    int st;
+    size_t num_escapes = 0;
+    size_t st;
     size_t ulen;
     size_t ui;
     int hi;
     int lo;
     char* chrbuf;
-    int chrpos;
+    size_t chrpos;
 
     if(d->p[d->i] != '\"') {
         return 0;
@@ -646,15 +653,19 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         dec_pop_assert(d, st_value);
                         break;
                     case '{':
-                        dec_push(d, st_object);
-                        dec_push(d, st_key);
+                        if(!dec_push(d, st_object) || !dec_push(d, st_key)) {
+                            ret = dec_error(d, "insufficient_memory");
+                            goto done;
+                        }
                         objs = enif_make_list_cell(env, curr, objs);
                         curr = enif_make_list(env, 0);
                         d->i++;
                         break;
                     case '[':
-                        dec_push(d, st_array);
-                        dec_push(d, st_value);
+                        if(!dec_push(d, st_array) || !dec_push(d, st_value)) {
+                            ret = dec_error(d, "insufficient_memory");
+                            goto done;
+                        }
                         objs = enif_make_list_cell(env, curr, objs);
                         curr = enif_make_list(env, 0);
                         d->i++;
