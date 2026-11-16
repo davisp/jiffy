@@ -114,7 +114,7 @@ extern "C" {
 #define FFC_API
 
 #define FFC_VERSION_YEAR  26
-#define FFC_VERSION_MONTH 04
+#define FFC_VERSION_MONTH 09
 #define FFC_VERSION_BUILD 01
 #define FFC_VERSION ((FFC_VERSION_YEAR << 16) | (FFC_VERSION_MONTH << 8) | (FFC_VERSION_BUILD))
 #define FFC_VERSION_STRINGIFY_(x) #x
@@ -126,6 +126,16 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+
+/* always_inline marker for internal static helpers.
+ * common.h re-uses this same definition under an #ifndef guard. */
+#if defined(_MSC_VER)
+  #define ffc_inline __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+  #define ffc_inline __attribute__((always_inline)) inline
+#else
+  #define ffc_inline inline
+#endif
 
 typedef uint32_t ffc_outcome;
 enum ffc_outcome_bits {
@@ -227,8 +237,47 @@ ffc_result ffc_parse_double(size_t len, const char *input, double *out);
  * `fast_float::chars_format::general` which allows both `fixed` and
  * `scientific`.
  */
-ffc_result ffc_from_chars_double(const char *start, const char *end, double* out);
-ffc_result ffc_from_chars_double_options(const char *start, const char *end, double* out, ffc_parse_options options);
+/* When included from a FFC_IMPL translation unit, the critical-path API
+ * functions below are declared always_inline so calls in that same TU get the
+ * parser specialized at the call site. In non-FFC_IMPL TUs the declarations
+ * are plain extern.
+ *
+ * FFC_API_INLINE is the one place that knows how to spell this so that the
+ * function is force-inlined in-TU while still being emitted as an external
+ * symbol for callers in other TUs:
+ *  - Clang honors always_inline without the `inline` keyword, in C and C++.
+ *    Spelling it with `inline` would give the function inline linkage in C++
+ *    and the symbol would not be emitted, breaking separate-TU callers.
+ *  - GCC only honors always_inline on functions declared `inline`; in C99
+ *    `extern inline` still yields an external definition. In C++ it would
+ *    not, so the GCC branch is C-only.
+ *  - Elsewhere the API is left out-of-line. */
+#if defined(__clang__)
+#  define FFC_API_INLINE __attribute__((always_inline))
+#elif defined(__GNUC__) && !defined(__cplusplus)
+#  define FFC_API_INLINE extern __attribute__((always_inline)) inline
+#else
+#  define FFC_API_INLINE
+#endif
+
+/* Double parsing is always inlined in the FFC_IMPL TU. */
+#ifdef FFC_IMPL
+#  define FFC_DOUBLE_IMPL_INLINE FFC_API_INLINE
+#else
+#  define FFC_DOUBLE_IMPL_INLINE
+#endif
+
+/* Float parsing is inlined only when FFC_ENABLE_FLOAT_INLINING is also
+ * defined: it speeds up float parsing considerably but grows the caller and
+ * has been measured to cost double parsing in the same TU a few percent. */
+#if defined(FFC_IMPL) && defined(FFC_ENABLE_FLOAT_INLINING)
+#  define FFC_FLOAT_IMPL_INLINE FFC_API_INLINE
+#else
+#  define FFC_FLOAT_IMPL_INLINE
+#endif
+
+FFC_DOUBLE_IMPL_INLINE ffc_result ffc_from_chars_double(const char *start, const char *end, double* out);
+FFC_DOUBLE_IMPL_INLINE ffc_result ffc_from_chars_double_options(const char *start, const char *end, double* out, ffc_parse_options options);
 
 /*
  * A simplified API; the result will be 0.0 on error, not uninitialized.
@@ -236,22 +285,46 @@ ffc_result ffc_from_chars_double_options(const char *start, const char *end, dou
  */
 float      ffc_parse_float_simple(size_t len, const char *s, ffc_outcome *outcome);
 ffc_result ffc_parse_float(size_t len, const char *s, float *out);
-ffc_result ffc_from_chars_float(const char *start,  const char *end, float* out);
-ffc_result ffc_from_chars_float_options(const char *start,  const char *end, float* out, ffc_parse_options options);
+FFC_FLOAT_IMPL_INLINE ffc_result ffc_from_chars_float(const char *start,  const char *end, float* out);
+FFC_FLOAT_IMPL_INLINE ffc_result ffc_from_chars_float_options(const char *start,  const char *end, float* out, ffc_parse_options options);
 
-ffc_result ffc_parse_i64(size_t len, const char *input, int base, int64_t  *out);
-ffc_result ffc_parse_u64(size_t len, const char *input, int base, uint64_t *out);
-ffc_result ffc_parse_i32(size_t len, const char *input, int base, int32_t  *out);
-ffc_result ffc_parse_u32(size_t len, const char *input, int base, uint32_t *out);
+
 
 /*
  * A simplified API; the result will be 0 on error, not uninitialized.
  * If outcome is null, it will not be written to
  */
 int64_t  ffc_parse_i64_simple(size_t len, const char *input, int base, ffc_outcome *outcome);
+ffc_result ffc_parse_i64(size_t len, const char *input, int base, int64_t  *out);
+ffc_result ffc_from_chars_i64(char const* first, char const* last, int base, int64_t* out);
+ffc_result ffc_from_chars_i64_options(const char *start, const char *end, int base, int64_t* out, ffc_parse_options options);
+
+/*
+ * A simplified API; the result will be 0 on error, not uninitialized.
+ * If outcome is null, it will not be written to
+ */
 uint64_t ffc_parse_u64_simple(size_t len, const char *input, int base, ffc_outcome *outcome);
+ffc_result ffc_parse_u64(size_t len, const char *input, int base, uint64_t *out);
+ffc_result ffc_from_chars_u64(char const* first, char const* last, int base, uint64_t* out);
+ffc_result ffc_from_chars_u64_options(const char *start, const char *end, int base, uint64_t* out, ffc_parse_options options);
+
+/*
+ * A simplified API; the result will be 0 on error, not uninitialized.
+ * If outcome is null, it will not be written to
+ */
 int32_t  ffc_parse_i32_simple(size_t len, const char *input, int base, ffc_outcome *outcome);
+ffc_result ffc_parse_i32(size_t len, const char *input, int base, int32_t  *out);
+ffc_result ffc_from_chars_i32(char const* first, char const* last, int base, int32_t* out);
+ffc_result ffc_from_chars_i32_options(const char *start, const char *end, int base, int32_t* out, ffc_parse_options options);
+
+/*
+ * A simplified API; the result will be 0 on error, not uninitialized.
+ * If outcome is null, it will not be written to
+ */
 uint32_t ffc_parse_u32_simple(size_t len, const char *input, int base, ffc_outcome *outcome);
+ffc_result ffc_parse_u32(size_t len, const char *input, int base, uint32_t *out);
+ffc_result ffc_from_chars_u32(char const* first, char const* last, int base, uint32_t* out);
+ffc_result ffc_from_chars_u32_options(const char *start, const char *end, int base, uint32_t* out, ffc_parse_options options);
 
 /**
  * Parse a JSON number from the range [start, end) and return an int64_t or a double
@@ -279,6 +352,25 @@ typedef struct ffc_json_number {
 
 ffc_result ffc_parse_json_number(const char *start, const char *end, ffc_json_number *out);
 
+/**
+ * Exact fixed-notation formatting, equivalent to printf("%.*f", places, value)
+ * on a libc that prints the exact binary value (glibc, musl, macOS): every
+ * digit is exact and rounding is round-half-to-even on the true binary value.
+ * No floating-point arithmetic is performed, so the output does not depend on
+ * the FPU rounding mode. Non-finite values print as "inf", "-inf", "nan", "-nan".
+ *
+ * A negative `places` means the printf default of 6.
+ *
+ * Writes at most `cap` bytes to `buf` and does not NUL-terminate. Returns the
+ * full length of the formatted number even when it exceeds `cap`, so a call
+ * with cap == 0 measures the required size. A buffer of 311 + places bytes
+ * (sign, up to 309 integer digits, the point, the fraction) always suffices.
+ *
+ * A float is exactly representable as a double, so pass (double)f to get the
+ * same output as printf("%.*f", places, f).
+ */
+size_t ffc_format_double_fixed(char *buf, size_t cap, double value, int places);
+
 #endif // FFC_API
 
 #ifdef FFC_IMPL
@@ -295,12 +387,14 @@ ffc_result ffc_parse_json_number(const char *start, const char *end, ffc_json_nu
 #define ffc_internal static
 #endif
 
+#ifndef ffc_inline
 #if defined(_MSC_VER)
   #define ffc_inline __forceinline
 #elif defined(__GNUC__) || defined(__clang__)
   #define ffc_inline __attribute__((always_inline)) inline
 #else
   #define ffc_inline inline
+#endif
 #endif
 
 #if FFC_DEBUG
@@ -808,6 +902,13 @@ bool ffc_strncasecmp5(char *actual_mixedcase, char const *expected_lowercase, si
 
 ffc_internal ffc_inline
 bool ffc_rounds_to_nearest(void) {
+#if defined(FFC_ROUNDS_TO_NEAREST)
+  // We're being compiled under a mode where IEEE 754 round-to-nearest mode is
+  // guaranteed.
+  // We can simply return true; this is an optimization that eliminates the
+  // volatile float FCMP chain below.
+  return true;
+#endif
   // https://lemire.me/blog/2020/06/26/gcc-not-nearest/
 #if (FLT_EVAL_METHOD != 1) && (FLT_EVAL_METHOD != 0)
   return false;
@@ -1121,17 +1222,72 @@ bool ffc_simd_parse_if_eight_digits_unrolled_simd(uint16_t const *chars, uint64_
 
 #endif // FFC_HAS_SIMD
 
+// Compute acc*10 + d_expr.
+//
+// On AArch64, Clang emits `smaddl` (3-cycle latency) for `acc*10 + d`, which
+// sits on the digit-accumulation critical path. Forcing the `add + lsl` form
+// via inline asm shortens it and is worth ~+9% on Clang/AArch64.
+//
+// The asm is intentionally narrow: it is only correct/beneficial on AArch64,
+// and *only* for Clang. GCC already strength-reduces `acc*10` to shift-adds
+// and schedules them optimally; routing GCC through this asm measurably
+// regressed it (canada -5.3%). Every other compiler therefore uses the plain
+// expression below, which is also what makes this safe to leave unconditional
+// at the call sites.
+#if defined(__aarch64__) && defined(__clang__)
+ffc_internal ffc_inline uint64_t
+ffc_digit_acc10(uint64_t acc, uint64_t d) {
+  uint64_t result;
+  __asm__("add %0, %2, %2, lsl #2\n\t"
+          "add %0, %1, %0, lsl #1"
+          : "=&r"(result) : "r"(d), "r"(acc));
+  return result;
+}
+#define FFC_DIGIT_ACC10(acc, d_expr) ffc_digit_acc10((acc), (uint64_t)(d_expr))
+#else
+#define FFC_DIGIT_ACC10(acc, d_expr) ((acc) * 10 + (uint64_t)(d_expr))
+#endif
+
 ffc_internal ffc_inline void
 ffc_loop_parse_if_eight_digits(char const **p, char const *const pend,
                            uint64_t* i) {
-  // optimizes better than parse_if_eight_digits_unrolled() for char.
+#if defined(__aarch64__) && defined(__clang__)
+  // Clang/AArch64: manual 2x unroll converts the hot path from a while loop
+  // to a single linear block for typical float fractions (<=16 digits).
+  // Eliminating the back-edge allows Clang to keep SWAR constants in registers
+  // rather than rematerializing them on each iteration; also, the 8-digit
+  // block becomes an if (no back-edge) so constants are always in a straight-
+  // line context. GCC auto-unrolls this naturally so we keep its while loop.
+  while (pend - *p >= 16) {
+    uint64_t val1 = ffc_read8_to_u64(*p);
+    if (!ffc_is_made_of_eight_digits_fast(val1)) { break; }
+    uint64_t val2 = ffc_read8_to_u64(*p + 8);
+    if (!ffc_is_made_of_eight_digits_fast(val2)) {
+      *i = (*i * 100000000) + ffc_parse_eight_digits_unrolled_swar(val1); // in rare cases overflows, ok
+      *p += 8;
+      break;
+    }
+    uint64_t s1 = ffc_parse_eight_digits_unrolled_swar(val1);
+    uint64_t s2 = ffc_parse_eight_digits_unrolled_swar(val2);
+    *i = (*i * 100000000ULL + s1) * 100000000ULL + s2; // in rare cases overflows, ok
+    *p += 16;
+  }
+  if (pend - *p >= 8) {
+    uint64_t val = ffc_read8_to_u64(*p);
+    if (ffc_is_made_of_eight_digits_fast(val)) {
+      *i = (*i * 100000000) + ffc_parse_eight_digits_unrolled_swar(val); // in rare cases overflows, ok
+      *p += 8;
+    }
+  }
+#else
+  // GCC and other compilers: original while loop that GCC auto-unrolls well.
   while (pend - *p >= 8) {
     uint64_t val = ffc_read8_to_u64(*p);
     if (!ffc_is_made_of_eight_digits_fast(val)) { break; }
-    *i = (*i * 100000000) + ffc_parse_eight_digits_unrolled_swar(val);
-        // in rare cases, this will overflow, but that's ok
+    *i = (*i * 100000000) + ffc_parse_eight_digits_unrolled_swar(val); // in rare cases, this will overflow, but that's ok
     *p += 8;
   }
+#endif
   // 4-digit follow-up: handles sub-8 remainders (e.g. 7-digit fractions)
   // without falling all the way to byte-by-byte for the first 4 digits.
   if (pend - *p >= 4) {
@@ -1209,7 +1365,7 @@ ffc_parsed ffc_parse_number_string(
       }
     } else {
       // a sign must be followed by an integer or the dot
-      if (!ffc_is_integer(*p) && (*p != decimal_point)) { 
+      if (!ffc_is_integer(*p) && (*p != decimal_point)) {
         return ffc_report_parse_error(p, FFC_PARSE_OUTCOME_MISSING_INTEGER_OR_DOT_AFTER_SIGN);
       }
     }
@@ -1220,14 +1376,26 @@ ffc_parsed ffc_parse_number_string(
 
   uint64_t i = 0; // an unsigned int avoids signed overflows (which are bad)
 
-  while ((p != pend) && ffc_is_integer(*p)) {
-    // Horner's method: only ever multiplies by the constant 10
-    // avoiding variable power-of-10 multiplies
-
-    // might overflow, we will handle the overflow later
-    uint64_t digit_value = (uint64_t)(*p - '0');
-    i = (10 * i) + digit_value; 
-    ++p;
+  // Integer scan: the first 5 digits are read straight-line, longer runs
+  // continue in the while loop. The common 1-5 digit case stays branch-light.
+  if ((p != pend) && ffc_is_integer(*p)) {
+    i = (uint64_t)(*p++ - '0');
+    if ((p != pend) && ffc_is_integer(*p)) {
+      i = FFC_DIGIT_ACC10(i, *p++ - '0');
+      if ((p != pend) && ffc_is_integer(*p)) {
+        i = FFC_DIGIT_ACC10(i, *p++ - '0');
+        if ((p != pend) && ffc_is_integer(*p)) {
+          i = FFC_DIGIT_ACC10(i, *p++ - '0');
+          if ((p != pend) && ffc_is_integer(*p)) {
+            i = FFC_DIGIT_ACC10(i, *p++ - '0');
+            while ((p != pend) && ffc_is_integer(*p)) {
+              i = FFC_DIGIT_ACC10(i, *p - '0'); // might overflow, handled later
+              ++p;
+            }
+          }
+        }
+      }
+    }
   }
 
   char const *const end_of_integer_part = p;
@@ -1250,18 +1418,28 @@ ffc_parsed ffc_parse_number_string(
   int64_t exponent = 0;
   bool const has_decimal_point = (p != pend) && (*p == decimal_point);
 
+  // Fraction-part bounds, kept as locals so the too_many_digits re-scan below
+  // can reuse them without reloading the answer.fraction_part_* fields.
+  char const *before = NULL;
+  char const *frac_end_local = NULL;
+
   /* post-decimal exponential part (calculates a negative exponent) */
   if (has_decimal_point) {
     ++p;
-    char const *before = p; 
+    before = p;
     // can occur at most twice without overflowing, but let it occur more, since
     // for integers with many digits, digit parsing is the primary bottleneck.
     ffc_loop_parse_if_eight_digits(&p, pend, &i);
 
-    while ((p != pend) && ffc_is_integer(*p)) {
-      uint8_t digit = (uint8_t)(*p - (char)('0'));
-      ++p;
-      i = i * 10 + digit; // in rare cases, this will overflow, but that's ok
+    // manual unroll for the 1-3 digit case
+    if (p != pend && ffc_is_integer(*p)) {
+      i = FFC_DIGIT_ACC10(i, (uint8_t)(*p++ - (char)('0'))); // in rare cases overflows, ok
+      if (p != pend && ffc_is_integer(*p)) {
+        i = FFC_DIGIT_ACC10(i, (uint8_t)(*p++ - (char)('0')));
+        if (p != pend && ffc_is_integer(*p)) {
+          i = FFC_DIGIT_ACC10(i, (uint8_t)(*p++ - (char)('0')));
+        }
+      }
     }
 
     // pre: i = 123, digit_count = 3
@@ -1273,6 +1451,7 @@ ffc_parsed ffc_parse_number_string(
     // i = 123456
     // digit_count = 3 - (-3) = 6
     exponent = before - p;
+    frac_end_local = p; // capture before p advances into explicit exponent
     answer.fraction_part_start = (char*)before;
     answer.fraction_part_len = (size_t)(p - before);
     digit_count -= exponent;
@@ -1321,7 +1500,7 @@ ffc_parsed ffc_parse_number_string(
       while ((p != pend) && ffc_is_integer(*p)) {
         uint8_t digit = (uint8_t)(*p - '0');
         if (exp_number < 0x10000000) {
-          exp_number = 10 * exp_number + digit;
+          exp_number = FFC_DIGIT_ACC10(exp_number, digit);
         }
         ++p;
       }
@@ -1361,12 +1540,12 @@ ffc_parsed ffc_parse_number_string(
 
     if (digit_count > 19) {
       answer.too_many_digits = true;
-      // Let us start again, this time, avoiding overflows.
-      // We don't need to call if is_integer, since we use the
-      // pre-tokenized spans from above.
+      // Re-scan the digits into i, this time stopping before overflow. Reads
+      // from the local digit-range pointers (start_digits, end_of_integer_part,
+      // before, frac_end_local) rather than the answer struct fields.
       i = 0;
-      p = answer.int_part_start;
-      char const *int_end = p + answer.int_part_len;
+      p = (char*)start_digits;
+      char const *int_end = (char*)end_of_integer_part;
       uint64_t const minimal_nineteen_digit_integer = 1000000000000000000;
       while ((i < minimal_nineteen_digit_integer) && (p != int_end)) {
         i = i * 10 + (uint64_t)(*p - '0');
@@ -1375,13 +1554,13 @@ ffc_parsed ffc_parse_number_string(
       if (i >= minimal_nineteen_digit_integer) { // We have a big integer
         exponent = end_of_integer_part - p + exp_number;
       } else { // We have a value with a fractional component.
-        p = answer.fraction_part_start;
-        char const *frac_end = p + answer.fraction_part_len;
+        p = (char*)before;
+        char const *frac_end = (char*)frac_end_local;
         while ((i < minimal_nineteen_digit_integer) && (p != frac_end)) {
           i = i * 10 + (uint64_t)(*p - '0');
           ++p;
         }
-        exponent = answer.fraction_part_start - p + exp_number;
+        exponent = before - p + exp_number;
       }
       // We have now corrected both exponent and i, to a truncated value
     }
@@ -2717,7 +2896,7 @@ ffc_adjusted_mantissa ffc_negative_digit_comp(
   ffc_adjusted_mantissa am_b = am;
   ffc_round_down(&am_b, vk);
   ffc_value b;
-  ffc_am_to_float(false, am_b, &b, FFC_VALUE_KIND_DOUBLE);
+  ffc_am_to_float(false, am_b, &b, vk);
 
   ffc_adjusted_mantissa theor = ffc_to_extended_halfway(b, vk);
   ffc_bigint theor_digits = ffc_bigint_make(theor.mantissa);
@@ -2778,6 +2957,250 @@ ffc_adjusted_mantissa ffc_digit_comp(ffc_parsed num, ffc_adjusted_mantissa am, f
 }
 
 #endif // FFC_DIGIT_COMPARISON_H
+#ifndef FFC_FORMAT_H
+#define FFC_FORMAT_H
+
+
+/* section: binary to decimal (fixed notation)
+ *
+ * Exact fixed-notation formatting, equivalent to printf("%.*f") on a libc
+ * that prints the exact binary value (glibc, musl, macOS). No floating-point
+ * arithmetic is used, so the result does not depend on the FPU rounding mode
+ * and is bit-for-bit reproducible across platforms.
+ *
+ * A double is m * 2^e with m < 2^53. To print `places` fraction digits we
+ * need N = round(m * 2^e * 10^places), then print N with the decimal point
+ * `places` digits from the right.
+ *
+ *   e >= 0: the value is the integer m << e, every fraction digit is zero.
+ *   e <  0: let k = -e. Only the first k fraction digits can be nonzero, so
+ *           with p = min(places, k):  N = round((m * 5^p) >> (k - p))
+ *           and the remaining places - p digits are zero.
+ *
+ * The shift-right is where rounding happens: the dropped bits give the exact
+ * half/sticky information for round-half-to-even. The worst case is
+ * m * 5^1074, about 2550 bits, which the 4000-bit ffc_bigint holds easily.
+ * The work is bounded by `places`, not by the exponent, so small numbers
+ * printed with few places stay cheap.
+ */
+
+// Divide in place by a divisor below 2^32, returning the remainder.
+// Each 64-bit limb is split into 32-bit halves so the only division needed
+// is 64-by-32, which is native everywhere and never a compiler-rt libcall.
+ffc_internal
+uint32_t ffc_bigint_divmod_u32(ffc_bigint* me, uint32_t d) {
+  uint64_t rem = 0;
+  for (size_t index = me->vec.len; index > 0; index--) {
+    ffc_bigint_limb x = me->vec.data[index - 1];
+#ifdef FFC_64BIT_LIMB
+    uint64_t hi = (rem << 32) | (x >> 32);
+    uint64_t qhi = hi / d;
+    rem = hi % d;
+    uint64_t lo = (rem << 32) | (x & 0xFFFFFFFFu);
+    uint64_t qlo = lo / d;
+    rem = lo % d;
+    me->vec.data[index - 1] = (qhi << 32) | qlo;
+#else
+    uint64_t cur = (rem << 32) | x;
+    me->vec.data[index - 1] = (ffc_bigint_limb)(cur / d);
+    rem = cur % d;
+#endif
+  }
+  ffc_sv_normalize(&me->vec);
+  return (uint32_t)rem;
+}
+
+// Test bit `n` (0 = least significant).
+ffc_internal ffc_inline
+bool ffc_bigint_test_bit(ffc_bigint const* me, size_t n) {
+  size_t limb = n / FFC_LIMB_BITS;
+  if (limb >= me->vec.len) {
+    return false;
+  }
+  return ((me->vec.data[limb] >> (n % FFC_LIMB_BITS)) & 1) != 0;
+}
+
+// True if any of the bits [0, n) is set.
+ffc_internal
+bool ffc_bigint_any_bits_below(ffc_bigint const* me, size_t n) {
+  size_t whole = n / FFC_LIMB_BITS;
+  size_t rem = n % FFC_LIMB_BITS;
+  if (whole > me->vec.len) {
+    whole = me->vec.len;
+    rem = 0;
+  }
+  for (size_t index = 0; index < whole; index++) {
+    if (me->vec.data[index] != 0) {
+      return true;
+    }
+  }
+  if (rem != 0 && whole < me->vec.len) {
+    ffc_bigint_limb mask = (((ffc_bigint_limb)1) << rem) - 1;
+    return (me->vec.data[whole] & mask) != 0;
+  }
+  return false;
+}
+
+// Shift right by `n` bits, discarding the low bits.
+ffc_internal
+void ffc_bigint_shr(ffc_bigint* me, size_t n) {
+  size_t limbs = n / FFC_LIMB_BITS;
+  size_t bits = n % FFC_LIMB_BITS;
+  if (limbs >= me->vec.len) {
+    me->vec.len = 0;
+    return;
+  }
+  if (limbs != 0) {
+    size_t keep = me->vec.len - limbs;
+    memmove(me->vec.data, me->vec.data + limbs, keep * sizeof(ffc_bigint_limb));
+    me->vec.len = (uint16_t)keep;
+  }
+  if (bits != 0) {
+    size_t last = me->vec.len - 1;
+    for (size_t index = 0; index < last; index++) {
+      me->vec.data[index] = (me->vec.data[index] >> bits) |
+                            (me->vec.data[index + 1] << (FFC_LIMB_BITS - bits));
+    }
+    me->vec.data[last] >>= bits;
+  }
+  ffc_sv_normalize(&me->vec);
+}
+
+// Bounded output cursor. `len` always counts the full output; bytes past
+// `cap` are dropped so the caller can size a buffer from the return value.
+typedef struct ffc_writer {
+  char *buf;
+  size_t cap;
+  size_t len;
+} ffc_writer;
+
+ffc_internal ffc_inline
+void ffc_writer_put(ffc_writer* w, char c) {
+  if (w->len < w->cap) {
+    w->buf[w->len] = c;
+  }
+  w->len++;
+}
+
+ffc_internal ffc_inline
+void ffc_writer_put_str(ffc_writer* w, char const* s) {
+  while (*s) {
+    ffc_writer_put(w, *s++);
+  }
+}
+
+ffc_internal ffc_inline
+void ffc_writer_put_zeros(ffc_writer* w, size_t n) {
+  while (n--) {
+    ffc_writer_put(w, '0');
+  }
+}
+
+// Largest N we can produce is just under 2^53 * 5^1074, which has 767
+// decimal digits (768 after a round-up). Digits are pulled nine at a time,
+// so round up to a multiple of nine with slack.
+#define FFC_FORMAT_DIGIT_BUF 800
+
+size_t ffc_format_double_fixed(char *buf, size_t cap, double value, int places) {
+  ffc_writer w;
+  w.buf = buf;
+  w.cap = cap;
+  w.len = 0;
+
+  size_t p = places < 0 ? 6 : (size_t)places;
+
+  uint64_t bits = ffc_get_double_bits(value);
+  bool negative = (bits >> FFC_DOUBLE_SIGN_INDEX) != 0;
+  int32_t biased_exp = (int32_t)((bits & FFC_DOUBLE_EXPONENT_MASK) >> FFC_DOUBLE_MANTISSA_EXPLICIT_BITS);
+  uint64_t m = bits & FFC_DOUBLE_MANTISSA_MASK;
+
+  if (negative) {
+    ffc_writer_put(&w, '-');
+  }
+  if (biased_exp == FFC_DOUBLE_INFINITE_POWER) {
+    ffc_writer_put_str(&w, m == 0 ? "inf" : "nan");
+    return w.len;
+  }
+
+  int32_t e;
+  if (biased_exp == 0) {
+    e = FFC_DOUBLE_MINIMUM_EXPONENT + 1 - FFC_DOUBLE_MANTISSA_EXPLICIT_BITS; // subnormal: -1074
+  } else {
+    m |= FFC_DOUBLE_HIDDEN_BIT_MASK;
+    e = biased_exp + FFC_DOUBLE_MINIMUM_EXPONENT - FFC_DOUBLE_MANTISSA_EXPLICIT_BITS;
+  }
+  if (m == 0) {
+    e = 0;
+  }
+  // Strip trailing zero bits so k is as small as it can be.
+  while (e < 0 && (m & 1) == 0) {
+    m >>= 1;
+    e++;
+  }
+
+  // N = big, holding p_eff fraction digits.
+  ffc_bigint big = ffc_bigint_make(m);
+  size_t p_eff = 0;
+  if (e >= 0) {
+    if (m != 0) {
+      FFC_ASSERT(ffc_bigint_shl(&big, (size_t)e));
+    }
+  } else {
+    size_t k = (size_t)(-e);
+    p_eff = p < k ? p : k;
+    FFC_ASSERT(ffc_bigint_pow5(&big, (uint32_t)p_eff));
+    size_t drop = k - p_eff;
+    if (drop != 0) {
+      bool half = ffc_bigint_test_bit(&big, drop - 1);
+      bool sticky = ffc_bigint_any_bits_below(&big, drop - 1);
+      ffc_bigint_shr(&big, drop);
+      bool odd = big.vec.len != 0 && (big.vec.data[0] & 1) != 0;
+      if (half && (sticky || odd)) {
+        FFC_ASSERT(ffc_bigint_add(&big, 1));
+      }
+    }
+  }
+
+  // Extract the decimal digits of N, least significant first.
+  char digits[FFC_FORMAT_DIGIT_BUF];
+  size_t ndigits = 0;
+  while (big.vec.len != 0) {
+    uint32_t chunk = ffc_bigint_divmod_u32(&big, 1000000000u);
+    for (int i = 0; i < 9; i++) {
+      digits[ndigits++] = (char)('0' + chunk % 10);
+      chunk /= 10;
+    }
+  }
+  while (ndigits > 0 && digits[ndigits - 1] == '0') {
+    ndigits--;
+  }
+
+  // Integer part: everything above the p_eff fraction digits.
+  if (ndigits > p_eff) {
+    for (size_t i = ndigits; i > p_eff; i--) {
+      ffc_writer_put(&w, digits[i - 1]);
+    }
+  } else {
+    ffc_writer_put(&w, '0');
+  }
+
+  if (p != 0) {
+    ffc_writer_put(&w, '.');
+    size_t have = ndigits < p_eff ? ndigits : p_eff;
+    ffc_writer_put_zeros(&w, p_eff - have);
+    for (size_t i = have; i > 0; i--) {
+      ffc_writer_put(&w, digits[i - 1]);
+    }
+    ffc_writer_put_zeros(&w, p - p_eff);
+  }
+  return w.len;
+}
+
+#undef FFC_FORMAT_DIGIT_BUF
+
+/* end section: binary to decimal */
+
+#endif // FFC_FORMAT_H
 
 /* section: decimal to binary */
 
@@ -2987,8 +3410,10 @@ bool ffc_clinger_fast_path_impl(uint64_t mantissa, int64_t exponent, bool is_neg
   // selected on the thread.
   // We proceed optimistically, assuming that detail::rounds_to_nearest()
   // returns true.
-  if (ffc_const(value_kind, MIN_EXPONENT_FAST_PATH) <= exponent &&
-      exponent <= ffc_const(value_kind, MAX_EXPONENT_FAST_PATH)) {
+  // Single unsigned range check replaces two signed comparisons, matching
+  // fast_float's layout: (uint64_t)(e - MIN) <= (MAX - MIN) in one compare.
+  if ((uint64_t)((int64_t)exponent - (int64_t)ffc_const(value_kind, MIN_EXPONENT_FAST_PATH)) <=
+      (uint64_t)((int64_t)ffc_const(value_kind, MAX_EXPONENT_FAST_PATH) - (int64_t)ffc_const(value_kind, MIN_EXPONENT_FAST_PATH))) {
     // Unfortunately, the conventional Clinger's fast path is only possible
     // when the system rounds to the nearest float.
     //
@@ -3054,6 +3479,19 @@ ffc_result ffc_from_chars_advanced(ffc_parsed const pns, ffc_value* value, ffc_v
 
   answer.outcome = FFC_OUTCOME_OK; // be optimistic :')
   answer.ptr = (char*)pns.lastmatch;
+
+  if (!pns.too_many_digits && pns.exponent == 0 &&
+      pns.mantissa <= ffc_const(vk, MAX_MANTISSA_FAST_PATH)) {
+#if defined(__clang__) || defined(FFC_32BIT)
+    if (pns.mantissa == 0) {
+      ffc_set_value(value, vk, pns.negative ? -0. : 0.);
+      return answer;
+    }
+#endif
+    ffc_set_value(value, vk, pns.mantissa);
+    if (pns.negative) { ffc_set_value(value, vk, -ffc_read_value(value, vk)); }
+    return answer;
+  }
 
   if (!pns.too_many_digits &&
       ffc_clinger_fast_path_impl(pns.mantissa, pns.exponent, pns.negative, value, vk)) {
@@ -3127,7 +3565,8 @@ ffc_result ffc_from_chars(char* first, char* last, ffc_parse_options options, ff
   return ffc_from_chars_advanced(pns, value, vk);
 }
 
-ffc_result ffc_from_chars_double_options(const char *start, const char *end, double* out, ffc_parse_options options) {
+/* See FFC_API_INLINE in api.h: force-inlined in this TU, still exported. */
+FFC_DOUBLE_IMPL_INLINE ffc_result ffc_from_chars_double_options(const char *start, const char *end, double* out, ffc_parse_options options) {
   // It would be UB to directly use *out as our ffc_value, even though its the same layout
   ffc_value out_value = {0};
 
@@ -3136,7 +3575,7 @@ ffc_result ffc_from_chars_double_options(const char *start, const char *end, dou
   *out = out_value.d;
   return result;
 }
-ffc_result ffc_from_chars_double(char const* first, char const* last, double* out) {
+FFC_DOUBLE_IMPL_INLINE ffc_result ffc_from_chars_double(char const* first, char const* last, double* out) {
   ffc_parse_options options = ffc_parse_options_default();
   return ffc_from_chars_double_options(first, last, out, options);
 }
@@ -3153,13 +3592,13 @@ double ffc_parse_double_simple(size_t len, const char *s, ffc_outcome *outcome) 
   return out;
 }
 
-ffc_result ffc_from_chars_float_options(const char *start,  const char *end, float* out, ffc_parse_options options) {
+FFC_FLOAT_IMPL_INLINE ffc_result ffc_from_chars_float_options(const char *start,  const char *end, float* out, ffc_parse_options options) {
   ffc_value out_value = {0};
   ffc_result result = ffc_from_chars((char*)start, (char*)end, options, &out_value, FFC_VALUE_KIND_FLOAT);
   *out = out_value.f;
   return result;
 }
-ffc_result ffc_from_chars_float(char const* first, char const* last, float* out) {
+FFC_FLOAT_IMPL_INLINE ffc_result ffc_from_chars_float(char const* first, char const* last, float* out) {
   ffc_parse_options options = ffc_parse_options_default();
   return ffc_from_chars_float_options(first, last, out, options);
 }
@@ -3176,33 +3615,63 @@ float ffc_parse_float_simple(size_t len, const char *s, ffc_outcome *outcome) {
   return out;
 }
 
-ffc_result ffc_parse_i64(size_t len, const char *input, int base, int64_t  *out) {
-  char *pend = (char*)(input + len);
+ffc_result ffc_from_chars_i64_options(const char *start, const char *end, int base, int64_t* out, ffc_parse_options options) {
   ffc_int_value value_out = {0};
-  ffc_result result = ffc_parse_int_string(input, pend, &value_out, FFC_INT_KIND_S64, ffc_parse_options_default(), base);
+  ffc_result result = ffc_parse_int_string(start, end, &value_out, FFC_INT_KIND_S64, options, base);
   *out = value_out.s64;
   return result;
 }
-ffc_result ffc_parse_u64(size_t len, const char *input, int base, uint64_t *out) {
-  char *pend = (char*)(input + len);
+ffc_result ffc_from_chars_i64(char const* first, char const* last, int base, int64_t* out) {
+  ffc_parse_options options = ffc_parse_options_default();
+  return ffc_from_chars_i64_options(first, last, base, out, options);
+}
+ffc_result ffc_from_chars_u64_options(const char *start, const char *end, int base, uint64_t* out, ffc_parse_options options) {
   ffc_int_value value_out = {0};
-  ffc_result result = ffc_parse_int_string(input, pend, &value_out, FFC_INT_KIND_U64, ffc_parse_options_default(), base);
+  ffc_result result = ffc_parse_int_string(start, end, &value_out, FFC_INT_KIND_U64, options, base);
   *out = value_out.u64;
   return result;
 }
-ffc_result ffc_parse_i32(size_t len, const char *input, int base, int32_t  *out) {
-  char *pend = (char*)(input + len);
+ffc_result ffc_from_chars_u64(char const* first, char const* last, int base, uint64_t* out) {
+  ffc_parse_options options = ffc_parse_options_default();
+  return ffc_from_chars_u64_options(first, last, base, out, options);
+}
+ffc_result ffc_from_chars_i32_options(const char *start, const char *end, int base, int32_t* out, ffc_parse_options options) {
   ffc_int_value value_out = {0};
-  ffc_result result = ffc_parse_int_string(input, pend, &value_out, FFC_INT_KIND_S32, ffc_parse_options_default(), base);
+  ffc_result result = ffc_parse_int_string(start, end, &value_out, FFC_INT_KIND_S32, options, base);
   *out = value_out.s32;
   return result;
 }
-ffc_result ffc_parse_u32(size_t len, const char *input, int base, uint32_t *out) {
-  char *pend = (char*)(input + len);
+ffc_result ffc_from_chars_i32(char const* first, char const* last, int base, int32_t* out) {
+  ffc_parse_options options = ffc_parse_options_default();
+  return ffc_from_chars_i32_options(first, last, base, out, options);
+}
+ffc_result ffc_from_chars_u32_options(const char *start, const char *end, int base, uint32_t* out, ffc_parse_options options) {
   ffc_int_value value_out = {0};
-  ffc_result result = ffc_parse_int_string(input, pend, &value_out, FFC_INT_KIND_U32, ffc_parse_options_default(), base);
+  ffc_result result = ffc_parse_int_string(start, end, &value_out, FFC_INT_KIND_U32, options, base);
   *out = value_out.u32;
   return result;
+}
+ffc_result ffc_from_chars_u32(char const* first, char const* last, int base, uint32_t* out) {
+  ffc_parse_options options = ffc_parse_options_default();
+  return ffc_from_chars_u32_options(first, last, base, out, options);
+}
+
+
+ffc_result ffc_parse_i64(size_t len, const char *input, int base, int64_t  *out) {
+  char *pend = (char*)(input + len);
+  return ffc_from_chars_i64(input, pend, base, out);
+}
+ffc_result ffc_parse_u64(size_t len, const char *input, int base, uint64_t *out) {
+  char *pend = (char*)(input + len);
+  return ffc_from_chars_u64(input, pend, base, out);
+}
+ffc_result ffc_parse_i32(size_t len, const char *input, int base, int32_t  *out) {
+  char *pend = (char*)(input + len);
+  return ffc_from_chars_i32(input, pend, base, out);
+}
+ffc_result ffc_parse_u32(size_t len, const char *input, int base, uint32_t *out) {
+  char *pend = (char*)(input + len);
+  return ffc_from_chars_u32(input, pend, base, out);
 }
 
 int64_t  ffc_parse_i64_simple(size_t len, const char *input, int base, ffc_outcome *outcome) {
