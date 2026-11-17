@@ -98,4 +98,4 @@ encode_bad_option_test_() ->
 
 
 enc_error(Type, Obj, Case) ->
-    ?_assertMatch({'EXIT', {{Type, Obj}, _}}, (catch jiffy:encode(Case))).
+    ?_assertMatch({error, {Type, Obj}}, try jiffy:encode(Case) catch T:E -> {T, E} end).
