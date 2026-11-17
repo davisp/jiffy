@@ -597,7 +597,9 @@ i64ToAsciiTable(unsigned char *dst, ErlNifSInt64 value)
 {
     if (value < 0) {
         *dst++ = '-';
-        return 1 + u64ToAsciiTable(dst, -value);
+        // Negate as unsigned: -value overflows for the smallest 64 bit
+        // integer, and signed overflow is undefined behavior
+        return 1 + u64ToAsciiTable(dst, 0 - (ErlNifUInt64) value);
     } else {
         return u64ToAsciiTable(dst, value);
     }
