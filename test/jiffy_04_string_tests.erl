@@ -22,6 +22,26 @@ latin1_nul_atom_test_() ->
                       enc(Bad, [uescape]))
     ].
 
+% Test encoding internal markers
+marker_atom_test_() ->
+    Markers = ['$object_ref$', '$array_ref$', '$map_ref$'],
+    [
+        begin
+            S = atom_to_binary(M, utf8),
+            J = <<"\"", S/binary, "\"">>,
+            DupS = lists:duplicate(2000, S),
+            DupM = lists:duplicate(2000, M),
+            [
+                ?_assertEqual(J, enc(M)),
+                ?_assertEqual(<<"[", J/binary, "]">>, enc([M])),
+                ?_assertEqual(<<"[1,", J/binary, ",2]">>, enc([1, M, 2])),
+                ?_assertEqual(<<"{", J/binary, ":", J/binary, "}">>, enc({[{M, M}]})),
+                ?_assertEqual(DupS, dec(enc(DupM, [{bytes_per_red, 1}])))
+            ]
+        end
+     || M <- Markers
+    ].
+
 % From issue https://github.com/davisp/jiffy/issues/231
 % ERL_NIF_UTF8 was added in NIF 2.17 (OTP 26) though
 -if(?OTP_RELEASE >= 26).

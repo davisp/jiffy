@@ -61,6 +61,8 @@ typedef struct {
 
     unsigned char*  p;
     size_t          i;
+
+    int             top_is_value;
 } Encoder;
 
 
@@ -163,6 +165,16 @@ termstack_is_empty(TermStack* stack)
     return stack->top == 0;
 }
 
+static inline void
+enc_push(Encoder* e, TermStack* stack,
+         ERL_NIF_TERM rest, ERL_NIF_TERM marker, ERL_NIF_TERM value)
+{
+    termstack_push(stack, rest);
+    termstack_push(stack, marker);
+    termstack_push(stack, value);
+    e->top_is_value = 1;
+}
+
 static Encoder*
 enc_new(ErlNifEnv* env)
 {
@@ -177,6 +189,7 @@ enc_new(ErlNifEnv* env)
     e->bytes_per_red = DEFAULT_BYTES_PER_REDUCTION;
     e->iolist = enif_make_list(env, 0);
     e->chunk_size = BIN_INC_SIZE;
+    e->top_is_value = 1;
 
     if(!enif_alloc_binary(e->chunk_size, &e->buffer)) {
         enif_release_resource(e);
@@ -650,17 +663,20 @@ enc_object_key(ErlNifEnv *env, Encoder* e, ERL_NIF_TERM val)
     ErlNifSInt64 ival;
     double dval;
 
-    if(enif_is_atom(env, val)) {
-        return enc_atom(e, val);
+    switch(enif_term_type(env, val)) {
+        case ERL_NIF_TERM_TYPE_BITSTRING:
+            return enc_string(e, val);
+        case ERL_NIF_TERM_TYPE_ATOM:
+            return enc_atom(e, val);
+        case ERL_NIF_TERM_TYPE_INTEGER:
+            return enif_get_int64(env, val, &ival)
+                && enc_char(e, '"') && enc_long(e, ival) && enc_char(e, '"');
+        case ERL_NIF_TERM_TYPE_FLOAT:
+            return enif_get_double(env, val, &dval)
+                && enc_char(e, '"') && enc_double(e, dval) && enc_char(e, '"');
+        default:
+            return 0;
     }
-    if(enif_get_int64(env, val, &ival)) {
-        return enc_char(e, '"') && enc_long(e, ival) && enc_char(e, '"');
-    }
-    if(enif_get_double(env, val, &dval)) {
-        return enc_char(e, '"') && enc_double(e, dval) && enc_char(e, '"');
-    }
-
-    return enc_string(e, val);
 }
 
 static int
@@ -854,6 +870,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     int arity;
     ErlNifSInt64 lval;
     double dval;
+    ErlNifBinary bin;
+    ErlNifTermType type;
 
     void* res;
 
@@ -907,7 +925,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
         curr = termstack_pop(&stack);
 
-        if(enif_is_atom(env, curr)) {
+        if(!e->top_is_value) {
+            // A marker. We got an object or array then
             if(enif_is_identical(curr, e->atoms->ref_object)) {
                 curr = termstack_pop(&stack);
 
@@ -939,9 +958,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     goto done;
                 }
 
-                termstack_push(&stack, curr);
-                termstack_push(&stack, e->atoms->ref_object);
-                termstack_push(&stack, tuple[1]);
+                enc_push(e, &stack, curr, e->atoms->ref_object, tuple[1]);
             } else if(enif_is_identical(curr, e->atoms->ref_array)) {
                 curr = termstack_pop(&stack);
 
@@ -957,11 +974,10 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     goto done;
                 }
 
-                termstack_push(&stack, curr);
-                termstack_push(&stack, e->atoms->ref_array);
-                termstack_push(&stack, item);
-            } else if(enif_is_identical(curr, e->atoms->ref_map)) {
-                // Maps are encoded as [k1, v1, ...]
+                enc_push(e, &stack, curr, e->atoms->ref_array, item);
+            } else {
+                // The only marker left is the one for maps, and those are
+                // encoded as [k1, v1, ...]
                 curr = termstack_pop(&stack);
 
                 if(!enif_get_list_cell(env, curr, &mkey, &curr)) {
@@ -988,10 +1004,18 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     goto done;
                 }
 
-                termstack_push(&stack, curr);
-                termstack_push(&stack, e->atoms->ref_map);
-                termstack_push(&stack, mval);
-            } else if(enif_is_identical(curr, e->atoms->atom_null)) {
+                enc_push(e, &stack, curr, e->atoms->ref_map, mval);
+            }
+            continue;
+        }
+
+        // After a value we have a marker unless the value is an object or array with items
+        e->top_is_value = 0;
+
+        type = enif_term_type(env, curr);
+
+        if(type == ERL_NIF_TERM_TYPE_ATOM) {
+            if(enif_is_identical(curr, e->atoms->atom_null)) {
                 if(!enc_literal(e, "null", 4)) {
                     ret = enc_error(e, "null");
                     goto done;
@@ -1015,22 +1039,26 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 ret = enc_obj_error(e, "invalid_string", curr);
                 goto done;
             }
-        } else if(enif_is_binary(env, curr)) {
-            if(!enc_string(e, curr)) {
+        } else if(type == ERL_NIF_TERM_TYPE_BITSTRING
+                && enif_inspect_binary(env, curr, &bin)) {
+            if(!enc_quoted(e, bin.data, bin.size, 0)) {
                 ret = enc_obj_error(e, "invalid_string", curr);
                 goto done;
             }
-        } else if(enif_get_int64(env, curr, &lval)) {
+        } else if(type == ERL_NIF_TERM_TYPE_INTEGER
+                && enif_get_int64(env, curr, &lval)) {
             if(!enc_long(e, lval)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-        } else if(enif_get_double(env, curr, &dval)) {
+        } else if(type == ERL_NIF_TERM_TYPE_FLOAT
+                && enif_get_double(env, curr, &dval)) {
             if(!enc_double(e, dval)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
             }
-        } else if(enif_get_tuple(env, curr, &arity, &tuple)) {
+        } else if(type == ERL_NIF_TERM_TYPE_TUPLE
+                && enif_get_tuple(env, curr, &arity, &tuple)) {
             if(arity != 1) {
                 // Handle unknown or pre-encoded JSON in finish_encode/2
                 if(!enc_unknown(e, curr)) {
@@ -1071,10 +1099,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
 
-            termstack_push(&stack, curr);
-            termstack_push(&stack, e->atoms->ref_object);
-            termstack_push(&stack, tuple[1]);
-        } else if(enif_is_map(env, curr)) {
+            enc_push(e, &stack, curr, e->atoms->ref_object, tuple[1]);
+        } else if(type == ERL_NIF_TERM_TYPE_MAP) {
             // A map is encoded as a flat [k1, v1, ...] list
             if(!enc_map_to_memberlist(env, curr, &curr)) {
                 ret = enc_error(e, "internal_error");
@@ -1104,10 +1130,8 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 goto done;
             }
 
-            termstack_push(&stack, curr);
-            termstack_push(&stack, e->atoms->ref_map);
-            termstack_push(&stack, mval);
-        } else if(enif_is_list(env, curr)) {
+            enc_push(e, &stack, curr, e->atoms->ref_map, mval);
+        } else if(type == ERL_NIF_TERM_TYPE_LIST) {
             if(!enc_start_array(e)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
@@ -1121,9 +1145,7 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 continue;
             }
 
-            termstack_push(&stack, curr);
-            termstack_push(&stack, e->atoms->ref_array);
-            termstack_push(&stack, item);
+            enc_push(e, &stack, curr, e->atoms->ref_array, item);
         } else {
             if(!enc_unknown(e, curr)) {
                 ret = enc_error(e, "internal_error");
