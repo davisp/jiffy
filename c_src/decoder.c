@@ -12,7 +12,6 @@
 #include "jiffy_utf8.h"
 
 #define STACK_SIZE_INC 64
-#define JIFFY_SMALL_ARRAY_SIZE 64
 
 enum {
     st_value=0,
@@ -416,30 +415,11 @@ make_empty_object(ErlNifEnv* env, int ret_map)
 static inline ERL_NIF_TERM
 make_array(ErlNifEnv* env, ERL_NIF_TERM list)
 {
-    ERL_NIF_TERM item;
+    ERL_NIF_TERM ret;
 
-    unsigned int count = 0;
-    enif_get_list_length(env, list, &count);
-
-    if(count == 0) {
+    // We accumulated in reverse so we can use this handy-dandy call
+    if(!enif_make_reverse_list(env, list, &ret)) {
         return enif_make_list(env, 0);
-    }
-
-    ERL_NIF_TERM small_buf[JIFFY_SMALL_ARRAY_SIZE];
-    ERL_NIF_TERM* arr = (count <= JIFFY_SMALL_ARRAY_SIZE)
-        ? small_buf
-        : enif_alloc(count * sizeof(ERL_NIF_TERM));
-
-    // Fill array in reverse since list was reversed after parsing
-    unsigned int i = count;
-    while(enif_get_list_cell(env, list, &item, &list)) {
-        arr[--i] = item;
-    }
-
-    ERL_NIF_TERM ret = enif_make_list_from_array(env, arr, count);
-
-    if(arr != small_buf) {
-        enif_free(arr);
     }
 
     return ret;
