@@ -12,6 +12,7 @@
 #include "jiffy_utf8.h"
 
 #define STACK_SIZE_INC 64
+#define SHORT_RUN_SIZE 8
 
 // The decoding position is managed via a stack (st_data) which keeps track of
 // the container type and nesting (so it's either st_object or st_array), and
@@ -170,6 +171,29 @@ dec_pop_assert(Decoder* d, char val)
     (void)current;
 }
 
+// Copy until the first backslash or len
+static inline size_t
+copy_to_escape(char* dst, const unsigned char* src, size_t len)
+{
+    const unsigned char* esc;
+    size_t n = len < SHORT_RUN_SIZE ? len : SHORT_RUN_SIZE;
+    size_t i = 0;
+
+    // Escape often come a few bytes apart, so start byte by byte
+    while(i < n && src[i] != '\\') {
+        dst[i] = src[i];
+        i++;
+    }
+    if(i < SHORT_RUN_SIZE || i == len || src[i] == '\\') {
+        return i;
+    }
+    // Press the fast-forward button: memchr and memcpy
+    esc = memchr(src + i, '\\', len - i);
+    n = esc == NULL ? len : (size_t) (esc - src);
+    memcpy(dst + i, src + i, n - i);
+    return n;
+}
+
 static int
 dec_string(Decoder* d, ERL_NIF_TERM* value)
 {
@@ -281,7 +305,7 @@ parse:
         return 1;
     } else if(!has_escape) {
         ulen = d->i - 1 - st;
-        chrbuf = (char*) enif_make_new_binary(d->env, ulen, value),
+        chrbuf = (char*) enif_make_new_binary(d->env, ulen, value);
         memcpy(chrbuf, &(d->p[st]), ulen);
         return 1;
     }
@@ -295,7 +319,9 @@ parse:
     ui = st;
     while(ui < d->i - 1) {
         if(d->p[ui] != '\\') {
-            chrbuf[chrpos++] = d->p[ui++];
+            ulen = copy_to_escape(chrbuf + chrpos, d->p + ui, d->i - 1 - ui);
+            chrpos += ulen;
+            ui += ulen;
             continue;
         }
         ui++;

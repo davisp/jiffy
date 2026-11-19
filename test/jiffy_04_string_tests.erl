@@ -77,6 +77,32 @@ utf8_atom_test_() ->
     ].
 -endif.
 
+% escapes at every distance from each other and from the end of the string
+unescape_boundary_test() ->
+    Escapes = [
+        {<<"\\n">>, <<"\n">>},
+        {<<"\\\"">>, <<"\"">>},
+        {<<"\\u00e9">>, <<195, 169>>},
+        {<<"\\ud83d\\ude00">>, <<240, 159, 152, 128>>}
+    ],
+    Lens = lists:seq(0, 100) ++ [127, 128, 129, 1000, 4095, 4096, 4097],
+    Tails = [0, 1, 7, 8, 9, 15, 16, 17, 31, 32, 33, 48, 100],
+    [
+        begin
+            A = binary:copy(<<"a">>, N),
+            B = binary:copy(<<"b">>, M),
+            Json = iol2b(["\"", A, Esc, B, Esc, B, "\""]),
+            Expect = iol2b([A, Chr, B, Chr, B]),
+            ?assertEqual(Expect, dec(Json)),
+            ?assertEqual(Expect, dec(Json, [copy_strings])),
+            % more input after the string
+            Two = iol2b(["[", Json, ",", Json, "]"]),
+            ?assertEqual([Expect, Expect], dec(Two))
+        end
+     || {Esc, Chr} <- Escapes, N <- Lens, M <- Tails
+    ],
+    ok.
+
 atom_key_test_() ->
     [
         ?_assertEqual(<<"{\"foo\":1}">>, enc({[{foo, 1}]})),
