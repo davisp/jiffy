@@ -13,6 +13,10 @@
 
 #define STACK_SIZE_INC 64
 
+// The decoding position is managed via a stack (st_data) which keeps track of
+// the container type and nesting (so it's either st_object or st_array), and
+// the state variable which can be: st_value, st_key, st_colon, st_comma or
+// st_done.
 enum {
     st_value=0,
     st_object,
@@ -43,6 +47,7 @@ typedef struct {
     size_t          i;
     size_t          len;
 
+    int             state;
     char*           st_data;
     size_t          st_size;
     size_t          st_top;
@@ -57,7 +62,6 @@ dec_new(ErlNifEnv* env)
     // If enif_alloc_resource cannot allocate it crashes the VM
     Decoder* d = enif_alloc_resource(st->res_dec, sizeof(Decoder));
     assert(d != NULL);
-    size_t i;
 
     // Zero everything and only set non-0 fields
     memset(d, 0, sizeof(*d));
@@ -66,6 +70,7 @@ dec_new(ErlNifEnv* env)
     d->bytes_per_red = DEFAULT_BYTES_PER_REDUCTION;
     d->null_term = d->atoms->atom_null;
     d->len = -1;
+    d->state = st_value;
 
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC);
     if(d->st_data == NULL) {
@@ -74,13 +79,6 @@ dec_new(ErlNifEnv* env)
     }
 
     d->st_size = STACK_SIZE_INC;
-
-    for(i = 0; i < d->st_size; i++) {
-        d->st_data[i] = st_invalid;
-    }
-
-    d->st_data[0] = st_value;
-    d->st_top++;
 
     return d;
 }
@@ -127,25 +125,27 @@ dec_top(Decoder* d)
     return d->st_top;
 }
 
+static int
+dec_grow(Decoder* d)
+{
+    size_t new_sz = d->st_size + STACK_SIZE_INC;
+    char* new_data = (char*) enif_realloc(d->st_data, new_sz);
+
+    if(new_data == NULL) {
+        return 0;
+    }
+
+    d->st_data = new_data;
+    d->st_size = new_sz;
+    return 1;
+}
+
 // Returns 0 if the stack could not be grown
 static inline int
 dec_push(Decoder* d, char val)
 {
-    size_t new_sz;
-    size_t i;
-    char* new_data;
-
-    if(d->st_top == d->st_size) {
-        new_sz = d->st_size + STACK_SIZE_INC;
-        new_data = (char*) enif_realloc(d->st_data, new_sz);
-        if(new_data == NULL) {
-            return 0;
-        }
-        d->st_data = new_data;
-        d->st_size = new_sz;
-        for(i = d->st_top; i < d->st_size; i++) {
-            d->st_data[i] = st_invalid;
-        }
+    if(JIFFY_UNLIKELY(d->st_top == d->st_size) && !dec_grow(d)) {
+        return 0;
     }
 
     assert(d->st_top < d->st_size);
@@ -155,22 +155,18 @@ dec_push(Decoder* d, char val)
 
 static inline char
 dec_pop(Decoder* d) {
-    char current = st_invalid;
-
-    if (d->st_top > 0) {
-        current = d->st_data[d->st_top - 1];
-        d->st_data[d->st_top - 1] = st_invalid;
-        d->st_top--;
+    if(d->st_top > 0) {
+        return d->st_data[--d->st_top];
     }
 
-    return current;
+    return st_invalid;
 }
 
 static void
 dec_pop_assert(Decoder* d, char val)
 {
     char current = dec_pop(d);
-    assert(current == val && "popped invalid state.");
+    assert(current == val && "popped invalid container.");
     (void)current;
 }
 
@@ -517,6 +513,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     size_t start;
     size_t bytes_processed = 0;
 
+    int state;
+
     if(!enif_inspect_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
     } else if(!enif_get_resource(env, argv[1], st->res_dec, &res)) {
@@ -530,6 +528,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     curr = argv[4];
 
     start = d->i;
+    state = d->state;
 
     const size_t yt = yield_threshold(d->bytes_per_red);
     const unsigned char* JIFFY_RESTRICT p = d->p;
@@ -541,6 +540,8 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         if(bytes_processed >= yt) {
             assert(enif_is_list(env, objs));
             assert(enif_is_list(env, curr));
+
+            d->state = state;
 
             tmp_argv[0] = argv[0];
             tmp_argv[1] = argv[1];
@@ -560,7 +561,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                 );
         }
 
-        switch(dec_curr(d)) {
+        switch(state) {
             case st_value:
                 switch(d->p[d->i]) {
                     case ' ':
@@ -568,7 +569,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     case '\r':
                     case '\t':
                         d->i = skip_whitespace(p, len, d->i + 1);
-                        break;
+                        continue;
                     case 'n':
                         if(d->i + 3 >= d->len) {
                             ret = dec_error(d, "invalid_literal");
@@ -579,7 +580,6 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         val = d->null_term;
-                        dec_pop_assert(d, st_value);
                         d->i += 4;
                         break;
                     case 't':
@@ -592,7 +592,6 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         val = d->atoms->atom_true;
-                        dec_pop_assert(d, st_value);
                         d->i += 4;
                         break;
                     case 'f':
@@ -605,7 +604,6 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         val = d->atoms->atom_false;
-                        dec_pop_assert(d, st_value);
                         d->i += 5;
                         break;
                     case '\"':
@@ -613,7 +611,6 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             ret = dec_error(d, "invalid_string");
                             goto done;
                         }
-                        dec_pop_assert(d, st_value);
                         break;
                     case '-':
                     case '0':
@@ -630,37 +627,35 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             ret = dec_error(d, "invalid_number");
                             goto done;
                         }
-                        dec_pop_assert(d, st_value);
                         break;
                     case '{':
-                        if(!dec_push(d, st_object) || !dec_push(d, st_key)) {
+                        if(!dec_push(d, st_object)) {
                             ret = dec_error(d, "insufficient_memory");
                             goto done;
                         }
                         objs = enif_make_list_cell(env, curr, objs);
                         curr = enif_make_list(env, 0);
+                        state = st_key;
                         d->i++;
-                        break;
+                        continue;
                     case '[':
-                        if(!dec_push(d, st_array) || !dec_push(d, st_value)) {
+                        if(!dec_push(d, st_array)) {
                             ret = dec_error(d, "insufficient_memory");
                             goto done;
                         }
                         objs = enif_make_list_cell(env, curr, objs);
                         curr = enif_make_list(env, 0);
                         d->i++;
-                        break;
+                        continue;
                     case ']':
                         if(!enif_is_empty_list(env, curr)) {
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
-                        dec_pop_assert(d, st_value);
                         if(dec_pop(d) != st_array) {
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
-                        dec_pop_assert(d, st_value);
                         val = curr; // curr is []
                         if(!enif_get_list_cell(env, objs, &curr, &objs)) {
                             ret = dec_error(d, "internal_error");
@@ -672,10 +667,11 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         ret = dec_error(d, "invalid_json");
                         goto done;
                 }
+                // Got a value: the result, or a member of the container
                 if(dec_top(d) == 0) {
-                    dec_push(d, st_done);
-                } else if(dec_curr(d) != st_value && dec_curr(d) != st_key) {
-                    dec_push(d, st_comma);
+                    state = st_done;
+                } else {
+                    state = st_comma;
                     curr = enif_make_list_cell(env, val, curr);
                 }
                 break;
@@ -693,8 +689,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             ret = dec_error(d, "invalid_string");
                             goto done;
                         }
-                        dec_pop_assert(d, st_key);
-                        dec_push(d, st_colon);
+                        state = st_colon;
                         curr = enif_make_list_cell(env, val, curr);
                         break;
                     case '}':
@@ -702,18 +697,16 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
-                        dec_pop_assert(d, st_key);
                         dec_pop_assert(d, st_object);
-                        dec_pop_assert(d, st_value);
                         val = make_empty_object(env, d->return_maps);
                         if(!enif_get_list_cell(env, objs, &curr, &objs)) {
                             ret = dec_error(d, "internal_error");
                             goto done;
                         }
                         if(dec_top(d) == 0) {
-                            dec_push(d, st_done);
+                            state = st_done;
                         } else {
-                            dec_push(d, st_comma);
+                            state = st_comma;
                             curr = enif_make_list_cell(env, val, curr);
                         }
                         d->i++;
@@ -733,8 +726,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         d->i = skip_whitespace(p, len, d->i + 1);
                         break;
                     case ':':
-                        dec_pop_assert(d, st_colon);
-                        dec_push(d, st_value);
+                        state = st_value;
                         d->i++;
                         break;
                     default:
@@ -752,13 +744,12 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         d->i = skip_whitespace(p, len, d->i + 1);
                         break;
                     case ',':
-                        dec_pop_assert(d, st_comma);
                         switch(dec_curr(d)) {
                             case st_object:
-                                dec_push(d, st_key);
+                                state = st_key;
                                 break;
                             case st_array:
-                                dec_push(d, st_value);
+                                state = st_value;
                                 break;
                             default:
                                 ret = dec_error(d, "internal_error");
@@ -767,12 +758,10 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         d->i++;
                         break;
                     case '}':
-                        dec_pop_assert(d, st_comma);
                         if(dec_pop(d) != st_object) {
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
-                        dec_pop_assert(d, st_value);
                         if(!make_object(env, curr, &val,
                                 d->return_maps, d->dedupe_keys)) {
                             ret = dec_error(d, "internal_object_error");
@@ -783,30 +772,28 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         if(dec_top(d) > 0) {
-                            dec_push(d, st_comma);
+                            state = st_comma;
                             curr = enif_make_list_cell(env, val, curr);
                         } else {
-                            dec_push(d, st_done);
+                            state = st_done;
                         }
                         d->i++;
                         break;
                     case ']':
-                        dec_pop_assert(d, st_comma);
                         if(dec_pop(d) != st_array) {
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
-                        dec_pop_assert(d, st_value);
                         val = make_array(env, curr);
                         if(!enif_get_list_cell(env, objs, &curr, &objs)) {
                             ret = dec_error(d, "internal_error");
                             goto done;
                         }
                         if(dec_top(d) > 0) {
-                            dec_push(d, st_comma);
+                            state = st_comma;
                             curr = enif_make_list_cell(env, val, curr);
                         } else {
-                            dec_push(d, st_done);
+                            state = st_done;
                         }
                         d->i++;
                         break;
@@ -845,7 +832,7 @@ decode_done:
         goto done;
     }
 
-    if(dec_pop(d) != st_done) {
+    if(state != st_done) {
         ret = dec_error(d, "truncated_json");
     } else if(d->is_partial) {
         ret = enif_make_tuple2(env, d->atoms->atom_partial, val);
