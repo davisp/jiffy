@@ -14,7 +14,8 @@
                     | json_string()
                     | json_number()
                     | json_object()
-                    | json_array().
+                    | json_array()
+                    | json_preencoded().
 
 -type json_array()  :: [json_value()].
 -type json_string() :: atom() | binary().
@@ -34,6 +35,7 @@
                         | dedupe_keys
                         | copy_strings
                         | {null_term, any()}
+                        | {max_depth, non_neg_integer()}
                         | {bytes_per_iter, non_neg_integer()}
                         | {bytes_per_red, non_neg_integer()}.
 

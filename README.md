@@ -20,10 +20,10 @@ of story.
 
 Errors are raised as error exceptions.
 
-    Eshell V5.8.2  (abort with ^G)
-    1> jiffy:decode(<<"{\"foo\": \"bar\"}">>).
+    Eshell V15.2.7.13 (press Ctrl+G to abort, type help(). for help)
+    1> jiffy:decode(~'{"foo": "bar"}').
     {[{<<"foo">>,<<"bar">>}]}
-    2> Doc = {[{foo, [<<"bing">>, 2.3, true]}]}.
+    2> Doc = {[{foo, [~"bing", 2.3, true]}]}.
     {[{foo,[<<"bing">>,2.3,true]}]}
     3> jiffy:encode(Doc).
     <<"{\"foo\":[\"bing\",2.3,true]}">>
@@ -59,6 +59,10 @@ The options for decode are:
   this option will instead allocate new binaries for each string, so
   the original JSON document can be garbage collected even though
   the decode result is still in use.
+* `{max_depth, N}` - Decode top `N` levels of nested objects and arrays.
+  Objects and arrays nested deeper than that are returned as `{json, Binary}`,
+  with `Binary` being their JSON. See [Partial decoding](#partial-decoding)
+  below.
 * `{bytes_per_red, N}` where N >= 0 - This controls the number of
   bytes that Jiffy will process as an equivalent to a reduction. Each
   20 reductions we consume 1% of our allocated time slice for the current
@@ -93,14 +97,33 @@ Pre-encoded JSON
 
 A `{json, IoData}` tuple can appear anywhere a JSON value is expected (except
 as an object key). The `IoData` is spliced into the output as is. Jiffy does
-not parse, validate, copy, or pretty-print it.
+not parse, validate, copy, or pretty-print it. Encode options such as `uescape`
+do not apply to it.
 
-    1> jiffy:encode([1, {json, <<"{\"cached\":true}">>}, 3]).
+    1> jiffy:encode([1, {json, ~'{"cached":true}'}, 3]).
     <<"[1,{\"cached\":true},3]">>
-    2> jiffy:encode({[{<<"a">>, {json, [<<"[1,">>, "2,3]"]}}]}).
+    2> jiffy:encode({[{~"a", {json, [~"[1,", "2,3]"]}}]}).
     <<"{\"a\":[1,2,3]}">>
 
 The caller is responsible for ensuring it is well-formed JSON.
+
+Partial decoding
+----------------
+
+With the `{max_depth, N}` decode option only the top `N` levels of nested
+objects and arrays are decoded. Anything nested deeper is validated and
+returned as `{json, Binary}`. The shape of the partial decoding is meant to be
+used as pre-encoded JSON. In other words, both can be used in a forwarding
+scheme, where the top levels contain info to make routing decisions without
+needing to decode and re-encode potentially large nested message bodies:
+
+    1> Doc = ~'{"id":"a1","tags":["x","y"],"body":{"k":[1,2]}}'.
+    2> jiffy:decode(Doc, [return_maps, {max_depth, 1}]).
+    #{<<"body">> => {json,<<"{\"k\":[1,2]}">>},
+      <<"id">> => <<"a1">>,
+      <<"tags">> => {json,<<"[\"x\",\"y\"]">>}}
+
+`Binary` is a sub-binary of the input, or a copy with `copy_strings`.
 
 Data Format
 -----------

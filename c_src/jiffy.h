@@ -55,6 +55,8 @@ typedef struct {
     ERL_NIF_TERM    atom_escape_forward_slashes;
     ERL_NIF_TERM    atom_dedupe_keys;
     ERL_NIF_TERM    atom_copy_strings;
+    ERL_NIF_TERM    atom_max_depth;
+    ERL_NIF_TERM    atom_json;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;
@@ -68,6 +70,7 @@ ERL_NIF_TERM make_atom(ErlNifEnv* env, const char* name);
 int get_bytes_per_iter(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpi);
 int get_bytes_per_red(ErlNifEnv* env, ERL_NIF_TERM val, size_t* bpr);
 int get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term);
+int get_max_depth(ErlNifEnv* env, ERL_NIF_TERM val, size_t* max_depth);
 static inline size_t yield_threshold(size_t bytes_per_red) {
     return bytes_per_red * DEFAULT_ERLANG_REDUCTION_COUNT;
 }
