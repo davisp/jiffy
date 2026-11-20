@@ -2,6 +2,7 @@
 // See the LICENSE file for more information.
 
 #include "jiffy.h"
+#include <stdint.h>
 #include <stdio.h>
 
 ERL_NIF_TERM
@@ -105,6 +106,39 @@ get_null_term(ErlNifEnv* env, ERL_NIF_TERM val, ERL_NIF_TERM *null_term)
     }
 
     *null_term = tuple[1];
+
+    return 1;
+}
+
+int
+get_max_depth(ErlNifEnv* env, ERL_NIF_TERM val, size_t* max_depth)
+{
+    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    const ERL_NIF_TERM* tuple;
+    int arity;
+    ErlNifUInt64 depth;
+
+    if(!enif_get_tuple(env, val, &arity, &tuple)) {
+        return 0;
+    }
+
+    if(arity != 2) {
+        return 0;
+    }
+
+    if(enif_compare(tuple[0], st->atom_max_depth) != 0) {
+        return 0;
+    }
+
+    if(!enif_get_uint64(env, tuple[1], &depth)) {
+        return 0;
+    }
+
+    // too large for size_t, might as well be unlimited
+    *max_depth = (size_t) depth;
+    if((ErlNifUInt64) *max_depth != depth) {
+        *max_depth = SIZE_MAX;
+    }
 
     return 1;
 }

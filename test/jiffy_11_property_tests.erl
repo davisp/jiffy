@@ -63,6 +63,89 @@ prop_map_enc_dec() ->
     ).
 
 
+% Decode with a depth limit and decode the raw bits, and we should end up
+% with what we started with.
+prop_dec_max_depth() ->
+    ?FORALL({Data, Depth, EncOpts}, {json(), max_depth(), enc_pretty_opts()},
+        begin
+            Json = iolist_to_binary(jiffy:encode(Data, EncOpts)),
+            Limited = jiffy:decode(Json, [{max_depth, Depth}]),
+            Data =:= expand(Limited, [])
+                andalso Data =:= jiffy:decode(jiffy:encode(Limited))
+        end
+    ).
+
+
+prop_map_dec_max_depth() ->
+    ?FORALL({Data, Depth, EncOpts}, {json(), max_depth(), enc_pretty_opts()},
+        begin
+            Map = to_map_ejson(Data),
+            Json = iolist_to_binary(jiffy:encode(Map, EncOpts)),
+            Opts = [return_maps, {max_depth, Depth}],
+            Map =:= expand(jiffy:decode(Json, Opts), [return_maps])
+        end
+    ).
+
+
+% Depth limit still validates
+prop_dec_max_depth_same_errors() ->
+    ?FORALL({Json, Depth, Opts},
+        {mutjson(), max_depth(), dec_object_opts()},
+        max_depth_same(Json, Depth, Opts)
+    ).
+
+
+prop_dec_max_depth_no_crash_bin() ->
+    ?FORALL({Data, Depth}, {binary(), max_depth()},
+        max_depth_same(Data, Depth, [])
+    ).
+
+
+max_depth() ->
+    choose(0, 6).
+
+
+enc_pretty_opts() ->
+    elements([[], [pretty]]).
+
+
+dec_object_opts() ->
+    elements([[], [return_maps], [dedupe_keys]]).
+
+
+mutjson() ->
+    ?LET({Data, EncOpts, Mutations},
+        {json(), enc_pretty_opts(), list(mutgen())},
+        begin
+            Json = iolist_to_binary(jiffy:encode(Data, EncOpts)),
+            lists:foldl(fun mutate/2, Json, Mutations)
+        end
+    ).
+
+
+mutgen() ->
+    {elements([delete, replace, insert]), non_neg_integer(), mutbyte()}.
+
+
+mutbyte() ->
+    frequency([
+        {10, elements("[]{},:\"\\ \n0123456789.-+eEtfnu/")},
+        {1, byte()}
+    ]).
+
+
+mutate(_Mutation, <<>>) ->
+    <<>>;
+mutate({Op, N, Byte}, Bin) ->
+    Pos = N rem byte_size(Bin),
+    <<Before:Pos/binary, Old, After/binary>> = Bin,
+    case Op of
+        delete -> <<Before/binary, After/binary>>;
+        replace -> <<Before/binary, Byte, After/binary>>;
+        insert -> <<Before/binary, Byte, Old, After/binary>>
+    end.
+
+
 prop_enc_no_crash() ->
     ?FORALL(Data, any_term(), begin catch jiffy:encode(Data), true end).
 

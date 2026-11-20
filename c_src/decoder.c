@@ -2,6 +2,7 @@
 // See the LICENSE file for more information.
 
 #include <assert.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -52,6 +53,11 @@ typedef struct {
     char*           st_data;
     size_t          st_size;
     size_t          st_top;
+
+    size_t          max_depth;
+    size_t          raw_depth;  // raw container depth
+    size_t          raw_start;  // raw container offset in input
+    int             raw_empty;  // raw container is empty
 } Decoder;
 
 // Returns an allocated resource or NULL if the term stack
@@ -72,6 +78,7 @@ dec_new(ErlNifEnv* env)
     d->null_term = d->atoms->atom_null;
     d->len = -1;
     d->state = st_value;
+    d->max_depth = SIZE_MAX;
 
     d->st_data = (char*) enif_alloc(STACK_SIZE_INC);
     if(d->st_data == NULL) {
@@ -169,6 +176,71 @@ dec_pop_assert(Decoder* d, char val)
     char current = dec_pop(d);
     assert(current == val && "popped invalid container.");
     (void)current;
+}
+
+static inline int
+dec_is_raw(Decoder* d)
+{
+    return JIFFY_UNLIKELY(d->raw_depth != 0);
+}
+
+static inline void
+dec_raw_in(Decoder* d)
+{
+    if(JIFFY_UNLIKELY(dec_top(d) >= d->max_depth)) {
+        if(!dec_is_raw(d)) {
+            d->raw_depth = dec_top(d) + 1;
+            d->raw_start = d->i;
+        }
+        d->raw_empty = 1;
+    }
+}
+
+static void
+dec_raw_out(Decoder* d, ERL_NIF_TERM* value)
+{
+    ERL_NIF_TERM bin;
+    size_t len;
+
+    assert(dec_is_raw(d) && dec_top(d) + 1 >= d->raw_depth);
+
+    if(dec_top(d) + 1 != d->raw_depth) {
+        return;
+    }
+
+    len = d->i + 1 - d->raw_start;
+    if(d->copy_strings) {
+        memcpy(
+                enif_make_new_binary(d->env, len, &bin),
+                &(d->p[d->raw_start]),
+                len
+            );
+    } else {
+        bin = enif_make_sub_binary(d->env, d->arg, d->raw_start, len);
+    }
+
+    *value = enif_make_tuple2(d->env, d->atoms->atom_json, bin);
+    d->raw_depth = 0;
+}
+
+static inline ERL_NIF_TERM
+dec_add(Decoder* d, ERL_NIF_TERM value, ERL_NIF_TERM members)
+{
+    if(dec_is_raw(d)) {
+        // In raw mode just note it's not empty
+        d->raw_empty = 0;
+        return members;
+    }
+    return enif_make_list_cell(d->env, value, members);
+}
+
+static inline int
+dec_is_empty(Decoder* d, ERL_NIF_TERM members)
+{
+    if(dec_is_raw(d)) {
+        return d->raw_empty;
+    }
+    return enif_is_empty_list(d->env, members);
 }
 
 // Copy until the first backslash or len
@@ -300,6 +372,11 @@ dec_string(Decoder* d, ERL_NIF_TERM* value)
     return 0;
 
 parse:
+    if(dec_is_raw(d)) {
+        // In raw mode validate only
+        return 1;
+    }
+
     if(!has_escape && !d->copy_strings) {
         *value = enif_make_sub_binary(d->env, d->arg, st, (d->i - st - 1));
         return 1;
@@ -382,6 +459,7 @@ parse:
     return 1;
 }
 
+// In raw mode the number is only validated and value is not set
 static int
 dec_number(Decoder* d, ERL_NIF_TERM* value)
 {
@@ -402,6 +480,10 @@ dec_number(Decoder* d, ERL_NIF_TERM* value)
 
     if(r.outcome == FFC_OUTCOME_INVALID_INPUT) {
         return 0;
+    }
+
+    if(dec_is_raw(d)) {
+        return 1;
     }
 
     if(r.outcome == FFC_OUTCOME_OK) {
@@ -510,6 +592,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         } else if(enif_is_identical(val, d->atoms->atom_use_nil)) {
             d->null_term = d->atoms->atom_nil;
         } else if(get_null_term(env, val, &(d->null_term))) {
+            continue;
+        } else if(get_max_depth(env, val, &(d->max_depth))) {
             continue;
         } else {
             return enif_make_badarg(env);
@@ -655,26 +739,32 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                         }
                         break;
                     case '{':
+                        dec_raw_in(d);
                         if(!dec_push(d, st_object)) {
                             ret = dec_error(d, "insufficient_memory");
                             goto done;
                         }
-                        objs = enif_make_list_cell(env, curr, objs);
-                        curr = enif_make_list(env, 0);
+                        if(!dec_is_raw(d)) {
+                            objs = enif_make_list_cell(env, curr, objs);
+                            curr = enif_make_list(env, 0);
+                        }
                         state = st_key;
                         d->i++;
                         continue;
                     case '[':
+                        dec_raw_in(d);
                         if(!dec_push(d, st_array)) {
                             ret = dec_error(d, "insufficient_memory");
                             goto done;
                         }
-                        objs = enif_make_list_cell(env, curr, objs);
-                        curr = enif_make_list(env, 0);
+                        if(!dec_is_raw(d)) {
+                            objs = enif_make_list_cell(env, curr, objs);
+                            curr = enif_make_list(env, 0);
+                        }
                         d->i++;
                         continue;
                     case ']':
-                        if(!enif_is_empty_list(env, curr)) {
+                        if(!dec_is_empty(d, curr)) {
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
@@ -682,10 +772,14 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
-                        val = curr; // curr is []
-                        if(!enif_get_list_cell(env, objs, &curr, &objs)) {
-                            ret = dec_error(d, "internal_error");
-                            goto done;
+                        if(dec_is_raw(d)) {
+                            dec_raw_out(d, &val);
+                        } else {
+                            val = curr; // curr is []
+                            if(!enif_get_list_cell(env, objs, &curr, &objs)) {
+                                ret = dec_error(d, "internal_error");
+                                goto done;
+                            }
                         }
                         d->i++;
                         break;
@@ -698,7 +792,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     state = st_done;
                 } else {
                     state = st_comma;
-                    curr = enif_make_list_cell(env, val, curr);
+                    curr = dec_add(d, val, curr);
                 }
                 break;
 
@@ -716,24 +810,28 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         state = st_colon;
-                        curr = enif_make_list_cell(env, val, curr);
+                        curr = dec_add(d, val, curr);
                         break;
                     case '}':
-                        if(!enif_is_empty_list(env, curr)) {
+                        if(!dec_is_empty(d, curr)) {
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
                         dec_pop_assert(d, st_object);
-                        val = make_empty_object(env, d->return_maps);
-                        if(!enif_get_list_cell(env, objs, &curr, &objs)) {
-                            ret = dec_error(d, "internal_error");
-                            goto done;
+                        if(dec_is_raw(d)) {
+                            dec_raw_out(d, &val);
+                        } else {
+                            val = make_empty_object(env, d->return_maps);
+                            if(!enif_get_list_cell(env, objs, &curr, &objs)) {
+                                ret = dec_error(d, "internal_error");
+                                goto done;
+                            }
                         }
                         if(dec_top(d) == 0) {
                             state = st_done;
                         } else {
                             state = st_comma;
-                            curr = enif_make_list_cell(env, val, curr);
+                            curr = dec_add(d, val, curr);
                         }
                         d->i++;
                         break;
@@ -788,18 +886,22 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
-                        if(!make_object(env, curr, &val,
-                                d->return_maps, d->dedupe_keys)) {
-                            ret = dec_error(d, "internal_object_error");
-                            goto done;
-                        }
-                        if(!enif_get_list_cell(env, objs, &curr, &objs)) {
-                            ret = dec_error(d, "internal_error");
-                            goto done;
+                        if(dec_is_raw(d)) {
+                            dec_raw_out(d, &val);
+                        } else {
+                            if(!make_object(env, curr, &val,
+                                    d->return_maps, d->dedupe_keys)) {
+                                ret = dec_error(d, "internal_object_error");
+                                goto done;
+                            }
+                            if(!enif_get_list_cell(env, objs, &curr, &objs)) {
+                                ret = dec_error(d, "internal_error");
+                                goto done;
+                            }
                         }
                         if(dec_top(d) > 0) {
                             state = st_comma;
-                            curr = enif_make_list_cell(env, val, curr);
+                            curr = dec_add(d, val, curr);
                         } else {
                             state = st_done;
                         }
@@ -810,14 +912,18 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             ret = dec_error(d, "invalid_json");
                             goto done;
                         }
-                        val = make_array(env, curr);
-                        if(!enif_get_list_cell(env, objs, &curr, &objs)) {
-                            ret = dec_error(d, "internal_error");
-                            goto done;
+                        if(dec_is_raw(d)) {
+                            dec_raw_out(d, &val);
+                        } else {
+                            val = make_array(env, curr);
+                            if(!enif_get_list_cell(env, objs, &curr, &objs)) {
+                                ret = dec_error(d, "internal_error");
+                                goto done;
+                            }
                         }
                         if(dec_top(d) > 0) {
                             state = st_comma;
-                            curr = enif_make_list_cell(env, val, curr);
+                            curr = dec_add(d, val, curr);
                         } else {
                             state = st_done;
                         }
