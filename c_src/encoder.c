@@ -21,6 +21,13 @@
 
 #define SMALL_TERMSTACK_SIZE 16
 
+// The first chunk of output is a buffer on stack to allow faster encoding
+// of small json objects. We'll allocate the resource on the demand only if
+// we have to yield
+#define BUF_NONE 0
+#define BUF_BIN 1
+#define BUF_STACK 2
+
 #define MAYBE_PRETTY(e)             \
 do {                                \
     if(e->pretty) {                 \
@@ -56,11 +63,12 @@ typedef struct {
     int             partial_output;
 
     ErlNifBinary    buffer;
-    int             have_buffer;
+    int             have_buffer;    // BUF_NONE | BUF_BIN | BUF_STACK
     size_t          chunk_size;
 
     unsigned char*  p;
     size_t          i;
+    size_t          cap;
 
     int             top_is_value;
 } Encoder;
@@ -175,31 +183,19 @@ enc_push(Encoder* e, TermStack* stack,
     e->top_is_value = 1;
 }
 
-static Encoder*
-enc_new(ErlNifEnv* env)
+static void
+enc_setup(Encoder* e, jiffy_st* st, unsigned char* buf, size_t size)
 {
-    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
-    Encoder* e = enif_alloc_resource(st->res_enc, sizeof(Encoder));
-
-    // Zero everything so enc_destroy() never sees an uninitialized
-    // have_buffer if we bail out before the encoder is fully built
     memset(e, 0, sizeof(*e));
 
     e->atoms = st;
     e->bytes_per_red = DEFAULT_BYTES_PER_REDUCTION;
-    e->iolist = enif_make_list(env, 0);
     e->chunk_size = BIN_INC_SIZE;
     e->top_is_value = 1;
 
-    if(!enif_alloc_binary(e->chunk_size, &e->buffer)) {
-        enif_release_resource(e);
-        return NULL;
-    }
-
-    e->have_buffer = 1;
-    e->p = e->buffer.data;
-
-    return e;
+    e->have_buffer = BUF_STACK;
+    e->p = buf;
+    e->cap = size;
 }
 
 static int
@@ -214,7 +210,7 @@ enc_destroy(ErlNifEnv* env, void* obj)
 {
     Encoder* e = (Encoder*) obj;
 
-    if(e->have_buffer) {
+    if(e->have_buffer == BUF_BIN) {
         enif_release_binary(&e->buffer);
     }
 }
@@ -255,14 +251,17 @@ enc_flush(Encoder* e)
         return 1;
     }
 
-    if(e->i < e->buffer.size) {
-        if(!enif_realloc_binary(&e->buffer, e->i)) {
-            return 0;
+    if(e->have_buffer == BUF_STACK) {
+        memcpy(enif_make_new_binary(e->env, e->i, &bin), e->p, e->i);
+    } else {
+        if(e->i < e->buffer.size) {
+            if(!enif_realloc_binary(&e->buffer, e->i)) {
+                return 0;
+            }
         }
+        bin = enif_make_binary(e->env, &e->buffer);
     }
-
-    bin = enif_make_binary(e->env, &e->buffer);
-    e->have_buffer = 0;
+    e->have_buffer = BUF_NONE;
 
     e->iolist = enif_make_list_cell(e->env, bin, e->iolist);
     e->iosize += e->i;
@@ -281,7 +280,7 @@ enc_ensure(Encoder* e, size_t req)
     size_t new_size = BIN_INC_SIZE;
 
     if(JIFFY_LIKELY(e->have_buffer)) {
-        if(JIFFY_LIKELY(req < (e->buffer.size - e->i))) {
+        if(JIFFY_LIKELY(req < (e->cap - e->i))) {
             return 1;
         }
 
@@ -294,11 +293,13 @@ enc_ensure(Encoder* e, size_t req)
         // newer one of the right size. Otherwise we could return a small
         // buffer then risk a memory overrwrite on a memcpy.
         if(e->have_buffer) {
-            if(req < (e->buffer.size - e->i)) {
+            if(req < (e->cap - e->i)) {
                 return 1;
             }
-            enif_release_binary(&e->buffer);
-            e->have_buffer = 0;
+            if(e->have_buffer == BUF_BIN) {
+                enif_release_binary(&e->buffer);
+            }
+            e->have_buffer = BUF_NONE;
         }
     }
 
@@ -308,12 +309,34 @@ enc_ensure(Encoder* e, size_t req)
         return 0;
     }
 
-    e->have_buffer = 1;
+    e->have_buffer = BUF_BIN;
 
     e->p = e->buffer.data;
+    e->cap = e->buffer.size;
     e->i = 0;
 
     return 1;
+}
+
+// Before yielding keep encoder on the stack
+static Encoder*
+enc_to_resource(ErlNifEnv* env, Encoder* e, ERL_NIF_TERM* res)
+{
+    // enif_alloc_resource crashes the VM if it cannot allocate
+    Encoder* r = enif_alloc_resource(e->atoms->res_enc, sizeof(Encoder));
+    assert(r != NULL);
+
+    // If we yielded means we should need more output buffer than the first
+    // chunk holds, so we shouldn't have a stack buffer any longer
+    assert(e->have_buffer != BUF_STACK);
+
+    memcpy(r, e, sizeof(Encoder));
+    // buffer belongs to the resource now
+    e->have_buffer = BUF_NONE;
+
+    *res = enif_make_resource(env, r);
+    enif_release_resource(r);
+    return r;
 }
 
 static inline int
@@ -799,30 +822,26 @@ enc_map_to_memberlist(ErlNifEnv* env, ERL_NIF_TERM map, ERL_NIF_TERM* out)
     return 1;
 }
 
+static ERL_NIF_TERM enc_run(ErlNifEnv* env, Encoder* e, ERL_NIF_TERM res,
+        ERL_NIF_TERM terms, ERL_NIF_TERM iolist);
+
 ERL_NIF_TERM
 encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
-    Encoder* e;
+    Encoder enc;
+    Encoder* e = &enc;
+    unsigned char buf[BIN_INC_SIZE];
 
     ERL_NIF_TERM opts;
     ERL_NIF_TERM val;
-    ERL_NIF_TERM tmp_argv[3];
+    ERL_NIF_TERM ret;
 
     if(argc != 2) {
         return enif_make_badarg(env);
     }
 
-    e = enc_new(env);
-    if(e == NULL) {
-        return make_error(st, env, "internal_error");
-    }
-
-    tmp_argv[0] = enif_make_resource(env, e);
-    tmp_argv[1] = enif_make_tuple1(env, argv[0]);
-    tmp_argv[2] = enif_make_list(env, 0);
-
-    enif_release_resource(e);
+    enc_setup(e, st, buf, sizeof(buf));
 
     opts = argv[1];
     if(!enif_is_list(env, opts)) {
@@ -849,14 +868,34 @@ encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         }
     }
 
-    return encode_iter(env, 3, tmp_argv);
+    ret = enc_run(env, e, 0, enif_make_tuple1(env, argv[0]),
+            enif_make_list(env, 0));
+
+    if(e->have_buffer == BUF_BIN) {
+        enif_release_binary(&e->buffer);
+    }
+
+    return ret;
 }
 
 ERL_NIF_TERM
 encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
-    Encoder* e;
+    void* res;
+
+    if(!enif_get_resource(env, argv[0], st->res_enc, &res)) {
+        return enif_make_badarg(env);
+    }
+
+    return enc_run(env, (Encoder*) res, argv[0], argv[1], argv[2]);
+}
+
+// While we're on the stack only res is 0
+static ERL_NIF_TERM
+enc_run(ErlNifEnv* env, Encoder* e, ERL_NIF_TERM res, ERL_NIF_TERM terms,
+        ERL_NIF_TERM iolist)
+{
     TermStack stack;
 
     ERL_NIF_TERM ret = 0;
@@ -873,26 +912,18 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ErlNifBinary bin;
     ErlNifTermType type;
 
-    void* res;
-
     size_t start;
     size_t bytes_processed = 0;
-
-    if(!enif_get_resource(env, argv[0], st->res_enc, &res)) {
-        return enif_make_badarg(env);
-    }
-
-    e = (Encoder*) res;
 
     if(!enc_init(e, env)) {
         return enif_make_badarg(env);
     }
 
-    if(!termstack_restore(env, argv[1], &stack)) {
+    if(!termstack_restore(env, terms, &stack)) {
         return enif_make_badarg(env);
     }
 
-    e->iolist = argv[2];
+    e->iolist = iolist;
 
     start = e->iosize + e->i;
 
@@ -905,7 +936,11 @@ encode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
             assert(enif_is_list(env, e->iolist));
 
-            tmp_argv[0] = argv[0];
+            if(res == 0) {
+                e = enc_to_resource(env, e, &res);
+            }
+
+            tmp_argv[0] = res;
             tmp_argv[1] = termstack_save(env, &stack);
             tmp_argv[2] = e->iolist;
 

@@ -58,18 +58,13 @@ typedef struct {
     size_t          raw_depth;  // raw container depth
     size_t          raw_start;  // raw container offset in input
     int             raw_empty;  // raw container is empty
+
+    char            st_small[STACK_SIZE_INC];
 } Decoder;
 
-// Returns an allocated resource or NULL if the term stack
-// cannot be allocated
-static Decoder*
-dec_new(ErlNifEnv* env)
+static void
+dec_setup(Decoder* d, jiffy_st* st)
 {
-    jiffy_st* st = (jiffy_st*) enif_priv_data(env);
-    // If enif_alloc_resource cannot allocate it crashes the VM
-    Decoder* d = enif_alloc_resource(st->res_dec, sizeof(Decoder));
-    assert(d != NULL);
-
     // Zero everything and only set non-0 fields
     memset(d, 0, sizeof(*d));
 
@@ -80,15 +75,28 @@ dec_new(ErlNifEnv* env)
     d->state = st_value;
     d->max_depth = SIZE_MAX;
 
-    d->st_data = (char*) enif_alloc(STACK_SIZE_INC);
-    if(d->st_data == NULL) {
-        enif_release_resource(d);
-        return NULL;
-    }
-
+    d->st_data = d->st_small;
     d->st_size = STACK_SIZE_INC;
+}
 
-    return d;
+// The decoder is on the C stack until it has to yield
+static Decoder*
+dec_to_resource(ErlNifEnv* env, Decoder* d, ERL_NIF_TERM* res)
+{
+    // enif_alloc_resource crashes on alloc failure
+    Decoder* r = enif_alloc_resource(d->atoms->res_dec, sizeof(Decoder));
+    assert(r != NULL);
+
+    memcpy(r, d, sizeof(Decoder));
+    if(d->st_data == d->st_small) {
+        r->st_data = r->st_small;
+    }
+    // The stack belongs to the resource now
+    d->st_data = d->st_small;
+
+    *res = enif_make_resource(env, r);
+    enif_release_resource(r);
+    return r;
 }
 
 static void
@@ -106,7 +114,7 @@ dec_destroy(ErlNifEnv* env, void* obj)
 {
     Decoder* d = (Decoder*) obj;
 
-    if(d->st_data != NULL) {
+    if(d->st_data != d->st_small) {
         enif_free(d->st_data);
     }
 }
@@ -137,7 +145,16 @@ static int
 dec_grow(Decoder* d)
 {
     size_t new_sz = d->st_size + STACK_SIZE_INC;
-    char* new_data = (char*) enif_realloc(d->st_data, new_sz);
+    char* new_data;
+
+    if(d->st_data == d->st_small) {
+        new_data = (char*) enif_alloc(new_sz);
+        if(new_data != NULL) {
+            memcpy(new_data, d->st_small, d->st_size);
+        }
+    } else {
+        new_data = (char*) enif_realloc(d->st_data, new_sz);
+    }
 
     if(new_data == NULL) {
         return 0;
@@ -544,32 +561,25 @@ skip_whitespace(const unsigned char* JIFFY_RESTRICT p, size_t len, size_t i)
     return i;
 }
 
+static ERL_NIF_TERM dec_run(ErlNifEnv* env, Decoder* d, ERL_NIF_TERM res,
+        ERL_NIF_TERM arg, ERL_NIF_TERM val, ERL_NIF_TERM objs,
+        ERL_NIF_TERM curr);
+
 ERL_NIF_TERM
 decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    Decoder* d;
+    Decoder dec;
+    Decoder* d = &dec;
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
-    ERL_NIF_TERM tmp_argv[5];
     ERL_NIF_TERM opts;
     ERL_NIF_TERM val;
+    ERL_NIF_TERM ret;
 
     if(argc != 2) {
         return enif_make_badarg(env);
     }
 
-    d = dec_new(env);
-    if(d == NULL) {
-        return enif_make_tuple2(env, st->atom_error,
-                make_atom(env, "internal_error"));
-    }
-
-    tmp_argv[0] = argv[0];
-    tmp_argv[1] = enif_make_resource(env, d);
-    tmp_argv[2] = st->atom_error;
-    tmp_argv[3] = enif_make_list(env, 0);
-    tmp_argv[4] = enif_make_list(env, 0);
-
-    enif_release_resource(d);
+    dec_setup(d, st);
 
     opts = argv[1];
     if(!enif_is_list(env, opts)) {
@@ -600,42 +610,51 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         }
     }
 
-    return decode_iter(env, 5, tmp_argv);
+    ret = dec_run(env, d, 0, argv[0], st->atom_error,
+            enif_make_list(env, 0), enif_make_list(env, 0));
+
+    if(d->st_data != d->st_small) {
+        enif_free(d->st_data);
+    }
+
+    return ret;
 }
 
 ERL_NIF_TERM
 decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    Decoder* d;
     jiffy_st* st = (jiffy_st*) enif_priv_data(env);
+    void* res;
 
+    if(!enif_get_resource(env, argv[1], st->res_dec, &res)) {
+        return enif_make_badarg(env);
+    }
+
+    return dec_run(env, (Decoder*) res, argv[1], argv[0],
+            argv[2], argv[3], argv[4]);
+}
+
+// When decode is on the stack (before first yield) res is 0
+static ERL_NIF_TERM
+dec_run(ErlNifEnv* env, Decoder* d, ERL_NIF_TERM res, ERL_NIF_TERM arg,
+        ERL_NIF_TERM val, ERL_NIF_TERM objs, ERL_NIF_TERM curr)
+{
     ErlNifBinary bin;
 
-    ERL_NIF_TERM objs;
-    ERL_NIF_TERM curr;
-    ERL_NIF_TERM val = argv[2];
     ERL_NIF_TERM trailer;
     ERL_NIF_TERM ret;
     ERL_NIF_TERM tmp_argv[5];
-
-    void* res;
 
     size_t start;
     size_t bytes_processed = 0;
 
     int state;
 
-    if(!enif_inspect_binary(env, argv[0], &bin)) {
-        return enif_make_badarg(env);
-    } else if(!enif_get_resource(env, argv[1], st->res_dec, &res)) {
+    if(!enif_inspect_binary(env, arg, &bin)) {
         return enif_make_badarg(env);
     }
 
-    d = (Decoder*) res;
-
-    dec_init(d, env, argv[0], &bin);
-    objs = argv[3];
-    curr = argv[4];
+    dec_init(d, env, arg, &bin);
 
     start = d->i;
     state = d->state;
@@ -653,8 +672,12 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
             d->state = state;
 
-            tmp_argv[0] = argv[0];
-            tmp_argv[1] = argv[1];
+            if(res == 0) {
+                d = dec_to_resource(env, d, &res);
+            }
+
+            tmp_argv[0] = arg;
+            tmp_argv[1] = res;
             tmp_argv[2] = val;
             tmp_argv[3] = objs;
             tmp_argv[4] = curr;
@@ -957,7 +980,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 decode_done:
 
     if(d->i < bin.size && d->return_trailer) {
-        trailer = enif_make_sub_binary(env, argv[0], d->i, bin.size - d->i);
+        trailer = enif_make_sub_binary(env, arg, d->i, bin.size - d->i);
         val = enif_make_tuple3(env, d->atoms->atom_has_trailer, val, trailer);
     } else if(d->i < bin.size) {
         ret = dec_error(d, "invalid_trailing_data");
