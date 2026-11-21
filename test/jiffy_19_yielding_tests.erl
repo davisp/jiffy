@@ -124,3 +124,24 @@ large_string_yield_test_() ->
         {"Encode",
             ?_assertEqual(Json, enc(Big, [{bytes_per_red, 1}]))}
     ].
+
+% Encoder errors out after it switched from the stack buffer to a binary but
+% before it yielded. That way there is no resource to release that binary.
+% (This was found from seeing missing covarge with lcov/gcov running).
+encode_error_after_first_chunk_test() ->
+    Big = binary:copy(<<"a">>, 3000),
+    ?assertError({invalid_string, _}, enc([Big, <<255>>])).
+
+% Bignums get handled in Erlang, and the encoder flushes its buffer before.
+% Yield that flush, when the encoder has no buffer at all. (This was found from
+% seeing missing coverage with lcov/gcov running).
+encode_yield_after_bignum_flush_test_() ->
+    Big = 1 bsl 70,
+    Opts = [{bytes_per_red, 1}],
+    Check = fun(Data) -> ?_assertEqual(Data, dec(enc(Data, Opts))) end,
+    [
+        {"bignum flush with stack buffer",
+            Check(lists:duplicate(1004, 1) ++ [Big, 2])},
+        {"bignum flush with a binary buffer",
+            Check([binary:copy(<<"a">>, 2100), Big, 2])}
+    ].
