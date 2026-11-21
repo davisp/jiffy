@@ -55,6 +55,27 @@ encode_deep_nesting_yield_test() ->
     Encoded = enc(Nested, [{bytes_per_red, 1}]),
     ?assertEqual(Nested, dec(Encoded)).
 
+% Before yielding first time the decoder keeps the stack inline so test
+% yielding more thoroughly along with more nesting at the same time.
+decode_deep_nesting_yield_test_() ->
+    Depth = 200,
+    Pad = binary:copy(<<" ">>, 5000),
+    Open = lists:duplicate(Depth, <<"[">>),
+    Close = lists:duplicate(Depth, <<"]">>),
+    Nested = lists:foldl(fun(_, Acc) -> [Acc] end, 1, lists:seq(1, Depth)),
+    [
+        {"deep nesting then yield",
+            ?_assertEqual(
+                Nested,
+                dec(iol2b([Open, Pad, <<"1">>, Pad, Close]), [{bytes_per_red, 1}])
+            )},
+        {"yield then deep nesting",
+            ?_assertEqual(
+                [Nested],
+                dec(iol2b([<<"[">>, Pad, Open, <<"1">>, Close, <<"]">>]), [{bytes_per_red, 1}])
+            )}
+    ].
+
 % Force yielding and test restore/save and schedule bits.
 decode_excessive_yield_test_() ->
     Data = iol2b([
