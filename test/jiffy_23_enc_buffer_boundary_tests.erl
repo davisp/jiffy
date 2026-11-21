@@ -58,3 +58,16 @@ escape_forward_slashes_test_() ->
             ?assertEqual(Bin, dec(enc(Bin, [escape_forward_slashes])))
         end, lists:seq(1015, 1025))
     end}.
+
+% Encoder saves room for the raw string beforehand. Enough escapes use that up,
+% so a new buffer is allocated right before the ASCII-only run and that run
+% doesn't fit that one either. (This was discovered by running lcov/gcov
+% covarge, and yeah we're coveragemaxxing here)
+escapes_use_up_reserved_space_test_() ->
+    Run = binary:copy(<<"a">>, 5000),
+    {timeout, 60, fun() ->
+        lists:foreach(fun(N) ->
+            Bin = <<(binary:copy(<<$\b>>, N))/binary, Run/binary>>,
+            roundtrip(Bin)
+        end, lists:seq(8170, 8200))
+    end}.
