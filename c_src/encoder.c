@@ -352,11 +352,22 @@ enc_literal(Encoder* e, const char* literal, size_t len)
     return 1;
 }
 
-static inline int
+static int
 enc_unknown(Encoder* e, ERL_NIF_TERM value) {
+    ERL_NIF_TERM bin;
+
     // Bignums are encoded in Erlang as the NIF API
     // does not have functions for dealing with them.
-    if(!enc_flush(e)) {
+    //
+    // See if we can copy a short run and keep teh buffer around. Otherwise if
+    // we hand the buffer over it will cost a realloc and a new buffer for each
+    // such unknown value
+    if(e->have_buffer == BUF_BIN && e->i <= BIN_INC_SIZE) {
+        memcpy(enif_make_new_binary(e->env, e->i, &bin), e->p, e->i);
+        e->iolist = enif_make_list_cell(e->env, bin, e->iolist);
+        e->iosize += e->i;
+        e->i = 0;
+    } else if(!enc_flush(e)) {
         return 0;
     }
 
@@ -1094,7 +1105,7 @@ enc_run(ErlNifEnv* env, Encoder* e, ERL_NIF_TERM res, ERL_NIF_TERM terms,
             }
         } else if(type == ERL_NIF_TERM_TYPE_TUPLE
                 && enif_get_tuple(env, curr, &arity, &tuple)) {
-            if(arity != 1) {
+            if(JIFFY_UNLIKELY(arity != 1)) {
                 // Handle unknown or pre-encoded JSON in finish_encode/2
                 if(!enc_unknown(e, curr)) {
                     ret = enc_error(e, "internal_error");
@@ -1166,7 +1177,7 @@ enc_run(ErlNifEnv* env, Encoder* e, ERL_NIF_TERM res, ERL_NIF_TERM terms,
             }
 
             enc_push(e, &stack, curr, e->atoms->ref_map, mval);
-        } else if(type == ERL_NIF_TERM_TYPE_LIST) {
+        } else if(JIFFY_LIKELY(type == ERL_NIF_TERM_TYPE_LIST)) {
             if(!enc_start_array(e)) {
                 ret = enc_error(e, "internal_error");
                 goto done;
