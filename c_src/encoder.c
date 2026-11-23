@@ -265,6 +265,7 @@ enc_flush(Encoder* e)
 
     e->iolist = enif_make_list_cell(e->env, bin, e->iolist);
     e->iosize += e->i;
+    e->i = 0;
 
     // Grow the next chunk geometrically so large outputs flush O(log n) times.
     if(e->chunk_size < MAX_CHUNK_SIZE) {
@@ -1214,7 +1215,8 @@ enc_run(ErlNifEnv* env, Encoder* e, ERL_NIF_TERM res, ERL_NIF_TERM terms,
     }
 
 done:
-    bump_used_reds(env, bytes_processed, e->bytes_per_red);
+    // Count the last term too
+    bump_used_reds(env, (e->iosize + e->i) - start, e->bytes_per_red);
     termstack_destroy(&stack);
 
     return ret;

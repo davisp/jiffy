@@ -132,9 +132,9 @@ encode_error_after_first_chunk_test() ->
     Big = binary:copy(<<"a">>, 3000),
     ?assertError({invalid_string, _}, enc([Big, <<255>>])).
 
-% Bignums get handled in Erlang, and the encoder flushes its buffer before.
-% Yield that flush, when the encoder has no buffer at all. (This was found from
-% seeing missing coverage with lcov/gcov running).
+% Bignums get handled in Erlang, and the encoder flushes its buffer before:
+% the stack buffer, or a binary. (This was found from seeing missing coverage
+% with lcov/gcov running).
 encode_yield_after_bignum_flush_test_() ->
     Big = 1 bsl 70,
     Opts = [{bytes_per_red, 1}],
@@ -145,3 +145,28 @@ encode_yield_after_bignum_flush_test_() ->
         {"bignum flush with a binary buffer",
             Check([binary:copy(<<"a">>, 2100), Big, 2])}
     ].
+
+% A document that is one long string, so the last token is all of it
+single_string_uses_reductions_test_() ->
+    Big = binary:copy(<<"a">>, 30000),
+    Json = <<"\"", Big/binary, "\"">>,
+    N = 20,
+    [
+        {"decode",
+            ?_assert(reds(fun() -> jiffy:decode(Json) end, N) > N * 1000)},
+        {"encode",
+            ?_assert(reds(fun() -> jiffy:encode(Big) end, N) > N * 1000)}
+    ].
+
+% The flush before a bignum does not count the flushed bytes twice. That made
+% this yield at the bignum and again right after it, for two whole time slices.
+bignum_flush_reductions_test() ->
+    Data = [binary:copy(<<"a">>, 21000), 1 bsl 70, 2],
+    N = 20,
+    ?assert(reds(fun() -> jiffy:encode(Data) end, N) < N * 3000).
+
+reds(Fun, N) ->
+    {reductions, R0} = process_info(self(), reductions),
+    lists:foreach(fun(_) -> Fun() end, lists:seq(1, N)),
+    {reductions, R1} = process_info(self(), reductions),
+    R1 - R0.

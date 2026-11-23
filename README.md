@@ -64,9 +64,9 @@ The options for decode are:
   with `Binary` being their JSON. See [Partial decoding](#partial-decoding)
   below.
 * `{bytes_per_red, N}` where N >= 0 - This controls the number of
-  bytes that Jiffy will process as an equivalent to a reduction. Each
-  20 reductions we consume 1% of our allocated time slice for the current
-  process. When the Erlang VM indicates we need to return from the NIF.
+  bytes that Jiffy will process as an equivalent to a reduction. The
+  default is 10. Jiffy reports the reductions it used to the Erlang VM and
+  yields after a time slice worth of them (4000).
 * `{bytes_per_iter, N}` where N >= 0 - Backwards compatible option
   that is converted into the `bytes_per_red` value.
 

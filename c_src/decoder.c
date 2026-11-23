@@ -996,7 +996,8 @@ decode_done:
     }
 
 done:
-    bump_used_reds(env, bytes_processed, d->bytes_per_red);
+    // Count the last token too
+    bump_used_reds(env, d->i - start, d->bytes_per_red);
 
     return ret;
 }
