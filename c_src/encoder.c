@@ -11,6 +11,11 @@
 
 #define BIN_INC_SIZE 2048
 
+// How many bytes to count for {json,...} and bignums. These are shouldn't be
+// proportional to the length as we just emit them to Erlang but they shouldn't
+// be 0 either. Use 16 bytes for them.
+#define UNKNOWN_BYTES 16
+
 // When we flush output buffer to an iolist double the next chunk size so a
 // large doc is emitted in O(log n) segments. But we also limit it at 64KB
 // size. This should reduce total number of memory allocations (those can
@@ -328,7 +333,8 @@ enc_to_resource(ErlNifEnv* env, Encoder* e, ERL_NIF_TERM* res)
     assert(r != NULL);
 
     // If we yielded means we should need more output buffer than the first
-    // chunk holds, so we shouldn't have a stack buffer any longer
+    // chunk holds, and enc_unknown() only keeps it while it can't fill up
+    // past a yield, so we shouldn't have a stack buffer any longer
     assert(e->have_buffer != BUF_STACK);
 
     memcpy(r, e, sizeof(Encoder));
@@ -356,14 +362,22 @@ enc_literal(Encoder* e, const char* literal, size_t len)
 static int
 enc_unknown(Encoder* e, ERL_NIF_TERM value) {
     ERL_NIF_TERM bin;
+    int keep;
+
+    // Not output, it only counts towards reductions and yields
+    e->iosize += UNKNOWN_BYTES;
 
     // Bignums are encoded in Erlang as the NIF API
     // does not have functions for dealing with them.
     //
     // See if we can copy a short run and keep teh buffer around. Otherwise if
     // we hand the buffer over it will cost a realloc and a new buffer for each
-    // such unknown value
-    if(e->have_buffer == BUF_BIN && e->i <= BIN_INC_SIZE) {
+    // such unknown value. The stack buffer has to be gone before we yield,
+    // so it's kept only if filling it up can't get us there.
+    keep = e->have_buffer == BUF_BIN || (e->have_buffer == BUF_STACK
+        && e->iosize + e->i + e->cap <= yield_threshold(e->bytes_per_red));
+
+    if(keep && e->i > 0 && e->i <= BIN_INC_SIZE) {
         memcpy(enif_make_new_binary(e->env, e->i, &bin), e->p, e->i);
         e->iolist = enif_make_list_cell(e->env, bin, e->iolist);
         e->iosize += e->i;

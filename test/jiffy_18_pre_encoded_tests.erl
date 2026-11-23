@@ -83,7 +83,7 @@ many_across_yields_test_() ->
 % If the run is long enough it will go out with the buffer. Padding make the
 % encoder yield. This will likely need to be adjust if we adjust internal
 % buffer sizes
-pre_encoded_opy_limit_test_() ->
+pre_encoded_copy_limit_test_() ->
     Pre = {json, <<"0">>},
     Pad = binary:copy(<<"b">>, 4100),
     {timeout, 60, fun() ->
@@ -98,6 +98,24 @@ pre_encoded_opy_limit_test_() ->
                 dec(enc([Pad, Pre, Aa, Pre, Aa, Pre], [{bytes_per_red, 1}]))
             )
         end, lists:seq(2014, 2074))
+    end}.
+
+% The stack buffer is kept past a pre-encoded value only if filling it up
+% can't get to a yield. Sweep the output in front of one across that point,
+% then fill the buffer up and yield. This depends on the stack buffer size
+% and on how much a pre-encoded value counts for.
+pre_encoded_stack_buffer_test_() ->
+    Pre = {json, <<"0">>},
+    Fill = binary:copy(<<"a">>, 2000),
+    Nest = lists:foldl(fun(_, Acc) -> [Acc] end, [], lists:seq(1, 30)),
+    {timeout, 60, fun() ->
+        lists:foreach(fun(N) ->
+            Bb = binary:copy(<<"b">>, N),
+            ?assertEqual(
+                [Bb, 0, Fill, Nest],
+                dec(enc([Bb, Pre, Fill, Nest], [{bytes_per_red, 1}]))
+            )
+        end, lists:seq(1900, 1970))
     end}.
 
 % An error after a copy, when the encoder still has its buffer

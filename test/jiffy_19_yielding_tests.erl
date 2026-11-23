@@ -132,18 +132,34 @@ encode_error_after_first_chunk_test() ->
     Big = binary:copy(<<"a">>, 3000),
     ?assertError({invalid_string, _}, enc([Big, <<255>>])).
 
-% Bignums get handled in Erlang, and the encoder flushes its buffer before:
-% the stack buffer, or a binary. (This was found from seeing missing coverage
-% with lcov/gcov running).
+% Bignums and pre-encoded values get handled in Erlang, and the encoder flushes
+% its buffer before them: the stack buffer, or a binary. They count for a few
+% bytes, so a yield can come right after one, when a long run went out with the
+% buffer and there is no buffer at all. Sweep the run so the yield lands there,
+% in the first call and after a yield. (This was found from seeing missing
+% coverage with lcov/gcov running).
 encode_yield_after_bignum_flush_test_() ->
     Big = 1 bsl 70,
+    Pre = {json, <<"0">>},
+    Pad = binary:copy(<<"b">>, 4100),
     Opts = [{bytes_per_red, 1}],
     Check = fun(Data) -> ?_assertEqual(Data, dec(enc(Data, Opts))) end,
+    Sweep = fun(Val, Dec) ->
+        {timeout, 60, fun() ->
+            lists:foreach(fun(N) ->
+                Aa = binary:copy(<<"a">>, N),
+                ?assertEqual([Aa, Dec, 1], dec(enc([Aa, Val, 1], Opts))),
+                ?assertEqual([Pad, Aa, Dec, 1], dec(enc([Pad, Aa, Val, 1], Opts)))
+            end, lists:seq(3950, 4010))
+        end}
+    end,
     [
         {"bignum flush with stack buffer",
             Check(lists:duplicate(1004, 1) ++ [Big, 2])},
         {"bignum flush with a binary buffer",
-            Check([binary:copy(<<"a">>, 2100), Big, 2])}
+            Check([binary:copy(<<"a">>, 2100), Big, 2])},
+        {"yield right after a bignum", Sweep(Big, Big)},
+        {"yield right after a pre-encoded value", Sweep(Pre, 0)}
     ].
 
 % A document that is one long string, so the last token is all of it
@@ -164,6 +180,20 @@ bignum_flush_reductions_test() ->
     Data = [binary:copy(<<"a">>, 21000), 1 bsl 70, 2],
     N = 20,
     ?assert(reds(fun() -> jiffy:encode(Data) end, N) < N * 3000).
+
+% Pre-encoded values and bignums are added in Erlang, so the encoder counts
+% each as a few bytes. Before a long list of them was nearly free.
+pre_encoded_reductions_test_() ->
+    N = 5000,
+    Opts = [{bytes_per_red, 1}],
+    Pres = lists:duplicate(N, {json, <<"1">>}),
+    Bigs = lists:duplicate(N, 1 bsl 70),
+    [
+        {"pre-encoded array",
+            ?_assert(reds(fun() -> jiffy:encode(Pres, Opts) end, 1) > N * 10)},
+        {"bignum array",
+            ?_assert(reds(fun() -> jiffy:encode(Bigs, Opts) end, 1) > N * 10)}
+    ].
 
 reds(Fun, N) ->
     {reductions, R0} = process_info(self(), reductions),
