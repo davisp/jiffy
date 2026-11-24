@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: rebar3 make check-with-proper
         run: |
-          make REBAR=rebar3 check-with-proper
+          CFLAGS="-UNDEBUG" make REBAR=rebar3 check-with-proper
 
   lcov-coverage:
     name: lcov-coverage
@@ -71,7 +71,7 @@ jobs:
           apt install -y --no-install-recommends --no-install-suggests gcc-14 g++-14
       - name: make check
         run: |
-          CC=gcc-14 CXX=g++-14 CFLAGS="-Wextra -Wno-unused-parameter" make check
+          CC=gcc-14 CXX=g++-14 CFLAGS="-UNDEBUG -Wextra -Wno-unused-parameter" make check
 
   clang-19:
     name: clang-19
@@ -86,7 +86,7 @@ jobs:
           apt install -y --no-install-recommends --no-install-suggests clang-19
       - name: make check
         run: |
-          CC=clang-19 CXX=clang++-19 CFLAGS="-Wextra -Wno-unused-parameter" make check
+          CC=clang-19 CXX=clang++-19 CFLAGS="-UNDEBUG -Wextra -Wno-unused-parameter" make check
 
   macos:
     name: macos
