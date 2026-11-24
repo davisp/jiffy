@@ -162,11 +162,11 @@ Jiffy specifically avoids using shared resources like the dirty CPU schedulers,
 since those are used for large heap garbage collection, crypto functions, large
 binary matching, etc. Instead, it works with Erlang's regular VM schedulers and
 yields appropriately after consuming a fraction of available reductions.
-Yielding behavior can be explicitly controlled via the ` {bytes_per_red, N}`
+Yielding behavior can be explicitly controlled via the `{bytes_per_red, N}`
 option.
 
 To get an idea of how this works, use the `bench_scheduling.sh` benchmark from
-https://github.com/nickva/bench. It check concurrent encoding and decoding
+https://github.com/nickva/bench. It checks concurrent encoding and decoding
 scaled by the number of schedulers. An example run comparing against other JSON
 libraries may look like:
 
@@ -175,31 +175,31 @@ libraries may look like:
 ...
 scheduler responsiveness check
   input:       citm-catalog.json duration: 2000
-  schedulers:  12 online
-  impls:       json, jiffy, simdjsone, jsone, jsx
+  schedulers:  80 online
+  impls:       json, jiffy, glazer, jsone, jsx
 
 [json]
-  1x encdec       n=84 p50=135.0ms p95=182.9ms p99=191.9ms max=196.7ms
-  12x encdec      n=86 p50=129.7ms p95=189.9ms p99=203.0ms max=206.2ms
-  24x encdec      n=87 p50=263.0ms p95=461.2ms p99=506.1ms max=527.1ms
+  1x encdec       n=55 p50=18.4ms p95=19.9ms p99=20.5ms max=24.6ms
+  80x encdec      n=480 p50=182.4ms p95=234.1ms p99=247.0ms max=280.2ms
+  160x encdec     n=464 p50=420.6ms p95=517.6ms p99=572.0ms max=618.5ms
 
 [jiffy]
-  1x encdec       n=309 p50=38.3ms p95=51.9ms p99=57.4ms max=66.5ms
-  12x encdec      n=300 p50=41.2ms p95=52.5ms p99=59.7ms max=66.2ms
-  24x encdec      n=306 p50=80.2ms p95=111.8ms p99=118.8ms max=140.1ms
+  1x encdec       n=122 p50=8.6ms p95=9.2ms p99=9.9ms max=15.0ms
+  80x encdec      n=1430 p50=53.2ms p95=104.8ms p99=121.1ms max=145.0ms
+  160x encdec     n=1314 p50=114.3ms p95=228.3ms p99=261.0ms max=310.3ms
 
-[simdjsone]
-  1x encdec       n=20 p50=690.1ms p95=784.6ms p99=784.6ms max=784.8ms
-  12x encdec      n=16 p50=790.9ms p95=887.5ms p99=887.5ms max=899.9ms
-  24x encdec      n=24 p50=1448.4ms p95=1876.7ms p99=1879.5ms max=1882.7ms
+[glazer]
+  1x encdec       n=316 p50=3.0ms p95=3.7ms p99=6.1ms max=11.7ms
+  80x encdec      n=236 p50=413.7ms p95=439.0ms p99=453.4ms max=459.6ms
+  160x encdec     n=160 p50=976.8ms p95=1449.3ms p99=1451.1ms max=1451.6ms
 
 [jsone]
-  1x encdec       n=60 p50=213.1ms p95=261.8ms p99=263.9ms max=264.8ms
-  12x encdec      n=60 p50=204.9ms p95=329.8ms p99=345.0ms max=350.9ms
-  24x encdec      n=52 p50=440.1ms p95=700.3ms p99=773.3ms max=817.3ms
+  1x encdec       n=36 p50=27.3ms p95=34.1ms p99=36.8ms max=37.8ms
+  80x encdec      n=325 p50=240.0ms p95=313.4ms p99=332.8ms max=363.1ms
+  160x encdec     n=320 p50=502.1ms p95=654.0ms p99=697.8ms max=797.1ms
 
 [jsx]
-  1x encdec       n=24 p50=398.8ms p95=539.0ms p99=544.1ms max=548.3ms
-  12x encdec      n=24 p50=391.5ms p95=684.9ms p99=687.0ms max=689.6ms
-  24x encdec      n=24 p50=1181.3ms p95=1479.0ms p99=1558.1ms max=1654.7ms
+  1x encdec       n=15 p50=56.6ms p95=76.2ms p99=76.2ms max=83.2ms
+  80x encdec      n=156 p50=673.3ms p95=764.0ms p99=779.7ms max=800.1ms
+  160x encdec     n=150 p50=1789.0ms p95=1955.6ms p99=1983.9ms max=1999.8ms
 ```
