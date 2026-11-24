@@ -177,6 +177,7 @@ make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     int rv = enif_get_list_length(env, pairs, &list_len);
     assert(rv && "pairs must be a list");
     assert((list_len % 2) == 0 && "Unbalanced object pairs.");
+    (void)rv;
     unsigned int count = list_len / 2;
 
     if(count == 0) {
